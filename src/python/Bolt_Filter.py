@@ -2,11 +2,11 @@
 
 class Filter():
     def __init__(self,
-                name="unamed",
+                name="[unamed]",
                 parameters=0,
                 talkative=False):
         self.name=name
         self.parameters = parameters
-        if Talkative : print("Filter " + filter.name + " initialized with parameters " + str(self.parameters))
+        if Talkative : print("Filter " + self.name + " initialized with parameters " + str(self.parameters))
     
     # uses a prebuilt filtering system
