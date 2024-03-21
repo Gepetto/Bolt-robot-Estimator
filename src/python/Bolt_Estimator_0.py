@@ -15,30 +15,82 @@ class Estimator():
                 ModelPathth="",
                 UrdfPath="",
                 Talkative=True, 
-                FilterType = "complementary",
-                MemorySize = 100) -> None:
-        self.MsgName = "Bolt Estimator v0.0"
+                AttitudeFilterType = "complementary",
+                SpeedFilterType = "complementary",
+                TimeStep = None,
+                MemorySize = 100,
+                SimulationLength = 1000) -> None:
+
+        self.MsgName = "Bolt Estimator v0.2"
         self.Talkative=Talkative
         if self.Talkative : print("Initializing " + self.MsgName + " ...")
+        
+        # loading data from file
         self.robot = pin.RobotWrapper.BuildFromURDF(UrdfPath, ModelPath)
+        self.FeetIndexes = [0, 0]
         if self.Talkative : print("  -> URDF built")
 
-        # self.q = 0. etc
+        if TimeStep is not None :
+            self.TimeStep = TimeStep
+        else:
+            self.TimeStep = 0.01 # ??? aucune id
+        # initializes data & logs with np.zeros arrays
+        self.InitImuData()
+        self.InitKinematicsData()
+        self.InitLogMatrixes()
+
+        # check that sensors can be read 
         self.ReadSensor()
         if self.Talkative : print("  -> Sensors read, initial data acquired")
         
-        if FilterType=="complementary":
-            self.filter = ComplementaryFilter(parameters=(0.001, 2.5), name="attitude complementary filter", talkative=Talkative)
-        if self.Talkative : print("  -> Filter of type " + FilterType + " added")
+        # set desired filters types for attitude and speed
+        # for the time being, complementary only
+        if AttitudeFilterType=="complementary":
+            self.attitudeFilter = ComplementaryFilter(parameters=(0.001, 50), name="attitude complementary filter", talkative=Talkative)
+        if self.Talkative : print("  -> Filter of type " + AttitudeFilterType + " added")
+        
+        if SpeedFilterType=="complementary":
+            self.SpeedFilter = ComplementaryFilter(parameters=(0.001, 50), name="speed complementary filter", talkative=Talkative)
+        if self.Talkative : print("  -> Filter of type " + SpeedFilterType + " added")
 
         # returns info on Slips, Contact Forces, Contact with the ground
         self.ContactEstimator = ContactEstimator()
         if self.Talkative : print("  -> Contact Estimator added ")
 
+        
         self.MemorySize = MemorySize
-        self.AllTimeAcceleration, self.AllTimeq = np.zeros(self.MemorySize), np.zeros(self.MemorySize)
+        self.AllTimeAcceleration, self.AllTimeq = np.zeros((3, self.MemorySize)), np.zeros((3, self.MemorySize))
         if self.Talkative : print(self.MsgName +" initialized successfully.")
 
+
+    def InitImuData(self) -> None :
+        self.a_imu = np.zeros((3,))            
+        self.w_imu = np.zeros((3,))
+        self.DeltaTheta = np.zeros((4,))
+        self.DeltaV = np.zeros((3,))
+        return None
+    def InitKinematicsData(self) -> None :
+        # base kinematics
+        self.v_fk = np.zeros((3,))
+        self.z_fk = np.zeros((3,))
+        # motors positions & velocities
+        self.q = np.zeros((12, ))
+        self.qp = np.zeros((12, ))
+        return None
+    def InitLogMatrixes(self) -> None :
+        # base velocitie & co, post-filtering logs
+        self.log_v_out = np.zeros([3, self.SimulationLength])
+        self.log_w_out = np.zeros([3, self.SimulationLength])
+        self.log_a_out = np.zeros([3, self.SimulationLength])
+        self.log_theta_out = np.zeros([3, self.SimulationLength])
+        # imu data log
+        self.log_v_imu = np.zeros([3, self.SimulationLength])
+        self.log_w_imu = np.zeros([3, self.SimulationLength])
+        self.log_a_imu = np.zeros([3, self.SimulationLength])
+        self.log_theta_imu = np.zeros([3, self.SimulationLength])
+        # other logs
+        self.iter = 0.
+        return None
 
 
 
@@ -74,16 +126,17 @@ class Estimator():
 
 
     def ReadSensor(self) -> None:
-        # acceleration and rotation speed from IMU
-        self.a = 0.
-        self.q = 0.
+        # base acceleration, acceleration with gravity and rotation speed from IMU
+        self.a_imu = 0.
+        self.ag_imu = 0.
+        self.w_imu = 0.
         # integrated data from IMU
         self.DeltaTheta = 0.
         self.DeltaV = 0.
-        # Kinematic data from motors
+        # Kinematic data from encoders
         self.q = 0.
         # torques from motors
-        self.tau=0.
+        self.tau = 0.
 
         self.UpdateMemory()
         return None
@@ -103,6 +156,8 @@ class Estimator():
         return None
     
     def AcquireInitialData(self) -> None:
+        # initializes averaged data while the robot starts
+        # might be useless
         self.ReferenceAcceleration = np.average(self.AllTimeAcceleration, axis=0)
         self.ReferenceKinematics = np.average(self.AllTimeq, axis=0)
         self.ReferenceOrientation = 0.
@@ -111,12 +166,14 @@ class Estimator():
 
     
     def KinematicAttitude(self, KinPos) -> np.ndarray:
-        # uses robot model to provide attitude estimate based on encoder data
+        # uses robot model and rotation speed to provide attitude estimate based on encoder data
         LeftContact, RightContact = self.ContactEstimator.LegsonGround(Kinpos, self.a, self.Fcontact)
-        if LeftContact : 
+        if LeftContact :
+            if self.Talkative : print("  -> left foot touching the ground")
             robot.forwardKinematics(self.q, [self.v,[self.a]])
             pass
         elif RightContact :
+            if self.Talkative : print("  -> right foot touching the ground")
             pass
         else :
             if self.Talkative : print("  *!* No legs are touching the ground")
@@ -152,9 +209,6 @@ class Estimator():
         # 3DM-CX5-AHRS sensor returns Δθ
         return self.ReferenceOrientation + self.DeltaTheta
 
-
-
-
     def AttitudeFusion(self, KinPos, Gyro) -> None :
         # uses attitude Kinematic estimate and gyro data to provide attitude estimate
         AttitudeFromKin = self.KinematicAttitude(KinPos)
@@ -162,13 +216,29 @@ class Estimator():
         AttitudeFromGyro = self.GyroAttitude()
         return None
 
-    def KinematicSpeed(self) -> None:
-        # uses Kinematic data (the waist of the robot) to approximate speed
+
+    def IMUSpeed(self) -> np.ndarray:
+        # direclty uses IMU data to approximate speed
+        return self.ReferenceSpeed + self.DeltaV
+
+    def KinematicSpeed(self) -> np.ndarray:
+        # uses Kinematic data (the waist of the robot) 
+        # along with contact and rotation speed information to approximate speed
+
+        self.q 
+        self.w
+        LeftContact, RightContact = self.ContactEstimator.LegsonGround(Kinpos, self.a, self.Fcontact)
+        if LeftContact and RightContact :
+            # both feet on the ground. Will use pinocchio estimate that induce the lowest base speed
+            pass
         return None
 
     def SpeedFusion(self) -> None:
         # uses Kinematic-derived speed estimate and gyro (?) to estimate speed
         return None
+    
+    def RunFilter(self):
+        pass
 
 
 

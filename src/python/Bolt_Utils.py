@@ -6,7 +6,7 @@ class utils():
         pass
 
     def cross(a,b):
-        # return a ^ b
+        # return a ^ b [PINOCCHIO INCLUDES A CROSSPRODUCT]
         return np.array([b[1]*a[2] - b[2]*a[1],
                         b[2]*a[0] - b[0]*a[2],
                         b[0]*a[1] - b[1]*a[0]])
