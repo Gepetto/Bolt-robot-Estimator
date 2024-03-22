@@ -39,6 +39,8 @@ d = np.array([4, 1, 2])
 d[:-1] = d[1:]
 #print( utils.MatrixFromVectors((a, b, c, d)) )
 
+A = (1, 2)
+print(A[1])
 
 
 filter = ComplementaryFilter((0.0005, 3), talkative=True)

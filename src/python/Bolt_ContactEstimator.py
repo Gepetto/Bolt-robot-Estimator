@@ -10,14 +10,14 @@ class ContactForcesEstimator():
         self.RightFootFrameID = RightFootFrameID
         self.logger = logger
     
-    def ContactForces(self, current, position) -> tuple[np.ndarray, np.ndarray]:
+    def ContactForces(self, torques, position) -> tuple[np.ndarray, np.ndarray]:
         return None
 
     def LegsOnGround(self, Kinpos, Acc, Fcontact) -> tuple[bool, bool]:
         # return wether or not left and right legs are in contact with the ground
         LeftContact, RightContact = False, False
         return LeftContact, RightContact
-        
+
 
     def LegsOnGroundKin(self, Kinpos, vertical) -> tuple[bool, bool]:
         # return iwether or notf left and right legs are in contact with the ground
