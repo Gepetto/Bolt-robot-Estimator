@@ -1,7 +1,19 @@
 import numpy as np
 from Bolt_Utils import utils
+from Bolt_Utils import Log
+
 from Bolt_Filter_Complementary import ComplementaryFilter
 
+
+logs = Log()
+logs.LogTheLog(" Starting log of" + "bob", ToPrint=False)
+logs.LogTheLog("Initializing " + "non" + "...", style="title")
+logs.LogTheLog("No legs are touching the ground", style="warn")
+logs.LogTheLog("No legs are touching the ground", style="warn")
+logs.LogTheLog("No legs are touching the ground", style="warn")
+logs.LogTheLog("Initializing " + "oui" + "...", style="info")
+
+print(logs.GetLog())
 # create an array
 array1 = np.array([[0, 1], 
                     [2, 3], 

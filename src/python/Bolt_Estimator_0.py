@@ -4,9 +4,24 @@ import time as t
 from quaternion import quaternion, from_rotation_vector, rotate_vectors
 
 from Bolt_Utils import utils
+from Bolt_Utils import Log
+
 from Bolt_ContactEstimator import ContactForcesEstimator
 from Bolt_Filter import Filter
 from Bolt_Filter_Complementary import ComplementaryFilter
+
+
+"""
+An dummy estimator for Bolt Bipedal Robot
+
+    Program description
+
+    Class estimator Description
+
+License, authors, LAAS
+
+"""
+
 
 
 
@@ -19,16 +34,18 @@ class Estimator():
                 SpeedFilterType = "complementary",
                 TimeStep = None,
                 MemorySize = 100,
-                SimulationLength = 1000) -> None:
+                IterNumber = 1000) -> None:
 
-        self.MsgName = "Bolt Estimator v0.2"
+        self.MsgName = "Bolt Estimator v0.3"
         self.Talkative=Talkative
-        if self.Talkative : print("Initializing " + self.MsgName + " ...")
+        self.logs = Log()
+        logs.LogTheLog(" Starting log of" + self.MsgName, ToPrint=False)
+        if self.Talkative : logs.LogTheLog("Initializing " + self.MsgName + "...", style="title")
         
         # loading data from file
         self.robot = pin.RobotWrapper.BuildFromURDF(UrdfPath, ModelPath)
         self.FeetIndexes = [0, 0]
-        if self.Talkative : print("  -> URDF built")
+        if self.Talkative : logs.LogTheLog("URDF built")
 
         if TimeStep is not None :
             self.TimeStep = TimeStep
@@ -41,56 +58,109 @@ class Estimator():
 
         # check that sensors can be read 
         self.ReadSensor()
-        if self.Talkative : print("  -> Sensors read, initial data acquired")
+        if self.Talkative : logs.LogTheLog("Sensors read, initial data acquired")
         
         # set desired filters types for attitude and speed
         # for the time being, complementary only
         if AttitudeFilterType=="complementary":
             self.attitudeFilter = ComplementaryFilter(parameters=(0.001, 50), name="attitude complementary filter", talkative=Talkative)
-        if self.Talkative : print("  -> Filter of type " + AttitudeFilterType + " added")
+        if self.Talkative : logs.LogTheLog("Filter of type " + AttitudeFilterType + " added")
         
         if SpeedFilterType=="complementary":
             self.SpeedFilter = ComplementaryFilter(parameters=(0.001, 50), name="speed complementary filter", talkative=Talkative)
-        if self.Talkative : print("  -> Filter of type " + SpeedFilterType + " added")
+        if self.Talkative : logs.LogTheLog("Filter of type " + SpeedFilterType + " added")
 
         # returns info on Slips, Contact Forces, Contact with the ground
         self.ContactEstimator = ContactEstimator()
-        if self.Talkative : print("  -> Contact Estimator added ")
+        if self.Talkative : logs.LogTheLog("Contact Estimator added ")
 
         
         self.MemorySize = MemorySize
         self.AllTimeAcceleration, self.AllTimeq = np.zeros((3, self.MemorySize)), np.zeros((3, self.MemorySize))
-        if self.Talkative : print(self.MsgName +" initialized successfully.")
+        if self.Talkative : logs.LogTheLog(self.MsgName +" initialized successfully.")
+
+
+    def ExternalDataCaster(self, DataType, ReceivedData) -> None:
+        # In case data from elsewhere needs to be converted to another format, or truncated
+        if DataType == "acceleration":
+            self.a = np.array(ReceivedData)
+        #...
+        return None
 
 
     def InitImuData(self) -> None :
+        # initialize data to the right format
         self.a_imu = np.zeros((3,))            
         self.w_imu = np.zeros((3,))
         self.DeltaTheta = np.zeros((4,))
         self.DeltaV = np.zeros((3,))
         return None
     def InitKinematicsData(self) -> None :
+        # initialize data to the right format
         # base kinematics
         self.v_fk = np.zeros((3,))
-        self.z_fk = np.zeros((3,))
+        self.z_fk = np.zeros((1,))
         # motors positions & velocities
         self.q = np.zeros((12, ))
         self.qp = np.zeros((12, ))
         return None
     def InitLogMatrixes(self) -> None :
+        # initialize data to the right format
         # base velocitie & co, post-filtering logs
-        self.log_v_out = np.zeros([3, self.SimulationLength])
-        self.log_w_out = np.zeros([3, self.SimulationLength])
-        self.log_a_out = np.zeros([3, self.SimulationLength])
-        self.log_theta_out = np.zeros([3, self.SimulationLength])
+        self.log_v_out = np.zeros([3, self.IterNumber])
+        self.log_w_out = np.zeros([3, self.IterNumber])
+        self.log_a_out = np.zeros([3, self.IterNumber])
+        self.log_theta_out = np.zeros([3, self.IterNumber])
         # imu data log
-        self.log_v_imu = np.zeros([3, self.SimulationLength])
-        self.log_w_imu = np.zeros([3, self.SimulationLength])
-        self.log_a_imu = np.zeros([3, self.SimulationLength])
-        self.log_theta_imu = np.zeros([3, self.SimulationLength])
+        self.log_v_imu = np.zeros([3, self.IterNumber])
+        self.log_w_imu = np.zeros([3, self.IterNumber])
+        self.log_a_imu = np.zeros([3, self.IterNumber])
+        self.log_theta_imu = np.zeros([3, self.IterNumber])
+        # forward kinematics data log
+        self.log_v_fk = np.zeros([3, self.IterNumber])
+        self.log_z_fk = np.zeros([1, self.IterNumber])
+        self.log_q = np.zeros([12, self.IterNumber])
+        self.log_qp = np.zeros([12, self.IterNumber])
+
         # other logs
         self.iter = 0.
         return None
+
+    def UpdateLogMatrixes(self) -> None :
+        if self.iter > self.IterNumber:
+            # Logs matrices' size will not be sufficient
+            if Talkative : logs.LogTheLog("Excedind planned number of executions, IterNumber = " + str(self.IterNumber), style="warn")
+
+            """
+            # base velocitie & co, post-filtering logs
+            self.log_v_out
+            self.log_w_out
+            self.log_a_out
+            self.log_theta_out
+            # imu data log
+            self.log_v_imu
+            self.log_w_imu
+            self.log_a_imu
+            self.log_theta_imu 
+            """
+        # update logs with latest data
+        # base velocitie & co, post-filtering logs
+        self.log_v_out[:, self.iter] = self.v
+        self.log_w_out[:, self.iter] = self.w
+        self.log_a_out[:, self.iter] = self.a
+        self.log_theta_out[:, self.iter] = self.theta
+        # imu data log
+        self.log_v_imu[:, self.iter] = self.v_imu
+        self.log_w_imu[:, self.iter] = self.w_imu
+        self.log_a_imu[:, self.iter] = self.a_imu
+        self.log_theta_imu[:, self.iter] = self.theta_imu
+        # forward kinematics data log
+        self.log_v_fk[:, self.iter] = self.v_fk
+        self.log_z_fk[:, self.iter] = self.z_fk
+        self.log_q[:, self.iter] = self.q
+        self.log_qp[:, self.iter] = self.qp
+        return None
+
 
 
 
@@ -120,24 +190,29 @@ class Estimator():
         
         # ...
         else :
-            print("  *!* Could not get data '" + data + "'. Unrecognised data getter.")
+            logs.LogTheLog("Could not get data '" + data + "'. Unrecognised data getter.", style="warn")
             return None
 
 
 
-    def ReadSensor(self) -> None:
+    def ReadSensor(self, device) -> None:
         # base acceleration, acceleration with gravity and rotation speed from IMU
-        self.a_imu = 0.
+        self.a_imu = device.baseLinearAcceleration # COPIED FROM SOLO CODE, CHECK CONSISTENCY WITH BOLT MASTERBOARD
         self.ag_imu = 0.
-        self.w_imu = 0.
+        self.w_imu = device.baseAngularVelocity
         # integrated data from IMU
-        self.DeltaTheta = 0.
+        self.DeltaTheta = device.baseOrientation - offset_yaw_IMU # to be found
         self.DeltaV = 0.
         # Kinematic data from encoders
-        self.q = 0.
+        self.q = device.q_mes
+        self.qp = device.v_mes
+        # data from forward kinematics
+        self.v_fk = 
+        self.z_fk = 
         # torques from motors
-        self.tau = 0.
+        self.tau = 
 
+        #self.ExternalDataCaster("acceleration", self.a)
         self.UpdateMemory()
         return None
     
@@ -169,14 +244,14 @@ class Estimator():
         # uses robot model and rotation speed to provide attitude estimate based on encoder data
         LeftContact, RightContact = self.ContactEstimator.LegsonGround(Kinpos, self.a, self.Fcontact)
         if LeftContact :
-            if self.Talkative : print("  -> left foot touching the ground")
+            if self.Talkative : logs.LogTheLog("left foot touching the ground")
             robot.forwardKinematics(self.q, [self.v,[self.a]])
             pass
         elif RightContact :
-            if self.Talkative : print("  -> right foot touching the ground")
+            if self.Talkative : logs.LogTheLog("right foot touching the ground")
             pass
         else :
-            if self.Talkative : print("  *!* No legs are touching the ground")
+            if self.Talkative : logs.LogTheLog("No legs are touching the ground", style="warn")
         return R
 
 
@@ -191,7 +266,7 @@ class Estimator():
         try :
             AvgAcc = np.average(self.AllTimeAcceleration, Axis=0)
         except :
-            if self.Talkative : print("  *!* Could not compute average acceleration. Using default acceleration instead.")
+            if self.Talkative : logs.LogTheLog("Could not compute average acceleration. Using default acceleration instead.", style="warn")
             AvgAcc = np.array([0, 0, 1])
         DeltAcc = self.a - AvgAcc
         

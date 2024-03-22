@@ -24,6 +24,7 @@ class KalmanFilter():
         # K : Kalman gain
         self.A, self.B, self.H, self.Q, self.R, self.InitialValue = self.parameters
         self.X = self.InitialValue
+        self.U = 0.#???
         kf = KalmanFilter(transition_matrices=self.A,
                         observation_matrices=self.H,
                         command_matrices = self.B,
@@ -64,15 +65,39 @@ class KalmanFilter():
 class KalmanFilterReimplemented(KalmanFilter):
     def __init__(self,
                 parameters=None,
-                name="[Kalman]",
+                name="[Kalman, Reimplemented:Unreliable]",
                 talkative=False):
         super.__init__(parameters, name, talkative)
     
-    def Initialize(self):
+    def Initialize(self) -> None :
+        return None
+
+    def Predict(self, U) -> tuple[np.ndarray, np.ndarray]:
+        self.U = U
+        self.X = self.A @ self.X + self.B @ self.U
+        self.P = self.A @ (self.P @ self.A.T)  + self. Q
+        return self.X, self.P
+
+    def Correct(self, Z):
+        # Z measurement
+        self.K = self.P @ self.H.T @ np.linalg.inv(self.H @ self.P @ self.H.T + self.R)
+        self.X = self.X + self.K @ (Z - self.H @ self.X)
+        self.P = self.P - self.K @ self.H @ self.P
         pass
-    def Predict(self):
-        pass
-    def Correct(self):
-        pass
+
     def Update(self):
-        pass
+        # Y measurement
+        # mean of Y prediction (?)
+        IM = self.H @ self.X
+        # Covariance of Y (?)
+        IS = self.R + self.H @ (self.P @ np.transpose(self.H))
+        # Kalman gain
+        self.K = P @ (np.transpose(self.H) @ np.linalg.inv(IS))
+        self.X = self.X + self.K @ (self.Y-IM)
+        self.P = self.P - self.K @ (IS @ np.transpose(self.K))
+        LH = 0. # TO UPDATE
+
+
+
+
+
