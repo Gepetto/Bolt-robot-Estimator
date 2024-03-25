@@ -25,8 +25,10 @@ class utils():
 
 
 class Log():
-    def __init__(self):
-        self.fulllog = ""
+    def __init__(self, name="", PrintOnFlight=True):
+        self.PrintOnFlight = PrintOnFlight
+        self.fulllog = "\n\n   ---   beginnig log:: " + name + " --- \n\n"
+        if self.PrintOnFlight : print(self.fulllog)
 
     def LogTheLog(self, log, style="info", ToPrint=True):
         if style=="info":
@@ -35,7 +37,37 @@ class Log():
             log = "  *!* " + log
         elif style=="title":
             log = "\n\n***\n\n " + log + "\n\n***\n\n "
-        if ToPrint : print(log)
+        if ToPrint and self.PrintOnFlight: print(log)
         self.fulllog  +=  log + "\n"
     def GetLog(self):
         return self.fulllog
+    def PrintLog(self):
+        print(self.GetLog())
+
+
+class Sinus():
+    def __init__(self, a, w, x=None):
+        self.a = a
+        self.w = w
+        if x is not None :
+            self.evaluate(x)
+        else:
+            return None
+    def evaluate(self, x):
+        return self.a * np.sin(self.w * x)
+    def deriv(self):
+        return Cosinus(self.a*self.w, self.w)
+    
+
+        
+class Cosinus():
+    def __init__(self, a, w):
+        self.a = a
+        self.w = w
+    def evaluate(self, x):
+        return self.a * np.cos(self.w * x)
+    def deriv(self):
+        return Sinus(-self.a*self.w, self.w)
+    
+
+ 

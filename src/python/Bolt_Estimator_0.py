@@ -69,7 +69,7 @@ class Estimator():
         # set desired filters types for attitude and speed
         # for the time being, complementary only
         if AttitudeFilterType=="complementary":
-            self.attitudeFilter = ComplementaryFilter(parameters=(0.001, 50), name="attitude complementary filter", talkative=Talkative)
+            self.attitudeFilter = ComplementaryFilter(parameters=(0.001, 50), name="attitude complementary filter", talkative=Talkative, logger=self.logger)
         self.logger.LogTheLog("Attitude Filter of type " + AttitudeFilterType + " added.", ToPrint=Talkative)
         
         if SpeedFilterType=="complementary":

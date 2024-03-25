@@ -7,7 +7,8 @@ class KalmanFilter():
     def __init__(self,
                 parameters=None,
                 name="[Kalman]",
-                talkative=False) -> None:
+                talkative=False,
+                logger=None) -> None:
         self.name=name
         self.n = 3 + 3 + 6   # base position, base velocity, feet position
         self.m = 4 + 12      # ??? IMU 
@@ -31,7 +32,8 @@ class KalmanFilter():
                         initial_state_mean=self.InitialValue,
                         observation_covariance=self.Q,
                         transition_covariance=self.R)
-        if self.Talkative : print("  -> Filter " + self.name + " initialized with parameters " + str(self.parameters))
+        if logger is not None : self.logger = logger
+        if self.Talkative : logger.LogTheLog("Filter " + self.name + " initialized with parameters " + str(self.parameters))
 
     def DefaultParametersInitializer(self) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         # initializes filter parameters to default parameters
