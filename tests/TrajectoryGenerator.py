@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from numpy.polynomial import Polynomial
 import sys
 sys.path.append('/home/nalbrecht/Bolt-Estimator/Bolt-robot---Estimator/src/python')
-from Bolt_Utils import Sinus, Cosinus
+from Bolt_Utils import Sinus, Cosinus, Exp
 
 
 
@@ -54,7 +54,7 @@ class TrajectoryGenerator:
             # speed and acceleration could not be derived analytically
             self.speed, self.acceleration = self.MakeSpeedFromTrajectory(self.trajectory), self.MakeAccelereationFromTrajectory(self.trajectory)
         # create fake noise
-        self.NoiseMaker = Metal(self.trajectory, self.speed, self.acceleration, NoiseLevel)
+        self.NoiseMaker = Metal(self.trajectory, self.speed, self.acceleration, NoiseLevel, logger=self.logger)
         self.noisy_trajectory, self.noisy_speed, self.noisy_acceleration = self.NoiseMaker.NoisyFullTrajectory()
         
 
@@ -87,6 +87,12 @@ class TrajectoryGenerator:
 
         elif TypeOfTraj == "sinus" or TypeOfTraj == "sinusoidal":
             self.trajectory, self.speed, self.acceleration = self.TrajectorySinusoidal(N, T)
+
+        elif TypeOfTraj == "exponential" or TypeOfTraj == "exp":
+            self.trajectory, self.speed, self.acceleration = self.TrajectoryExponential(N, T)
+        
+        elif TypeOfTraj == "multiexponential" or TypeOfTraj == "multiexp":
+            self.trajectory, self.speed, self.acceleration = self.TrajectoryMultiExponential(3, N, T)
 
         elif TypeOfTraj == 'custom':
             self.analytical = False
@@ -133,7 +139,6 @@ class TrajectoryGenerator:
         return self.trajectory, self.speed, self.acceleration
     
 
-
     def TrajectorySinusoidal(self, N, T, maxfreq=5):
         T_array = np.linspace(0, T, N)
         # randomly generates coeff that matches approx. speed and frequency
@@ -149,6 +154,41 @@ class TrajectoryGenerator:
         self.acceleration = acc.evaluate(T_array).reshape((1, N))
         # all done
         return self.trajectory, self.speed, self.acceleration
+    
+
+    def TrajectoryExponential(self, N, T, w=5, ImposedInit=0):
+        T_array = np.linspace(0, T, N)
+        # randomly generates coeff that matches approx. speed and frequency
+        if ImposedInit == 0:
+            C = np.random.random(1)*self.displacement*self.T
+        else :
+            C = ImposedInit
+        w = w + (np.random.random(1)-0.5)*w
+        # trajectory to be followed
+        T = Exp(C, w)
+        S = T.deriv()
+        A = S.deriv()
+        # evaluate exponential functions
+        trajectory = T.evaluate(T_array).reshape((1, N))
+        speed = S.evaluate(T_array).reshape((1, N))
+        acceleration = A.evaluate(T_array).reshape((1, N))
+        # all done
+        return trajectory, speed, acceleration
+    
+
+    def TrajectoryMultiExponential(self, k, N, T, w=5):
+        # for a succession of exponential
+        T_array = np.linspace(0, T, N)
+        # each line is a different exponential
+        n = int(np.floor(N/k)) +1 # n*k > N, data will be truncated
+        self.trajectory, self.speed, self.acceleration = np.zeros((k, n)), np.zeros((k, n)), np.zeros((k, n))
+
+        self.trajectory[0,:], self.speed[0,:], self.acceleration[0,:] = self.TrajectoryExponential(n, T_array[n], w)
+        for j in range(1, k):
+
+            self.trajectory[j,:], self.speed[j,:], self.acceleration[j,:] = self.TrajectoryExponential(n, T_array[j*n], w, ImposedInit=self.trajectory[j-1, 0])
+        # flatten and truncate
+        return self.trajectory.reshape((1, -1))[:, :N], self.speed.reshape((1, -1))[:, :N], self.acceleration.reshape((1, -1))[:, :N]
        
         
         
@@ -206,9 +246,10 @@ class Metal:
         
     def makeNoise(self, data, AutoAdjustAmplitude=True):
         # tune the noise level (absolute or proportionnal to signal)
-        amplitude = self.NoiseLevel
+        amplitude = self.NoiseLevel/100
         if AutoAdjustAmplitude : 
-            amplitude = abs(np.max(data) * self.NoiseLevel / 100)
+            amplitude = np.max(abs(data)) * self.NoiseLevel / 100
+            self.logger.LogTheLog(str(np.max(data)), style="warn")
         return data + np.random.normal(loc=0.0, scale=amplitude, size=(self.D,self.N))
     
     def NoisyFullTrajectory(self):

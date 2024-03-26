@@ -32,7 +32,11 @@ class ComplementaryFilter():
 
     def RunFilter(self, x, xdot) -> np.ndarray:
         # complementary filter x and its temporal derivative xdot. Updates previous estimates and returns current estimate.
+        # check data
         if not isinstance(x, np.ndarray) or not isinstance(xdot, np.ndarray) and (x.size!=self.ndim or xdot.size!=self.ndim):  self.logger.LogTheLog("giving unadapted argument to filter " + self.name + " : expected np.array of dim " + str(self.ndim), style="warn")
+        # filter runs for the first time
+        if self.k==0:
+            self.Estimate = x
         self.Estimate = self.b*self.Estimate + self.T*self.b*xdot + (1-self.b)*x
         self.k += 1
         #if self.k < 5 : self.logger.LogTheLog("Running Filter " + self.name + " (on run " + str(self.k) + " out of 4 prints)")
@@ -40,7 +44,11 @@ class ComplementaryFilter():
     
     def RunFilterOffset(self, x, xdot) -> np.ndarray:
         # complementary filter x and its temporal derivative xdot. Updates previous estimates and returns current estimate.
+        # check data
         if not isinstance(x, np.ndarray) or not isinstance(xdot, np.ndarray) and (x.size!=self.ndim or xdot.size!=self.ndim):  self.logger.LogTheLog("giving unadapted argument to filter " + self.name + " : expected np.array of dim " + str(self.ndim), style="warn")
+        # filter runs for the first time
+        if self.k==0:
+            self.Estimate = x
         self.Estimate = self.b*self.Estimate + self.T*self.b*xdot + (1-self.b)*x
         # prepare offset correction
         #self.InputHistory[self.k%5, :] = x
@@ -49,7 +57,7 @@ class ComplementaryFilter():
         # offset correction
         self.Estimate += self.Offset
         self.k += 1
-        if self.k < 5 : self.logger.LogTheLog("Running Filter " + self.name + " (on run " + str(self.k) + " out of 4 prints)")
+        #if self.k < 5 : self.logger.LogTheLog("Running Filter " + self.name + " (on run " + str(self.k) + " out of 4 prints)")
         return self.Estimate
 
 

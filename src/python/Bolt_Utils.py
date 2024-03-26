@@ -58,7 +58,6 @@ class Sinus():
     def deriv(self):
         return Cosinus(self.a*self.w, self.w)
     
-
         
 class Cosinus():
     def __init__(self, a, w):
@@ -70,4 +69,12 @@ class Cosinus():
         return Sinus(-self.a*self.w, self.w)
     
 
- 
+class Exp():
+    def __init__(self, C, w):
+        self.C = C
+        self.w = w
+    def evaluate(self, x):
+        return self.C * np.exp(-self.w * x)
+    def deriv(self):
+        return Exp(-self.C*self.w, self.w)
+    

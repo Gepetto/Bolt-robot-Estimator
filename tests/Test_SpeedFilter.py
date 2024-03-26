@@ -9,7 +9,7 @@ import numpy as np
 
 
 
-def main(N=1000, NoiseLevel=150):
+def main(N=1000, NoiseLevel=20):
 
     # generate useful objects
     testlogger = Log("test", PrintOnFlight=True)
@@ -17,7 +17,7 @@ def main(N=1000, NoiseLevel=150):
 
     # start generator
     generator = TrajectoryGenerator(logger=testlogger)
-    generator.Generate("sinus", NoiseLevel=NoiseLevel, N=N)
+    generator.Generate("multiexp", NoiseLevel=NoiseLevel, N=N)
 
     # start filter
     ComplementaryFilterT = ComplementaryFilter(parameters=(1/N, 2), 
