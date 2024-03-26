@@ -82,7 +82,7 @@ class TrajectoryGenerator:
         elif TypeOfTraj[:10] == 'polynomial':
             # last character can be polynom order
             k=5
-            if TypeOfTraj[-1].isalpha(): k = int(TypeOfTraj[-1])
+            if TypeOfTraj[-1].isnumeric(): k = int(TypeOfTraj[-1])
             self.trajectory, self.speed, self.acceleration = self.TrajectoryPolynomial(N, T, order=k)
 
         elif TypeOfTraj == "sinus" or TypeOfTraj == "sinusoidal":
@@ -134,11 +134,11 @@ class TrajectoryGenerator:
     
 
 
-    def TrajectorySinusoidal(self, N, T):
+    def TrajectorySinusoidal(self, N, T, maxfreq=5):
         T_array = np.linspace(0, T, N)
         # randomly generates coeff that matches approx. speed and frequency
         a = np.random.random(1)*self.displacement*self.T
-        omega = np.random.random(1)* 2*np.pi* 5 
+        omega = np.random.random(1)* 2*np.pi* maxfreq
         # trajectory to be followed
         traj = Sinus(a, omega)
         speed = traj.deriv()
@@ -165,8 +165,11 @@ class TrajectoryGenerator:
         D, N= np.shape(traj)
         self.MakeSpeedFromTrajectory(traj)
         self.acc[:, 1:] = (self.speed[:, 1:] - self.speed[:, 0:-1])/dt
-        
-
+    
+    def AdaptTrajectory(self):
+        # turns trajectory to accelerometer-like data
+        # x,v,a -> w, a
+        return self.rotspeed, self.acceleration
 
 
 
@@ -256,6 +259,10 @@ class Graphics:
         plt.grid('lightgrey')
         if titre != '':
             plt.title(titre)
+    
+    def legend(self, datatype, legends):
+
+        return legend
         
         
     def plot2DTraj(self, trajs, titre=''):
@@ -269,11 +276,12 @@ class Graphics:
         plt.ylabel('Y')
         plt.show()
     
-    def CompareNDdatas(self, dataset, datatype="speed", titre='', StyleAdapter=False, width=1):
+    def CompareNDdatas(self, dataset, datatype="speed", titre='', StyleAdapter=False, width=1, setsleg=[""]):
         # plot a X or X,Y or X,Y,Z dataset evolving over time
         # enable StyleAdapter when datas are not very different from one another
         # data : [ [data1: [x][y][z]   ] [data2: [x][y][z]   ] ]
         self.start(titre)
+        setsleg = [""]*len(dataset)
         ndim = len(dataset[0])
         if datatype=="position":
             legends = [' - x', ' - y', ' - z'][:ndim]
