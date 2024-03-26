@@ -248,21 +248,20 @@ class Metal:
 class Graphics:
     def __init__(self, logger=None):
         self.currentColor = 0
-        self.colors = ['#8f2d56', '#73d2de', '#ffbc42', '#218380', '#d81159', '#fe7f2d', '#3772ff']
+        self.colors = ['#73d2de', '#8f2d56', '#ffbc42', '#218380', '#d81159', '#fe7f2d', '#3772ff']
         if logger is not None :
             self.logger = logger
             self.logger.LogTheLog("started Graphics")
 
     def start(self, titre):
         # initialize a pretty plot
-        plt.figure(dpi=120)
+        plt.figure(dpi=200)
         plt.grid('lightgrey')
         if titre != '':
             plt.title(titre)
     
-    def legend(self, datatype, legends):
-
-        return legend
+    def SetLegend(self, legend):
+        self.legend = legend
         
         
     def plot2DTraj(self, trajs, titre=''):
@@ -276,13 +275,13 @@ class Graphics:
         plt.ylabel('Y')
         plt.show()
     
-    def CompareNDdatas(self, dataset, datatype="speed", titre='', StyleAdapter=False, width=1, setsleg=[""]):
+    def CompareNDdatas(self, dataset, datatype="speed", titre='', StyleAdapter=False, width=1, AutoLeg=True):
         # plot a X or X,Y or X,Y,Z dataset evolving over time
         # enable StyleAdapter when datas are not very different from one another
         # data : [ [data1: [x][y][z]   ] [data2: [x][y][z]   ] ]
         self.start(titre)
-        setsleg = [""]*len(dataset)
         ndim = len(dataset[0])
+        
         if datatype=="position":
             legends = [' - x', ' - y', ' - z'][:ndim]
         elif datatype=="speed":
@@ -291,15 +290,24 @@ class Graphics:
             legends = [' - Ax', ' - Ay', ' - Az'][:ndim]
         if StyleAdapter:
             style = ['-', '--', '-+']
+            width = [width]
+        elif "Noisy" in self.legend[0]: 
+            width = [width/3] + [width]
+            style = ['-']
         else:
             style = ['-']
-        k=0
+            width = [width]
+        k,j=0,0
         for data in dataset :
             for line in data :
-                plt.plot(line, self.colors[self.currentColor], linestyle=style[k], linewidth=width)
+                plt.plot(line, self.colors[self.currentColor], linestyle=style[k], linewidth=width[j])
                 self.currentColor = (self.currentColor+1)%len(self.colors)
             k = (k+1)%len(style)
-        plt.legend([str(k) + leg for k in range(len(dataset)) for leg in legends])
+            j = min(len(width)-1, j+1)
+        if AutoLeg :
+            plt.legend([str(k) + leg for k in range(len(dataset)) for leg in legends])
+        else :
+            plt.legend([ leg for leg in self.legend])
         plt.xlabel('sample (N)')
         plt.ylabel(datatype + 's')
         plt.show()
