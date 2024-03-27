@@ -301,8 +301,12 @@ class Graphics:
         if titre != '':
             plt.title(titre)
     
-    def SetLegend(self, legend):
-        self.legend = legend
+    def SetLegend(self, legend, ndim=0):
+        if ndim != 0: self.ndim=ndim
+        self.legend = []
+        for l in legend:
+            for dir in ["_x", "_y", "_z"][:self.ndim]:
+                self.legend = self.legend + [l+dir]
         
         
     def plot2DTraj(self, trajs, titre=''):
@@ -316,19 +320,19 @@ class Graphics:
         plt.ylabel('Y')
         plt.show()
     
-    def CompareNDdatas(self, dataset, datatype="speed", titre='', StyleAdapter=False, width=1, AutoLeg=True):
+    def CompareNDdatas(self, dataset, datatype="speed", titre='', StyleAdapter=False, width=1, AutoLeg=True, legend=[]):
         # plot a X or X,Y or X,Y,Z dataset evolving over time
         # enable StyleAdapter when datas are not very different from one another
         # data : [ [data1: [x][y][z]   ] [data2: [x][y][z]   ] ]
         self.start(titre)
-        ndim = len(dataset[0])
+        self.ndim = len(dataset[0])
         
         if datatype=="position":
-            legends = [' - x', ' - y', ' - z'][:ndim]
+            legends = [' - x', ' - y', ' - z'][:self.ndim]
         elif datatype=="speed":
-            legends = [' - Vx', ' - Vy', ' - Vz'][:ndim]
+            legends = [' - Vx', ' - Vy', ' - Vz'][:self.ndim]
         elif datatype=="acceleration":
-            legends = [' - Ax', ' - Ay', ' - Az'][:ndim]
+            legends = [' - Ax', ' - Ay', ' - Az'][:self.ndim]
         if StyleAdapter:
             style = ['-', '--', '-+']
             width = [width]
@@ -347,8 +351,11 @@ class Graphics:
             j = min(len(width)-1, j+1)
         if AutoLeg :
             plt.legend([str(k) + leg for k in range(len(dataset)) for leg in legends])
+        elif legend != []:
+            self.SetLegend(legend)
+            plt.legend(self.legend)
         else :
-            plt.legend([ leg for leg in self.legend])
+            plt.legend(self.legend)
         plt.xlabel('sample (N)')
         plt.ylabel(datatype + 's')
         plt.show()

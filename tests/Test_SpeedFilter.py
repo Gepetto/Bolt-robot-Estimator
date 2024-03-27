@@ -17,7 +17,7 @@ def main(N=1000, NoiseLevel=20):
 
     # start generator
     generator = TrajectoryGenerator(logger=testlogger)
-    generator.Generate("multiexp", NoiseLevel=NoiseLevel, N=N)
+    generator.Generate("sinus", NoiseLevel=NoiseLevel, N=N)
 
     # start filter
     ComplementaryFilterT = ComplementaryFilter(parameters=(1/N, 2), 
