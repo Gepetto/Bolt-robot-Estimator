@@ -42,17 +42,15 @@ class TrajectoryGenerator:
 
         if self.talkative : self.logger.LogTheLog("started Trajectory Generator")
     
-    def Generate(self, TypeOfTraj, N=1000, T=1, NoiseLevel=0.1, relative=True):
+    def Generate(self, TypeOfTraj, N=1000, T=1, NoiseLevel=0.1, relative=True, traj=None, speed=None, smooth=True):
         # time increment, in seconds
         self.dt = T/N
         self.N = N
         self.T = T
         # set up trajectory type, create trajectory, speed and acceleration
+        self.smooth = smooth
         self.TypeOfTraj = TypeOfTraj
-        self.TrajType(TypeOfTraj, self.N, self.T)
-        if not self.analytical :
-            # speed and acceleration could not be derived analytically
-            self.speed, self.acceleration = self.MakeSpeedFromTrajectory(self.trajectory), self.MakeAccelereationFromTrajectory(self.trajectory)
+        self.TrajType(TypeOfTraj, self.N, self.T, traj, speed)
         # create fake noise
         self.NoiseMaker = Metal(self.trajectory, self.speed, self.acceleration, NoiseLevel, logger=self.logger)
         self.noisy_trajectory, self.noisy_speed, self.noisy_acceleration = self.NoiseMaker.NoisyFullTrajectory()
@@ -63,15 +61,9 @@ class TrajectoryGenerator:
     def GetNoisyTraj(self):
         return self.noisy_trajectory, self.noisy_speed, self.noisy_acceleration
     
-        
-
 
         
-    
-    
-
-        
-    def TrajType(self, TypeOfTraj, N, T, traj=np.zeros((1, 1))):
+    def TrajType(self, TypeOfTraj, N, T, traj=None, speed=None):
         # calls the appropriate trajectory generator
         self.TypeOfTraj = TypeOfTraj
         # wether or not speed and acceleration has to be derived analytically
@@ -96,11 +88,26 @@ class TrajectoryGenerator:
 
         elif TypeOfTraj == 'custom':
             self.analytical = False
-            self.trajectory = traj
+            if traj is not None :
+                self.trajectory = traj.copy()
+            else :
+                self.logger.LogTheLog("No trajectory given !", style="warn")
+            if speed is None:
+                # speed is not given, derive speed and acceleration
+                self.acceleration = self.MakeSpeedFromTrajectory(traj)
+            else :
+                # speed is given
+                if speed.shape != self.trajectory.shape :
+                    # check if data are consistent
+                    self.logger.LogTheLog("Wrong dimensions for given custom speed and trajectory, deriving speed from traj", style="warn")
+                    self.MakeAccelerationFromTrajectory(traj)
+                else:
+                    self.speed = speed.copy()
+                    self.acceleration = self.MakeAccelerationFromSpeed(speed)
         else:
             self.logger.LogTheLog("undetermined trajectory type", style="warn")
             return None, None, None
-        # returned data is a 2D array
+        # returned data are 2D arrays
         self.logger.LogTheLog("generated " + TypeOfTraj + " trajectory")
         return self.trajectory, self.speed, self.acceleration
 
@@ -194,17 +201,52 @@ class TrajectoryGenerator:
         
     def MakeSpeedFromTrajectory(self, traj):
         # derives the speed
-        if self.analytical :
-            if self.talkative : logger.LogTheLog("The speed should be derived analytically, yet is derived numerically", style="warn")
+        if self.talkative : self.logger.LogTheLog("Speed is derived numerically from trajectory", style="warn")
         D, N= np.shape(traj)
-        self.speed = np.zeros((3,N))
-        self.speed[:, 1:] = (traj[:, 1:] - traj[:, 0:-1])/dt
+        self.speed = np.zeros((D,N))
+        self.speed[:, 1:] = (traj[:, 1:] - traj[:, 0:-1])/self.dt
+        if self.smooth : self.speed = self.SimpleSmoother(self.speed)
+        return self.speed
         
-    def MakeAccelereationFromTrajectory(self, traj):
-        # derives the acceleration
+    def MakeAccelerationFromTrajectory(self, traj):
+        # derives the acceleration and the speed
         D, N= np.shape(traj)
+        self.acceleration = np.zeros((D,N))
         self.MakeSpeedFromTrajectory(traj)
-        self.acc[:, 1:] = (self.speed[:, 1:] - self.speed[:, 0:-1])/dt
+        self.acceleration[:, 1:] = (self.speed[:, 1:] - self.speed[:, 0:-1])/self.dt
+        if self.smooth : self.acceleration = self.SimpleSmoother(self.acceleration)
+        return self.acceleration
+
+    def MakeAccelerationFromSpeed(self, speed):
+        # derives the acceleration and the speed
+        if self.talkative : logger.LogTheLog("Acceleration is derived numerically from speed", style="warn")
+        D, N= np.shape(speed)
+        self.acceleration = np.zeros((D,N))
+        self.acceleration[:, 1:] = (speed[:, 1:] - speed[:, 0:-1])/self.dt
+        if self.smooth : self.acceleration = self.SimpleSmoother(self.acceleration)
+        return self.acceleration
+    
+    def SimpleSmoother(self, data, smoothing=70):
+        # data must be a 2D array [[x], [y], [z]]
+        Smoothdata = np.zeros((data.shape))
+        # max differences on x, y, z (useless for now)
+        scale = abs(np.max(data, axis=0) - np.min(data, axis=0))
+        trigger = (100-smoothing)/100 * scale
+        # translate date left and right
+        MovedLeft = data.copy()
+        MovedLeft[:, 1:-1] = data[:, :-2]
+        MovedRight = data.copy()
+        MovedRight[:, 1:-1] = data[:, 2:]
+        # average data
+        Smoothdata = (MovedLeft + MovedRight + data)/3
+        return Smoothdata
+
+
+
+                
+
+
+
     
     def AdaptTrajectory(self):
         # turns trajectory to accelerometer-like data
@@ -249,10 +291,11 @@ class Metal:
         amplitude = self.NoiseLevel/100
         if AutoAdjustAmplitude : 
             amplitude = np.max(abs(data)) * self.NoiseLevel / 100
-            self.logger.LogTheLog(str(np.max(data)), style="warn")
+            #self.logger.LogTheLog(str(np.max(data)), style="warn")
         return data + np.random.normal(loc=0.0, scale=amplitude, size=(self.D,self.N))
     
     def NoisyFullTrajectory(self):
+        self.logger.LogTheLog("Adding noise on x, y, z given data")
         return self.makeNoise(self.RealTraj), self.makeNoise(self.RealSpeed), self.makeNoise(self.RealAcc)
     
     def measurePos(self):
@@ -289,13 +332,14 @@ class Metal:
 class Graphics:
     def __init__(self, logger=None):
         self.currentColor = 0
-        self.colors = ['#73d2de', '#8f2d56', '#ffbc42', '#218380', '#d81159', '#fe7f2d', '#3772ff']
+        self.colors = ['#73d2de', '#8f2d56', '#ffbc42', '#218380', '#d81159', '#fe7f2d', '#3772ff', '#70161E', '#F46036']
         if logger is not None :
             self.logger = logger
             self.logger.LogTheLog("started Graphics")
 
     def start(self, titre):
         # initialize a pretty plot
+        self.currentColor = 0
         plt.figure(dpi=200)
         plt.grid('lightgrey')
         if titre != '':
@@ -334,13 +378,15 @@ class Graphics:
         elif datatype=="acceleration":
             legends = [' - Ax', ' - Ay', ' - Az'][:self.ndim]
         if StyleAdapter:
-            style = ['-', '--', '-+']
-            width = [width]
-        elif "Noisy" in self.legend[0]: 
+            # adjust linestyle
+            style = ['solid', 'solid', 'dashed', 'dotted']
+        else :
+            style = ['-']
+
+        if "Noisy" in self.legend[0] or "noisy" in self.legend[0] or "true" in self.legend[0]:
+            # adjust width 
             width = [width/3] + [width]
-            style = ['-']
         else:
-            style = ['-']
             width = [width]
         k,j=0,0
         for data in dataset :
@@ -353,9 +399,9 @@ class Graphics:
             plt.legend([str(k) + leg for k in range(len(dataset)) for leg in legends])
         elif legend != []:
             self.SetLegend(legend)
-            plt.legend(self.legend)
+            plt.legend(self.legend, fontsize=6)
         else :
-            plt.legend(self.legend)
+            plt.legend(self.legend, fontsize=6)
         plt.xlabel('sample (N)')
         plt.ylabel(datatype + 's')
         plt.show()

@@ -4,11 +4,11 @@ class ComplementaryFilter():
     def __init__(self,
                 parameters=(0.001, 2),
                 name="[Complementary]",
-                ndim=3,
+                ndim=1,
                 talkative=False,
                 logger=None,
                 MemorySize=10,
-                OffsetGain=0.3) -> None:
+                OffsetGain=0.005) -> None:
         self.name=name
         self.parameters = parameters
         self.Talkative = talkative
@@ -30,35 +30,90 @@ class ComplementaryFilter():
         if self.Talkative : self.logger.LogTheLog("Filter " + self.name + " initialized with parameters " + str(self.parameters))
 
 
+
+
+
     def RunFilter(self, x, xdot) -> np.ndarray:
         # complementary filter x and its temporal derivative xdot. Updates previous estimates and returns current estimate.
         # check data
-        if not isinstance(x, np.ndarray) or not isinstance(xdot, np.ndarray) and (x.size!=self.ndim or xdot.size!=self.ndim):  self.logger.LogTheLog("giving unadapted argument to filter " + self.name + " : expected np.array of dim " + str(self.ndim), style="warn")
-        # filter runs for the first time
+        if not isinstance(x, np.ndarray) or not isinstance(xdot, np.ndarray) and (x.size!=self.ndim or xdot.size!=self.ndim):  self.logger.LogTheLog("giving unadapted argument to filter " + self.name + " : expected np.array of dim " + str(self.ndim), style="warn")   
         if self.k==0:
+            # filter runs for the first time
             self.Estimate = x
         self.Estimate = self.b*self.Estimate + self.T*self.b*xdot + (1-self.b)*x
         self.k += 1
         #if self.k < 5 : self.logger.LogTheLog("Running Filter " + self.name + " (on run " + str(self.k) + " out of 4 prints)")
         return self.Estimate
     
+
+
+
+
+
+
+
+
+
     def RunFilterOffset(self, x, xdot) -> np.ndarray:
         # complementary filter x and its temporal derivative xdot. Updates previous estimates and returns current estimate.
         # check data
         if not isinstance(x, np.ndarray) or not isinstance(xdot, np.ndarray) and (x.size!=self.ndim or xdot.size!=self.ndim):  self.logger.LogTheLog("giving unadapted argument to filter " + self.name + " : expected np.array of dim " + str(self.ndim), style="warn")
-        # filter runs for the first time
         if self.k==0:
+            # filter runs for the first time
             self.Estimate = x
         self.Estimate = self.b*self.Estimate + self.T*self.b*xdot + (1-self.b)*x
         # prepare offset correction
-        #self.InputHistory[self.k%5, :] = x
-        self.ErrorHistory[self.k%5, :] = x-self.Estimate
+        self.ErrorHistory[self.k%self.MemorySize, :] = x-self.Estimate
         self.Offset = np.mean(self.ErrorHistory, axis=0) * self.OffsetGain
+        #self.Offset = np.true_divide(self.ErrorHistory.sum(axis=0), np.count_nonzero(self.ErrorHistory, axis=0)) * self.OffsetGain
         # offset correction
         self.Estimate += self.Offset
         self.k += 1
         #if self.k < 5 : self.logger.LogTheLog("Running Filter " + self.name + " (on run " + str(self.k) + " out of 4 prints)")
         return self.Estimate
+    
+    def RunFilterOffset2(self, x, xdot) -> np.ndarray:
+        # better averaging technique
+        # complementary filter x and its temporal derivative xdot. Updates previous estimates and returns current estimate.
+        # check data
+        if not isinstance(x, np.ndarray) or not isinstance(xdot, np.ndarray) and (x.size!=self.ndim or xdot.size!=self.ndim):  self.logger.LogTheLog("giving unadapted argument to filter " + self.name + " : expected np.array of dim " + str(self.ndim), style="warn")
+        if self.k==0:
+            # filter runs for the first time
+            self.Estimate = x
+        self.Estimate = self.b*self.Estimate + self.T*self.b*xdot + (1-self.b)*x
+        # prepare offset correction
+        self.ErrorHistory[self.k%self.MemorySize, :] = x-self.Estimate
+        #self.Offset = np.mean(self.ErrorHistory, axis=0) * self.OffsetGain
+        self.Offset = np.true_divide(self.ErrorHistory.sum(axis=0), np.count_nonzero(self.ErrorHistory, axis=0)) * self.OffsetGain
+        # offset correction
+        self.Estimate += self.Offset
+        self.k += 1
+        #if self.k < 5 : self.logger.LogTheLog("Running Filter " + self.name + " (on run " + str(self.k) + " out of 4 prints)")
+        return self.Estimate
+
+    def RunFilterOffset3(self, x, xdot) -> np.ndarray:
+        # quicker convergence
+        # complementary filter x and its temporal derivative xdot. Updates previous estimates and returns current estimate.
+        # check data
+        if not isinstance(x, np.ndarray) or not isinstance(xdot, np.ndarray) and (x.size!=self.ndim or xdot.size!=self.ndim):  self.logger.LogTheLog("giving unadapted argument to filter " + self.name + " : expected np.array of dim " + str(self.ndim), style="warn")
+        if self.k==0:
+            # filter runs for the first time
+            self.Estimate = x
+        self.Estimate = self.b*self.Estimate + self.T*self.b*xdot + (1-self.b)*x
+        # prepare offset correction
+        self.ErrorHistory[self.k%self.MemorySize, :] = x-self.Estimate
+        
+        Converger = (self.MemorySize/10 - self.k) * self.OffsetGain * 0.5
+        if Converger < self.OffsetGain:
+            Converger = self.OffsetGain
+        self.Offset = np.true_divide(self.ErrorHistory.sum(axis=0), np.count_nonzero(self.ErrorHistory, axis=0)) * Converger
+        # offset correction
+        self.Estimate += self.Offset
+        self.k += 1
+        #if self.k < 5 : self.logger.LogTheLog("Running Filter " + self.name + " (on run " + str(self.k) + " out of 4 prints)")
+        return self.Estimate
+
+
 
 
     

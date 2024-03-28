@@ -9,7 +9,7 @@ import numpy as np
 
 
 
-def main(N=1000, NoiseLevel=20):
+def main(N=100, NoiseLevel=20):
 
     # generate useful objects
     testlogger = Log("test", PrintOnFlight=True)
@@ -17,7 +17,7 @@ def main(N=1000, NoiseLevel=20):
 
     # start generator
     generator = TrajectoryGenerator(logger=testlogger)
-    generator.Generate("sinus", NoiseLevel=NoiseLevel, N=N)
+    generator.Generate("polynomial2", NoiseLevel=NoiseLevel, N=N)
 
     # start filter
     ComplementaryFilterT = ComplementaryFilter(parameters=(1/N, 2), 
@@ -49,7 +49,7 @@ def main(N=1000, NoiseLevel=20):
     NoisyTraj, NoisySpeed, NoisyAcc = generator.GetNoisyTraj()
     #print(NoisyTraj)
 
-
+    # run filter over time, with noisy data as inputs
     for k in range(N):
         FilterSpeed.append(ComplementaryFilterT.RunFilter(np.array(NoisySpeed[0,k]), np.array(NoisyAcc[0,k]) ))
         FilterSpeedOffset.append(ComplementaryFilterO.RunFilterOffset(np.array(NoisySpeed[0,k]), np.array(NoisyAcc[0,k]) ))
@@ -65,7 +65,7 @@ def main(N=1000, NoiseLevel=20):
     #FilterAccOffset = np.array(FilterAccOffset).reshape(1, N)
 
     dataset = [NoisySpeed, TrueSpeed, FilterSpeed, FilterSpeedOffset]
-    grapher.SetLegend(["Noisy speed (" + str(NoiseLevel) + "%)", "True speed", "Filter out speed", "Filter w/ offset comp. out speed"])
+    grapher.SetLegend(["Noisy speed (" + str(NoiseLevel) + "%)", "True speed", "Filter out speed", "Filter w/ offset comp. out speed"], 1)
     grapher.CompareNDdatas(dataset, "speed", "Test CF, speed, sinus (memory=100, offsetgain=0.3)", StyleAdapter=False, AutoLeg=False, width=1.5)
     return dataset
 
