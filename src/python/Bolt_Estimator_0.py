@@ -109,7 +109,7 @@ class Estimator():
         self.z_fk = np.zeros((1,))
         # motors positions & velocities
         self.q = np.zeros((6, ))
-        self.qp = np.zeros((6, ))
+        self.qdot = np.zeros((6, ))
         return None
 
     def InitContactData(self) -> None:
@@ -134,7 +134,7 @@ class Estimator():
         self.log_v_fk = np.zeros([3, self.IterNumber])
         self.log_z_fk = np.zeros([1, self.IterNumber])
         self.log_q = np.zeros([6, self.IterNumber])
-        self.log_qp = np.zeros([6, self.IterNumber])
+        self.log_qdot = np.zeros([6, self.IterNumber])
         # other logs
         self.iter = 0.
         return None
@@ -171,7 +171,7 @@ class Estimator():
         self.log_v_fk[:, self.iter] = self.v_fk
         self.log_z_fk[:, self.iter] = self.z_fk
         self.log_q[:, self.iter] = self.q
-        self.log_qp[:, self.iter] = self.qp
+        self.log_qdot[:, self.iter] = self.qdot
         return None
 
 
@@ -218,7 +218,7 @@ class Estimator():
         self.DeltaV = 0.
         # Kinematic data from encoders
         self.q = device.q_mes
-        self.qp = device.v_mes
+        self.qdot = device.v_mes
         # data from forward kinematics
         self.v_fk = 0.
         self.z_fk = 0.

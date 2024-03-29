@@ -8,10 +8,18 @@ class KalmanFilter():
                 parameters=None,
                 name="[Kalman]",
                 talkative=False,
-                logger=None) -> None:
+                logger=None,
+                n=None,
+                m=None) -> None:
         self.name=name
-        self.n = 3 + 3 + 6   # base position, base velocity, feet position
-        self.m = 4 + 12      # ??? IMU 
+        if n is not None:
+            self.n = n
+        else:
+            self.n = 3 + 3 + 6   # base position, base velocity, feet position
+        if m is not None:
+            self.m = m
+        else:
+            self.m = 4 + 12      # ??? IMU 
         if parameters==None:
             parameters = self.DefaultParametersInitializer()
         self.parameters = parameters
@@ -46,15 +54,14 @@ class KalmanFilter():
 
         H = np.zeros((self.m, self.n))
 
-
         Q = np.zeros((self.n, self.n))
         R = np.zeros((self.m, self.m))
         InitialValue = np.zeros()
         return A, B, H, Q, R, InitialValue
 
-    def FilterAttitude(self, Rot) -> np.ndarray:
+    def FilterAttitude(self, RobotState) -> np.ndarray:
         # Runs the Kalman filter
-        self.FilteredStateMean, self.FilteredStateCovariance = kf.filter(Rot)
+        self.FilteredStateMean, self.FilteredStateCovariance = kf.filter(RobotState)
         return self.FilteredStateMean
 
 

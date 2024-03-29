@@ -5,8 +5,9 @@ import sys
 sys.path.append('/home/nalbrecht/Bolt-Estimator/Bolt-robot---Estimator/src/python')
 from Bolt_Utils import utils
 from Bolt_Utils import Log
-from TrajectoryGenerator import TrajectoryGenerator, Graphics, Metal
+from TrajectoryGenerator import TrajectoryGenerator, Metal
 from Bolt_Filter_Complementary import ComplementaryFilter
+from Graphics import Graphics
 
 
 
@@ -14,7 +15,7 @@ from Bolt_Filter_Complementary import ComplementaryFilter
 
 
 
-def main(N=100, NoiseLevel=50):
+def main(N=1000, NoiseLevel=50):
 
     # generate useful objects
     testlogger = Log("test", PrintOnFlight=True)
@@ -50,7 +51,7 @@ def main(N=100, NoiseLevel=50):
     ndim = 3
     # start generator
     generator = TrajectoryGenerator(logger=testlogger)
-    generator.Generate("custom", NoiseLevel=NoiseLevel, N=max(pcom.shape), traj=AdaptedTraj)
+    generator.Generate("custom", NoiseLevel=NoiseLevel, N=N, traj=AdaptedTraj)
 
     # start filter
     ComplementaryFilter1 = ComplementaryFilter(parameters=(1/N, 2), 

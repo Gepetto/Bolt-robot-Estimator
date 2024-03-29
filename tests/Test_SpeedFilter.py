@@ -2,14 +2,15 @@ import sys
 sys.path.append('/home/nalbrecht/Bolt-Estimator/Bolt-robot---Estimator/src/python')
 from Bolt_Utils import utils
 from Bolt_Utils import Log
-from TrajectoryGenerator import TrajectoryGenerator, Graphics, Metal
+from TrajectoryGenerator import TrajectoryGenerator, Metal
+from Graphics import Graphics
 from Bolt_Filter_Complementary import ComplementaryFilter
 import numpy as np
 
 
 
 
-def main(N=100, NoiseLevel=20):
+def main(N=1000, NoiseLevel=40):
 
     # generate useful objects
     testlogger = Log("test", PrintOnFlight=True)
@@ -17,7 +18,7 @@ def main(N=100, NoiseLevel=20):
 
     # start generator
     generator = TrajectoryGenerator(logger=testlogger)
-    generator.Generate("polynomial2", NoiseLevel=NoiseLevel, N=N)
+    generator.Generate("sinus", NoiseLevel=NoiseLevel, N=N)
 
     # start filter
     ComplementaryFilterT = ComplementaryFilter(parameters=(1/N, 2), 
@@ -64,9 +65,11 @@ def main(N=100, NoiseLevel=20):
     FilterSpeedOffset = np.array(FilterSpeedOffset).reshape(1, N)
     #FilterAccOffset = np.array(FilterAccOffset).reshape(1, N)
 
-    dataset = [NoisySpeed, TrueSpeed, FilterSpeed, FilterSpeedOffset]
-    grapher.SetLegend(["Noisy speed (" + str(NoiseLevel) + "%)", "True speed", "Filter out speed", "Filter w/ offset comp. out speed"], 1)
-    grapher.CompareNDdatas(dataset, "speed", "Test CF, speed, sinus (memory=100, offsetgain=0.3)", StyleAdapter=False, AutoLeg=False, width=1.5)
+    dataset = [NoisySpeed, TrueSpeed, FilterSpeed]
+    #grapher.SetLegend(["Noisy speed (" + str(NoiseLevel) + "%)", "True speed", "Filter out speed", "Filter w/ offset comp. out speed"], 1)
+    grapher.SetLegend(["Noisy speed (" + str(NoiseLevel) + "%)", "True speed", "Filter out speed"], 1)
+    grapher.CompareNDdatas(dataset, "speed", "Test CF, speed, sinusoidal", StyleAdapter=False, AutoLeg=False, width=1.5)
+    #grapher.CompareNDdatas(dataset, "speed", "Test CF, speed, sinus (memory=100, offsetgain=0.3)", StyleAdapter=False, AutoLeg=False, width=1.5)
     return dataset
 
 

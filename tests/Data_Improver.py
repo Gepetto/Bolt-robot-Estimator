@@ -11,7 +11,7 @@ N is the final number of points
 """
 
 
-def main(N=1000):
+def main(N=300):
 
     # get data and extract data
     pcom = np.load("/home/nalbrecht/Bolt-Estimator/Bolt-robot---Estimator/tests/com_pos.npy")

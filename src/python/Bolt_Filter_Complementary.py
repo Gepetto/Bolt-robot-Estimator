@@ -61,6 +61,7 @@ class ComplementaryFilter():
         if self.k==0:
             # filter runs for the first time
             self.Estimate = x
+        
         self.Estimate = self.b*self.Estimate + self.T*self.b*xdot + (1-self.b)*x
         # prepare offset correction
         self.ErrorHistory[self.k%self.MemorySize, :] = x-self.Estimate
@@ -103,7 +104,7 @@ class ComplementaryFilter():
         # prepare offset correction
         self.ErrorHistory[self.k%self.MemorySize, :] = x-self.Estimate
         
-        Converger = (self.MemorySize/10 - self.k) * self.OffsetGain * 0.5
+        Converger = (self.MemorySize/4 - self.k) * self.OffsetGain * 0.17
         if Converger < self.OffsetGain:
             Converger = self.OffsetGain
         self.Offset = np.true_divide(self.ErrorHistory.sum(axis=0), np.count_nonzero(self.ErrorHistory, axis=0)) * Converger
