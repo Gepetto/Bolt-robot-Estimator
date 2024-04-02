@@ -7,7 +7,7 @@ class ComplementaryFilter():
                 ndim=1,
                 talkative=False,
                 logger=None,
-                MemorySize=10,
+                MemorySize=100,
                 OffsetGain=0.005) -> None:
         self.name=name
         self.parameters = parameters
@@ -32,8 +32,8 @@ class ComplementaryFilter():
 
 
 
-
-    def RunFilter(self, x, xdot) -> np.ndarray:
+    # standard filter, deprecated
+    def RunFilterDeprecated(self, x, xdot) -> np.ndarray:
         # complementary filter x and its temporal derivative xdot. Updates previous estimates and returns current estimate.
         # check data
         if not isinstance(x, np.ndarray) or not isinstance(xdot, np.ndarray) and (x.size!=self.ndim or xdot.size!=self.ndim):  self.logger.LogTheLog("giving unadapted argument to filter " + self.name + " : expected np.array of dim " + str(self.ndim), style="warn")   
@@ -46,14 +46,7 @@ class ComplementaryFilter():
         return self.Estimate
     
 
-
-
-
-
-
-
-
-
+    # standard filter with offset compensation
     def RunFilterOffset(self, x, xdot) -> np.ndarray:
         # complementary filter x and its temporal derivative xdot. Updates previous estimates and returns current estimate.
         # check data
@@ -73,7 +66,8 @@ class ComplementaryFilter():
         #if self.k < 5 : self.logger.LogTheLog("Running Filter " + self.name + " (on run " + str(self.k) + " out of 4 prints)")
         return self.Estimate
     
-    def RunFilterOffset2(self, x, xdot) -> np.ndarray:
+    # standard filter with non-idiotic offset compensation
+    def RunFilter(self, x, xdot) -> np.ndarray:
         # better averaging technique
         # complementary filter x and its temporal derivative xdot. Updates previous estimates and returns current estimate.
         # check data
@@ -92,8 +86,8 @@ class ComplementaryFilter():
         #if self.k < 5 : self.logger.LogTheLog("Running Filter " + self.name + " (on run " + str(self.k) + " out of 4 prints)")
         return self.Estimate
 
+    # standard filter with offset commpensation and adaptative gain for quicker convergence
     def RunFilterOffset3(self, x, xdot) -> np.ndarray:
-        # quicker convergence
         # complementary filter x and its temporal derivative xdot. Updates previous estimates and returns current estimate.
         # check data
         if not isinstance(x, np.ndarray) or not isinstance(xdot, np.ndarray) and (x.size!=self.ndim or xdot.size!=self.ndim):  self.logger.LogTheLog("giving unadapted argument to filter " + self.name + " : expected np.array of dim " + str(self.ndim), style="warn")

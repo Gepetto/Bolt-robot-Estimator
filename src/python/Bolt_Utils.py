@@ -1,6 +1,9 @@
 import numpy as np
 
 
+'''
+Class with some function used in other objects
+'''
 class utils():
     def __init__(self):
         pass
@@ -23,7 +26,10 @@ class utils():
         # returns a scalar b
         return np.sum(a*b)
 
-
+'''
+A class to have a common log for all code
+Display logs on flight, or only when PrintLog() is called
+'''
 class Log():
     def __init__(self, name="", PrintOnFlight=True):
         self.PrintOnFlight = PrintOnFlight
@@ -44,7 +50,10 @@ class Log():
     def PrintLog(self):
         print(self.GetLog())
 
-
+'''
+Classes of functions that returns its derivatives
+Used to derive trajectory in speed and acceleration
+'''
 class Sinus():
     def __init__(self, a, w, x=None):
         self.a = a

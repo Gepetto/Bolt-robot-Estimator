@@ -45,7 +45,7 @@ class Estimator():
         
         # loading data from file
         self.robot = pin.RobotWrapper.BuildFromURDF(UrdfPath, ModelPath)
-        self.FeetIndexes = [0, 0]
+        self.FeetIndexes = [0, 0] # Left, Right
         self.logger.LogTheLog("URDF built", ToPrint=Talkative)
 
         # interfacing with masterboard (?)
@@ -102,14 +102,17 @@ class Estimator():
         self.DeltaV = np.zeros((3,))
         return None
 
-    def InitKinematicsData(self) -> None :
+    def InitKinematicData(self) -> None :
         # initialize data to the right format
         # base kinematics
-        self.v_fk = np.zeros((3,))
-        self.z_fk = np.zeros((1,))
+        self.v_kin = np.zeros((3,))
+        self.z_kin = np.zeros((1,))
         # motors positions & velocities
         self.q = np.zeros((6, ))
         self.qdot = np.zeros((6, ))
+        # attitude from Kin
+        self.w_kin = np.zeros((3,))
+        self.theta_kin = np.zeros((3,))
         return None
 
     def InitContactData(self) -> None:
@@ -131,10 +134,12 @@ class Estimator():
         self.log_a_imu = np.zeros([3, self.IterNumber])
         self.log_theta_imu = np.zeros([3, self.IterNumber])
         # forward kinematics data log
-        self.log_v_fk = np.zeros([3, self.IterNumber])
-        self.log_z_fk = np.zeros([1, self.IterNumber])
+        self.log_v_kin = np.zeros([3, self.IterNumber])
+        self.log_z_kin = np.zeros([1, self.IterNumber])
         self.log_q = np.zeros([6, self.IterNumber])
         self.log_qdot = np.zeros([6, self.IterNumber])
+        self.log_theta_kin = np.zeros([3, self.IterNumber])
+        self.log_w_kin = np.zeros([3, self.IterNumber])
         # other logs
         self.iter = 0.
         return None
@@ -168,17 +173,14 @@ class Estimator():
         self.log_a_imu[:, self.iter] = self.a_imu
         self.log_theta_imu[:, self.iter] = self.theta_imu
         # forward kinematics data log
-        self.log_v_fk[:, self.iter] = self.v_fk
-        self.log_z_fk[:, self.iter] = self.z_fk
+        self.log_v_kin[:, self.iter] = self.v_kin
+        self.log_z_kin[:, self.iter] = self.z_kin
         self.log_q[:, self.iter] = self.q
         self.log_qdot[:, self.iter] = self.qdot
+        self.log_theta_kin[:, self.iter] = self.theta_kin
+        self.log_w_kin[:, self.iter] = self.w_kin
         return None
 
-
-
-
-
- 
 
     def Get(self, data="acceleration") -> np.ndarray:
         # getter for all internal pertinent data
@@ -265,19 +267,37 @@ class Estimator():
 
 
     
-    def KinematicAttitude(self, KinPos) -> np.ndarray:
+    def KinematicAttitude(self) -> np.ndarray:
         # uses robot model and rotation speed to provide attitude estimate based on encoder data
-        LeftContact, RightContact = self.ContactEstimator.LegsonGround(Kinpos, self.a, self.Fcontact)
-        if LeftContact :
+        
+        # consider the right contact frames, depending on which foot is in contact with the ground
+        if self.LeftContact and self.RightContact :
+            self.logger.LogTheLog("Both feet are touching the ground", style="warn", ToPrint=Talkative)
+            ContactFrames = [0,1]
+        elif self.LeftContact :
             self.logger.LogTheLog("left foot touching the ground", ToPrint=Talkative)
-            robot.forwardKinematics(self.q, [self.v,[self.a]])
-            pass
-        elif RightContact :
+            ContactFrames = [0]
+        elif self.RightContact :
             self.logger.LogTheLog("right foot touching the ground", ToPrint=Talkative)
-            pass
+            ContactFrames = [1]
         else :
-            self.logger.LogTheLog("No legs are touching the ground", style="warn", ToPrint=Talkative)
-        return R
+            self.logger.LogTheLog("No feet are touching the ground", style="warn", ToPrint=Talkative)
+            ContactFrames = []
+
+        # Compute the base's attitude for each foot in contact
+        FrameAttitude = []
+        for foot in ContactFrames:
+            pin.forwardKinematics(self.q, [self.v,[self.a]])
+            FrameAttitude.append( - pin.updateFramePlacement(self.model, self.data, self.FeetIndexes[foot]).rotation)
+        
+        if self.LeftContact or self.RightContact :
+            # averages results
+            self.theta_kin = np.mean(np.array(FrameAttitude))
+        else :
+            # no foot touching the ground, keeping old attitude data
+            self.theta_kin = self.theta_kin
+
+        return self.theta_kin
 
 
     
@@ -296,7 +316,7 @@ class Estimator():
         DeltAcc = self.a - AvgAcc
         
         # compute rotation matrix [TO DERIVE AS QUATERNION]
-        u1 = utils.normalize(DelAcc)
+        u1 = utils.normalize(DeltAcc)
         u2 = utils.cross(u1, np.array([0, 0, 1]))
         if u2 == np.array([0, 0, 0]):
             u2[1] = 1
@@ -321,23 +341,52 @@ class Estimator():
         # direclty uses IMU data to approximate speed
         return self.ReferenceSpeed + self.DeltaV
 
-    def KinematicSpeed(self) -> np.ndarray:
-        # uses Kinematic data (the waist of the robot) 
+    def KinematicSpeed(self) -> tuple(np.ndarray, np.ndarray):
+        # uses Kinematic data
         # along with contact and rotation speed information to approximate speed
 
-        self.q 
-        self.w
-        LeftContact, RightContact = self.ContactEstimator.LegsonGround(Kinpos, self.a, self.Fcontact)
-        if LeftContact and RightContact :
-            # both feet on the ground. Will use pinocchio estimate that induce the lowest base speed
-            pass
-        return None
+        # consider the right contact frames, depending on which foot is in contact with the ground
+        if self.LeftContact and self.RightContact :
+            self.logger.LogTheLog("Both feet are touching the ground", style="warn", ToPrint=Talkative)
+            ContactFrames = [0,1]
+        elif self.LeftContact :
+            self.logger.LogTheLog("left foot touching the ground", ToPrint=Talkative)
+            ContactFrames = [0]
+        elif self.RightContact :
+            self.logger.LogTheLog("right foot touching the ground", ToPrint=Talkative)
+            ContactFrames = [1]
+        else :
+            self.logger.LogTheLog("No feet are touching the ground", style="warn", ToPrint=Talkative)
+            ContactFrames = []
+
+        # Compute the base's speed for each foot in contact
+        FrameSpeed = []
+        FrameRotSpeed = []
+        for foot in ContactFrames:
+            pin.forwardKinematics(self.q, [self.v,[self.a]])
+            # rotation and translation speed of Base wrt its immobile foot
+            FrameSpeed.append(pin.getFrameVelocity(self.model, self.data, self.BaseIndex, self.FeetIndexes[foot]).translation)
+            FrameRotSpeed.append(pin.getFrameVelocity(self.model, self.data, self.BaseIndex, self.FeetIndexes[foot]).rotation)
+        
+        if self.LeftContact or self.RightContact :
+            # averages results
+            self.v_kin = np.mean(np.array(FrameSpeed))
+            self.w_kin = np.mean(np.array(FrameRotSpeed))
+        else :
+            # no foot touching the ground, keeping old speed data
+            self.w_kin = self.w_kin
+            self.v_kin = self.v_kin
+
+        return self.v_kin, self.w_kin
+
+
+        
 
     def SpeedFusion(self) -> None:
         # uses Kinematic-derived speed estimate and gyro (?) to estimate speed
         return None
     
-    def RunFilter(self):
+    def Estimate(self):
         # this is the main function
         # updates all variables with latest available measurements
         self.ReadSensor(device)
