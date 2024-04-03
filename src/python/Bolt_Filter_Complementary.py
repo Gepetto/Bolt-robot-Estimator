@@ -58,10 +58,10 @@ class ComplementaryFilter():
         self.Estimate = self.b*self.Estimate + self.T*self.b*xdot + (1-self.b)*x
         # prepare offset correction
         self.ErrorHistory[self.k%self.MemorySize, :] = x-self.Estimate
-        self.Offset = np.mean(self.ErrorHistory, axis=0) * self.OffsetGain
+        self.Offset = np.mean(self.ErrorHistory, axis=0)
         #self.Offset = np.true_divide(self.ErrorHistory.sum(axis=0), np.count_nonzero(self.ErrorHistory, axis=0)) * self.OffsetGain
         # offset correction
-        self.Estimate += self.Offset
+        self.Estimate += self.Offset  * self.OffsetGain
         self.k += 1
         #if self.k < 5 : self.logger.LogTheLog("Running Filter " + self.name + " (on run " + str(self.k) + " out of 4 prints)")
         return self.Estimate
@@ -79,9 +79,9 @@ class ComplementaryFilter():
         # prepare offset correction
         self.ErrorHistory[self.k%self.MemorySize, :] = x-self.Estimate
         #self.Offset = np.mean(self.ErrorHistory, axis=0) * self.OffsetGain
-        self.Offset = np.true_divide(self.ErrorHistory.sum(axis=0), np.count_nonzero(self.ErrorHistory, axis=0)) * self.OffsetGain
+        self.Offset = np.true_divide(self.ErrorHistory.sum(axis=0), np.count_nonzero(self.ErrorHistory, axis=0)) 
         # offset correction
-        self.Estimate += self.Offset
+        self.Estimate += self.Offset * self.OffsetGain
         self.k += 1
         #if self.k < 5 : self.logger.LogTheLog("Running Filter " + self.name + " (on run " + str(self.k) + " out of 4 prints)")
         return self.Estimate

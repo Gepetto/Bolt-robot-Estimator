@@ -66,7 +66,7 @@ class Test_Filter():
         else : 
             # start generator
             generator = TrajectoryGenerator(logger=testlogger)
-            generator.Generate(datatype, NoiseLevel=NoiseLevel, N=N)
+            generator.Generate(datatype, NoiseLevel=NoiseLevel, N=N, amplitude=1)
             ndim=1
         
         if self.FilterType == "complementary":
@@ -99,7 +99,7 @@ class Test_Filter():
 
 
 
-TF = Test_Filter(filtertype, parameters, optaparameters, name=name)
+TF = Test_Filter(filtertype, parameters, optparameters, name=name)
 TF.RunTest(N, NoiseLevel=10, datatype="polynomial")
 TF.RunTest(N, NoiseLevel=40, datatype="sinus")
 TF.RunTest(N, NoiseLevel=80, datatype="polynomial9")

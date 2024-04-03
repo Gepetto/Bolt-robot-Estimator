@@ -46,7 +46,7 @@ class Graphics:
         self.start(titre)
         self.ndim = len(dataset[0])
         # adjust size of things following approximate number of curves to plot
-        legsize = round(10 - len(dataset) * len(dataset[0])/ 4  )
+        legsize = max(3, round(9 - len(dataset) * len(dataset[0])/ 4  ))
         
         if datatype=="position":
             legends = [' - x', ' - y', ' - z'][:self.ndim]
@@ -56,22 +56,22 @@ class Graphics:
             legends = [' - Ax', ' - Ay', ' - Az'][:self.ndim]
         if StyleAdapter:
             # adjust linestyle
-            style = ['solid', 'solid', 'dashed', 'dotted']
+            style = ['solid', 'dotted', 'solid', 'solid', 'dashed', 'dotted']
         else :
             style = ['-']
 
         if "Noisy" in self.legend[0] or "noisy" in self.legend[0] or "true" in self.legend[0]:
             # adjust width 
-            width = [width/3] + [width]
+            Width = [width/2] + [width]
         else:
-            width = [width]
+            Width = [width]
         k,j=0,0
         for data in dataset :
             for line in data :
-                plt.plot(line, self.colors[self.currentColor], linestyle=style[k], linewidth=width[j])
+                plt.plot(line, self.colors[self.currentColor], linestyle=style[k], linewidth=Width[j])
                 self.currentColor = (self.currentColor+1)%len(self.colors)
             k = (k+1)%len(style)
-            j = min(len(width)-1, j+1)
+            j = min(len(Width)-1, j+1)
         if AutoLeg :
             plt.legend([str(k) + leg for k in range(len(dataset)) for leg in legends])
         elif legend != []:

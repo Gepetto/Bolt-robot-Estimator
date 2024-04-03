@@ -10,7 +10,7 @@ import numpy as np
 
 
 
-def main(N=1000, NoiseLevel=40):
+def main(N=500, NoiseLevel=20, Drift=40):
 
     # generate useful objects
     testlogger = Log("test", PrintOnFlight=True)
@@ -18,58 +18,53 @@ def main(N=1000, NoiseLevel=40):
 
     # start generator
     generator = TrajectoryGenerator(logger=testlogger)
-    generator.Generate("sinus", NoiseLevel=NoiseLevel, N=N)
+    generator.Generate("polynomial", NoiseLevel=NoiseLevel, Drift=Drift, N=N, amplitude=1, avgfreq=1/6, T=1)
 
     # start filter
     ComplementaryFilterT = ComplementaryFilter(parameters=(1/N, 2), 
                                         ndim=1, 
                                         talkative=True, 
                                         name="Standard complementary",
-                                        logger=testlogger)
+                                        logger=testlogger,
+                                        MemorySize=150,
+                                        OffsetGain=0.02)
     FilterTraj = []
     FilterSpeed = []
     FilterAcc = []
-    
-    # start filter with added offset compensation (pseudo-integrator)
-    ComplementaryFilterO = ComplementaryFilter(parameters=(1/N, 2), 
-                                        ndim=1, 
-                                        talkative=True,
-                                        name="Offset-compensed complementary",
-                                        logger=testlogger,
-                                        MemorySize=100,
-                                        OffsetGain=0.3)
+    FilterDriftSpeed = []
 
-    FilterTrajOffset = []
-    FilterSpeedOffset = []
-    FilterAccOffset = []
 
 
 
     # get generated data
     TrueTraj, TrueSpeed, TrueAcc = generator.GetTrueTraj()
     NoisyTraj, NoisySpeed, NoisyAcc = generator.GetNoisyTraj()
-    #print(NoisyTraj)
+    DriftNoisyTraj, DriftNoisySpeed, DriftNoisyAcc = generator.GetDriftingNoisyTraj()
+    DriftTraj, DriftSpeed, DriftAcc = generator.GetDriftingTraj()
+
 
     # run filter over time, with noisy data as inputs
     for k in range(N):
         FilterSpeed.append(ComplementaryFilterT.RunFilter(np.array(NoisySpeed[0,k]), np.array(NoisyAcc[0,k]) ))
-        FilterSpeedOffset.append(ComplementaryFilterO.RunFilterOffset(np.array(NoisySpeed[0,k]), np.array(NoisyAcc[0,k]) ))
+        FilterDriftSpeed.append(ComplementaryFilterT.RunFilter(np.array(NoisySpeed[0,k]), np.array(DriftNoisyAcc[0,k]) ))
 
 
-    # turn list to array (sorry for ugliness)
     #FilterTraj = np.array(FilterTraj).reshape(1, N)
     FilterSpeed = np.array(FilterSpeed).reshape(1, N)
     #FilterAcc = np.array(FilterAcc).reshape(1, N)
 
     #FilterTrajOffset = np.array(FilterTrajOffset).reshape(1, N)
-    FilterSpeedOffset = np.array(FilterSpeedOffset).reshape(1, N)
+    FilterDriftSpeed = np.array(FilterDriftSpeed).reshape(1, N)
     #FilterAccOffset = np.array(FilterAccOffset).reshape(1, N)
 
-    dataset = [NoisySpeed, TrueSpeed, FilterSpeed]
-    #grapher.SetLegend(["Noisy speed (" + str(NoiseLevel) + "%)", "True speed", "Filter out speed", "Filter w/ offset comp. out speed"], 1)
-    grapher.SetLegend(["Noisy speed (" + str(NoiseLevel) + "%)", "True speed", "Filter out speed"], 1)
-    grapher.CompareNDdatas(dataset, "speed", "Test CF, speed, sinusoidal", StyleAdapter=False, AutoLeg=False, width=1.5)
-    #grapher.CompareNDdatas(dataset, "speed", "Test CF, speed, sinus (memory=100, offsetgain=0.3)", StyleAdapter=False, AutoLeg=False, width=1.5)
+    dataset = [NoisySpeed, DriftNoisySpeed, TrueSpeed, DriftSpeed]
+    grapher.SetLegend(["Noisy speed (" + str(NoiseLevel) + "%)", "Drifting noisy speed", "True speed", "Drifting Speed"], 1)
+    grapher.CompareNDdatas(dataset, "speed", "Test CF, speed, sinusoidal", StyleAdapter=False, AutoLeg=False, width=0.8)
+
+    dataset = [TrueSpeed, TrueAcc, DriftAcc, FilterDriftSpeed]
+    grapher.SetLegend(["Theta ", "Omega", "Drifting Omega",  "Filter acting on\nnoisy Theta & Drifting noisy Omega"], 1)
+    grapher.CompareNDdatas(dataset, "speed", "Test CF, theta, sinusoidal", StyleAdapter=True, AutoLeg=False, width=1.5)
+
     return dataset
 
 

@@ -32,7 +32,9 @@ class Estimator():
                 UrdfPath="",
                 Talkative=True, 
                 AttitudeFilterType = "complementary",
+                parametersAF = (),
                 SpeedFilterType = "complementary",
+                parametersSF = (),
                 TimeStep = None,
                 MemorySize = 100,
                 IterNumber = 1000) -> None:
@@ -54,11 +56,12 @@ class Estimator():
         if TimeStep is not None :
             self.TimeStep = TimeStep
         else:
-            self.TimeStep = 0.01 # ??? aucune id
+            self.TimeStep = 0.001 # 1 kHz
         
         # initializes data & logs with np.zeros arrays
         self.InitImuData()
         self.InitKinematicsData()
+        self.InitOutData()
         self.InitContactData()
         self.InitLogMatrixes()
 
@@ -96,10 +99,22 @@ class Estimator():
 
     def InitImuData(self) -> None :
         # initialize data to the right format
-        self.a_imu = np.zeros((3,))            
+        self.a_imu = np.zeros((3,))   
+        self.ag_imu = np.zeros((3,))            
         self.w_imu = np.zeros((3,))
         self.DeltaTheta = np.zeros((4,))
         self.DeltaV = np.zeros((3,))
+        return None
+
+    def InitOutData(self) -> None:
+        # initialize filter out data
+        self.v_out = np.zeros((3,)) 
+        self.a_out = np.zeros((3,)) 
+        self.theta_out = np.zeros((3,)) 
+        self.w_out = np.zeros((3,)) 
+
+        self.c_out = np.zeros((3,)) 
+        self.cdot_out = np.zeros((3,)) 
         return None
 
     def InitKinematicData(self) -> None :
@@ -118,7 +133,8 @@ class Estimator():
     def InitContactData(self) -> None:
         self.LeftContact = False
         self.RightContact = False
-        self.Fcontact = (np.zeros(3), np.zeros(3))
+        self.FLContact = np.zeros(3)
+        self.FRContact = np.zeros(3)
         return None
 
     def InitLogMatrixes(self) -> None :
@@ -141,6 +157,9 @@ class Estimator():
         self.log_theta_kin = np.zeros([3, self.IterNumber])
         self.log_w_kin = np.zeros([3, self.IterNumber])
         # other logs
+        self.log_c = np.zeros([3, self.IterNumber])
+        self.log_cdot = np.zeros([3, self.IterNumber])
+        self.log_contactforces = np.zeros([6, self.IterNumber])
         self.iter = 0.
         return None
 
@@ -149,18 +168,6 @@ class Estimator():
             # Logs matrices' size will not be sufficient
             if Talkative : logs.LogTheLog("Excedind planned number of executions, IterNumber = " + str(self.IterNumber), style="warn", ToPrint=Talkative)
 
-            """
-            # base velocitie & co, post-filtering logs
-            self.log_v_out
-            self.log_w_out
-            self.log_a_out
-            self.log_theta_out
-            # imu data log
-            self.log_v_imu
-            self.log_w_imu
-            self.log_a_imu
-            self.log_theta_imu 
-            """
         # update logs with latest data
         # base velocitie & co, post-filtering logs
         self.log_v_out[:, self.iter] = self.v
@@ -179,30 +186,77 @@ class Estimator():
         self.log_qdot[:, self.iter] = self.qdot
         self.log_theta_kin[:, self.iter] = self.theta_kin
         self.log_w_kin[:, self.iter] = self.w_kin
+        # other
+        self.log_c[:, self.iter] = self.c
+        self.log_cdot[:, self.iter] = self.cdot
+        self.log_contactforces[:3, self.iter] = self.FLContact
+        self.log_contactforces[3:, self.iter] = self.FRContact
         return None
 
 
     def Get(self, data="acceleration") -> np.ndarray:
         # getter for all internal pertinent data
-        if data=="acceleration":
-            return self.a
-        elif data=="rotation_speed":
-            return self.w
 
-        elif data=="attitude":
-            return quaternion(R)
-        elif data=="com_position":
-            return self.c
-        elif data=="com_speed":
-            return self.cdot
+        # out data getter
+        if data=="acceleration" or data=="a":
+            return self.a_out
+        elif data=="rotation_speed" or data=="w" or data=="omega":
+            return self.w_out
+        elif data=="attitude" or data=="theta":
+            return quaternion(self.theta_out)
+        elif data=="com_position" or data=="c":
+            return self.c_out
+        elif data=="com_speed" or data=="cdot":
+            return self.cdot_out
+        elif data=="base_speed" or data=="v":
+            return self.v_out
+        elif data=="contact_forces" or data=="f":
+            ContactForces = np.zeros(6)
+            ContactForces[:3] = self.FLContact
+            ContactForces[3:] = self.FRContact
+            return ContactForces
+        elif data=="q":
+            return self.q, 
+        elif data=="qdot":
+            return self.qdot
         
-        elif data=="base_speed":
-            return self.v
+        # logs data getter
+
+        elif data=="acceleration_logs" or data=="a_logs":
+            return self.log_a_out
+        elif data=="rotation_speed_logs" or data=="w_logs" or data=="omega_logs":
+            return self.log_w_out
+        elif data=="attitude_logs" or data=="theta_logs":
+            return self.log_theta_out
+        elif data=="com_position_logs" or data=="c_logs":
+            return self.log_c_out
+        elif data=="com_speed_logs" or data=="cdot_logs":
+            return self.log_cdot_out
+        elif data=="base_speed_logs" or data=="v_logs":
+            return self.log_v_out
+        elif data=="contact_forces_logs" or data=="f_logs":
+            return self.log_contactforces
+        elif data=="q_logs":
+            return self.log_q, 
+        elif data=="qdot_logs":
+            return self.log_qdot
         
-        elif data=="feet_contact":
-            #return self.ContactEstimator.LegsonGround(Kinpos, self.a, self.Fcontact) unconsistent with return type
-            return self.ContactEstimator.ContactForces()
-        
+        # IMU logs data getter
+        elif data=="acceleration_logs_imu" or data=="a_logs_imu":
+            return self.log_a_imu
+        elif data=="rotation_speed_logs_imu" or data=="w_logs_imu" or data=="omega_logs_imu":
+            return self.log_w_imu
+        elif data=="theta_logs_imu" or data=="attitude_logs_imu":
+            return self.log_theta_imu
+        elif data=="base_speed_logs_imu" or data=="v_logs_imu":
+            return self.log_v_imu
+        # kin logs data getter
+        elif data=="rotation_speed_logs_kin" or data=="w_logs_kin" or data=="omega_logs_kin":
+            return self.log_w_kin
+        elif data=="theta_logs_kin" or data=="attitude_logs_kin":
+            return self.log_theta_kin
+        elif data=="base_speed_logs_kin" or data=="v_logs_kin":
+            return self.log_v_kin
         # ...
         else :
             logs.LogTheLog("Could not get data '" + data + "'. Unrecognised data getter.", style="warn", ToPrint=Talkative)
@@ -239,22 +293,6 @@ class Estimator():
             self.LeftContcat, self.RightContact = self.ContactEstimator.LegsOnGround(self.q, self.a, self.Fcontact)
         elif TypeOfContactEstimator=="kin":
             self.LeftContcat, self.RightContact = self.ContactEstimator.LegsOnGroundKin(self.q, self.a_imu - self.ag_imu)
-    
-
-
-    def UpdateMemory(self) -> None:
-        # updates a set of previously acquired data
-        # to optimize
-
-        # acceleration
-        self.AllTimeAcceleration[:-1] = self.AllTimeAcceleration[1:]
-        self.AllTimeAcceleration[-1] = self.a
-        # q
-        self.AllTimeq[:-1] = self.AllTimeq[1:]
-        self.AllTimeq[-1] = self.q
-        # ...
-        return None
-    
 
 
     def AcquireInitialData(self) -> None:
@@ -299,9 +337,8 @@ class Estimator():
 
         return self.theta_kin
 
-
     
-    def IMUAttitude(self) -> np.ndarray:
+    def IMUAttitudeDEPRECATED(self) -> np.ndarray:
         # average the robot acceleration over a long time to find direction of gravity, 
         # compares it to his current acceleration and returns a rotation matrix
 
@@ -324,11 +361,19 @@ class Estimator():
         R = utils.MatrixFromVectors((u1, u2, u3))
         return R
     
+    
+    def IMUAttitude(self) -> np.ndarray :
+        # deduce
+        # IMU gives us acceleration and acceleration without gravity
+        return self.ag_imu - self.a_imu
+
+    
     def GyroAttitude(self) -> np.ndarray:
         # Uses integrated angular velocity to derive rotation matrix 
         # 3DM-CX5-AHRS sensor returns Δθ
         return self.ReferenceOrientation + self.DeltaTheta
 
+    
     def AttitudeFusion(self, KinPos, Gyro) -> None :
         # uses attitude Kinematic estimate and gyro data to provide attitude estimate
         AttitudeFromKin = self.KinematicAttitude(KinPos)
@@ -341,6 +386,7 @@ class Estimator():
         # direclty uses IMU data to approximate speed
         return self.ReferenceSpeed + self.DeltaV
 
+    
     def KinematicSpeed(self) -> tuple(np.ndarray, np.ndarray):
         # uses Kinematic data
         # along with contact and rotation speed information to approximate speed
@@ -380,11 +426,10 @@ class Estimator():
         return self.v_kin, self.w_kin
 
 
-        
-
     def SpeedFusion(self) -> None:
         # uses Kinematic-derived speed estimate and gyro (?) to estimate speed
         return None
+    
     
     def Estimate(self):
         # this is the main function
