@@ -1,12 +1,12 @@
-import numpy as numpy
+import numpy as np
 import pinocchio as pin
 import time as t
-from quaternion import quaternion, from_rotation_vector, rotate_vectors
+#from quaternion import quaternion, from_rotation_vector, rotate_vectors
 
 from Bolt_Utils import utils
 from Bolt_Utils import Log
 
-from Bolt_ContactEstimator import ContactForcesEstimator
+from Bolt_ContactEstimator import ContactEstimator
 from Bolt_Filter import Filter
 from Bolt_Filter_Complementary import ComplementaryFilter
 
@@ -30,25 +30,34 @@ class Estimator():
                 device,
                 ModelPathth="",
                 UrdfPath="",
-                Talkative=True, 
+                Talkative=True,
+                logger=None,
                 AttitudeFilterType = "complementary",
                 parametersAF = (),
                 SpeedFilterType = "complementary",
                 parametersSF = (),
                 TimeStep = None,
-                MemorySize = 100,
                 IterNumber = 1000) -> None:
 
-        self.MsgName = "Bolt Estimator v0.3"
+        self.MsgName = "Bolt Estimator v0.4"
         self.Talkative=Talkative
-        self.logger = Log()
+        if logger is not None :
+            self.logger = logger
+        else:
+            self.logger = Log("default " + self.MsgName+ " log")
         self.logger.LogTheLog(" Starting log of" + self.MsgName, ToPrint=False)
         self.logger.LogTheLog("Initializing " + self.MsgName + "...", style="title", ToPrint=Talkative)
+        self.IterNumber = IterNumber
         
         # loading data from file
-        self.robot = pin.RobotWrapper.BuildFromURDF(UrdfPath, ModelPath)
+        if UrdfPath=="" or ModelPath=="":
+            self.logger.LogTheLog("No URDF path or ModelPath added !", style="warn", ToPrint=True)
+            self.robot=None
+        else :
+            self.robot = pin.RobotWrapper.BuildFromURDF(UrdfPath, ModelPath)
+            self.logger.LogTheLog("URDF built", ToPrint=Talkative)
         self.FeetIndexes = [0, 0] # Left, Right
-        self.logger.LogTheLog("URDF built", ToPrint=Talkative)
+        
 
         # interfacing with masterboard (?)
         self.device = device
@@ -60,7 +69,7 @@ class Estimator():
         
         # initializes data & logs with np.zeros arrays
         self.InitImuData()
-        self.InitKinematicsData()
+        self.InitKinematicData()
         self.InitOutData()
         self.InitContactData()
         self.InitLogMatrixes()
@@ -72,20 +81,19 @@ class Estimator():
         # set desired filters types for attitude and speed
         # for the time being, complementary only
         if AttitudeFilterType=="complementary":
-            self.attitudeFilter = ComplementaryFilter(parameters=(0.001, 50), name="attitude complementary filter", talkative=Talkative, logger=self.logger)
-        self.logger.LogTheLog("Attitude Filter of type " + AttitudeFilterType + " added.", ToPrint=Talkative)
+            self.AttitudeFilter = ComplementaryFilter(parameters=(0.001, 50), name="attitude complementary filter", talkative=Talkative, logger=self.logger)
+        self.logger.LogTheLog("Attitude Filter of type '" + AttitudeFilterType + "' added.", ToPrint=Talkative)
         
         if SpeedFilterType=="complementary":
-            self.SpeedFilter = ComplementaryFilter(parameters=(0.001, 50), name="speed complementary filter", talkative=Talkative)
-        self.logger.LogTheLog("Speed Filter of type " + SpeedFilterType + " added.", ToPrint=Talkative)
+            self.SpeedFilter = ComplementaryFilter(parameters=(0.001, 50), name="speed complementary filter", talkative=Talkative, logger=self.logger)
+        self.logger.LogTheLog("Speed Filter of type '" + SpeedFilterType + "' added.", ToPrint=Talkative)
 
         # returns info on Slips, Contact Forces, Contact with the ground
         self.ContactEstimator = ContactEstimator(self.robot, self.FeetIndexes[0], self.FeetIndexes[1], self.logger)
         self.logger.LogTheLog("Contact Estimator added.", ToPrint=Talkative)
 
         
-        self.MemorySize = MemorySize
-        self.AllTimeAcceleration, self.AllTimeq = np.zeros((3, self.MemorySize)), np.zeros((3, self.MemorySize))
+        #self.AllTimeAcceleration, self.AllTimeq = np.zeros((3, self.MemorySize)), np.zeros((3, self.MemorySize))
         self.logger.LogTheLog(self.MsgName +" initialized successfully.", ToPrint=Talkative)
 
 
@@ -102,7 +110,8 @@ class Estimator():
         self.a_imu = np.zeros((3,))   
         self.ag_imu = np.zeros((3,))            
         self.w_imu = np.zeros((3,))
-        self.DeltaTheta = np.zeros((4,))
+        # angles ? quaternion ?
+        self.DeltaTheta = np.zeros((3,))
         self.DeltaV = np.zeros((3,))
         return None
 
@@ -122,9 +131,10 @@ class Estimator():
         # base kinematics
         self.v_kin = np.zeros((3,))
         self.z_kin = np.zeros((1,))
-        # motors positions & velocities
+        # motors positions & velocities & torques
         self.q = np.zeros((6, ))
         self.qdot = np.zeros((6, ))
+        self.tau = np.zeros((6, ))
         # attitude from Kin
         self.w_kin = np.zeros((3,))
         self.theta_kin = np.zeros((3,))
@@ -264,25 +274,26 @@ class Estimator():
 
 
 
-    def ReadSensor(self, device) -> None:
+    def ReadSensor(self) -> None:
+        self.device.Read() # FOR TESTING ONLY
         # base acceleration, acceleration with gravity and rotation speed from IMU
-        self.a_imu = device.baseLinearAcceleration # COPIED FROM SOLO CODE, CHECK CONSISTENCY WITH BOLT MASTERBOARD
-        self.ag_imu = 0.
-        self.w_imu = device.baseAngularVelocity
+        self.a_imu[:] = self.device.baseLinearAcceleration[:] # COPIED FROM SOLO CODE, CHECK CONSISTENCY WITH BOLT MASTERBOARD
+        self.ag_imu[:] = self.device.baseLinearAccelerationGravity[:] # bs
+        self.w_imu[:] = self.device.baseAngularVelocity[:]
         # integrated data from IMU
-        self.DeltaTheta = device.baseOrientation - offset_yaw_IMU # to be found
-        self.DeltaV = 0.
+        self.DeltaTheta[:] = self.device.baseOrientation[:] - self.device.offset_yaw_IMU[:] # bs, to be found
+        self.DeltaV[:] = self.device.baseSpeed[:] - self.device.offset_speed_IMU[:] # bs
         # Kinematic data from encoders
-        self.q = device.q_mes
-        self.qdot = device.v_mes
+        self.q[:] = self.device.q_mes[:]
+        self.qdot[:] = self.device.v_mes[:]
         # data from forward kinematics
-        self.v_fk = 0.
-        self.z_fk = 0.
+        self.v_kin[:] = np.zeros(3)[:]
+        self.z_kin[:] = np.zeros(1)[:]
         # torques from motors
-        self.tau = 0.
+        self.tau[:] = np.zeros(6)[:]
 
         #self.ExternalDataCaster("acceleration", self.a)
-        self.UpdateMemory()
+
         return None
     
 
@@ -338,47 +349,27 @@ class Estimator():
         return self.theta_kin
 
     
-    def IMUAttitudeDEPRECATED(self) -> np.ndarray:
-        # average the robot acceleration over a long time to find direction of gravity, 
-        # compares it to his current acceleration and returns a rotation matrix
-
-        # self.AllTimeAcceleration = [ [ax, ay, az], ...]
-
-        # COMPLÈTEMENT BIDON CORRIGER CETTE MERDE ASAP
-        try :
-            AvgAcc = np.average(self.AllTimeAcceleration, Axis=0)
-        except :
-            self.logger.LogTheLog("Could not compute average acceleration. Using default acceleration instead.", style="warn", ToPrint=Talkative)
-            AvgAcc = np.array([0, 0, 1])
-        DeltAcc = self.a - AvgAcc
-        
-        # compute rotation matrix [TO DERIVE AS QUATERNION]
-        u1 = utils.normalize(DeltAcc)
-        u2 = utils.cross(u1, np.array([0, 0, 1]))
-        if u2 == np.array([0, 0, 0]):
-            u2[1] = 1
-        u3 = utils.cross(u1, u2)
-        R = utils.MatrixFromVectors((u1, u2, u3))
-        return R
-    
-    
     def IMUAttitude(self) -> np.ndarray :
         # deduce
         # IMU gives us acceleration and acceleration without gravity
-        return self.ag_imu - self.a_imu
+        g = utils. self.ag_imu - self.a_imu
+        r = np.linalg.norm(g)
+        phi = np.arccos(g[3]/r)
+        theta = np.arcsin(g[2]/(r*np.sin(phi)))
 
     
     def GyroAttitude(self) -> np.ndarray:
-        # Uses integrated angular velocity to derive rotation matrix 
+        # Uses integrated angular velocity to derive rotation angles 
         # 3DM-CX5-AHRS sensor returns Δθ
         return self.ReferenceOrientation + self.DeltaTheta
 
     
-    def AttitudeFusion(self, KinPos, Gyro) -> None :
+    def AttitudeFusion(self) -> None :
         # uses attitude Kinematic estimate and gyro data to provide attitude estimate
-        AttitudeFromKin = self.KinematicAttitude(KinPos)
+        #PPP AttitudeFromKin = self.KinematicAttitude(KinPos)
         AttitudeFromIMU = self.IMUAttitude()
         AttitudeFromGyro = self.GyroAttitude()
+        self.AttitudeFilter.RunFilter(AttitudeFromIMU)
         return None
 
 
@@ -387,7 +378,7 @@ class Estimator():
         return self.ReferenceSpeed + self.DeltaV
 
     
-    def KinematicSpeed(self) -> tuple(np.ndarray, np.ndarray):
+    def KinematicSpeed(self) -> tuple((np.ndarray, np.ndarray)):
         # uses Kinematic data
         # along with contact and rotation speed information to approximate speed
 
@@ -434,14 +425,16 @@ class Estimator():
     def Estimate(self):
         # this is the main function
         # updates all variables with latest available measurements
-        self.ReadSensor(device)
-        self.UpdateContactInformation()
+        self.ReadSensor()
+
+        #PPP self.UpdateContactInformation()
 
         # counts iteration
         self.iter += 1
 
         # derive data & runs filter
-        self.SpeedFusion()
+        #PPP self.SpeedFusion()
+
         self.AttitudeFusion()
 
         # update all logs & past variables
@@ -452,10 +445,3 @@ class Estimator():
 
 
 
-
-
-def main():
-    pass
-
-if __name__ == "__main__":
-    main()

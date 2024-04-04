@@ -70,7 +70,7 @@ class Test_Filter():
             ndim=1
         
         if self.FilterType == "complementary":
-            print("#########wtf", self.optparameters)
+            print("# ", self.optparameters)
             memsize, integratorgain = self.optparameters
             self.filter = ComplementaryFilter(self.parameters, ndim=ndim, talkative=True, name=self.name, logger=testlogger, MemorySize=memsize, OffsetGain=integratorgain)
             
@@ -95,7 +95,7 @@ class Test_Filter():
         dataset = [abs(TrueTraj-FilterTraj)/scaler]
         grapher.SetLegend(["error of the filter " + self.filter.name], ndim)
         grapher.CompareNDdatas(dataset, "position", "Error on " + datatype + " traj. with noise level " + str(NoiseLevel) + "\n to filter " + self.filter.name, StyleAdapter=False, AutoLeg=False, width=1.5)
-
+        grapher.end()
 
 
 

@@ -8,6 +8,7 @@ class Graphics:
     def __init__(self, logger=None):
         self.currentColor = 0
         self.colors = ['#73d2de', '#8f2d56', '#ffbc42', '#218380', '#d81159', '#fe7f2d', '#3772ff', '#70161E', '#F46036']
+        self.counter = 1
         if logger is not None :
             self.logger = logger
             self.logger.LogTheLog("started Graphics")
@@ -15,10 +16,11 @@ class Graphics:
     def start(self, titre):
         # initialize a pretty plot
         self.currentColor = 0
-        plt.figure(dpi=200)
+        plt.figure(self.counter, dpi=200)
         plt.grid('lightgrey')
         if titre != '':
             plt.title(titre)
+        self.counter += 1
     
     def SetLegend(self, legend, ndim=0):
         if ndim != 0: self.ndim=ndim
@@ -81,6 +83,10 @@ class Graphics:
             plt.legend(self.legend, fontsize=legsize)
         plt.xlabel('sample (N)')
         plt.ylabel(datatype + 's')
+        #plt.show()
+    
+    def end(self):
+        # so that all grapph appear at once
         plt.show()
     
 

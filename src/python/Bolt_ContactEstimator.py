@@ -2,7 +2,7 @@ import numpy as np
 import pinocchio as pin
 
 
-class ContactForcesEstimator():
+class ContactEstimator():
     def __init__(self, robot, LeftFootFrameID, RightFootFrameID, logger) -> None:
         print("Contact Forces Estimator started")
         self.robot = robot # for pinocchio computations

@@ -1,5 +1,5 @@
 import numpy as np
-
+from scipy.spatial.transform import Rotation 
 
 '''
 Class with some function used in other objects
@@ -25,6 +25,13 @@ class utils():
     def scalar(a, b) -> float:
         # returns a scalar b
         return np.sum(a*b)
+
+    def RotationMatrix(EulerArray) -> np.ndarray:
+        return Rotation.from_euler('zyx', EulerArray).as_matrix()
+    
+    def rotation(EulerArray, ArrayToRotate) -> np.ndarray:
+        R = Rotation.from_euler('zyx', EulerArray).as_matrix()
+        return R@ArrayToRotate
 
 '''
 A class to have a common log for all code

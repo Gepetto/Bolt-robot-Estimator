@@ -26,8 +26,10 @@ class ComplementaryFilter():
         self.Offset = np.zeros(self.ndim)
         self.OffsetGain=OffsetGain
         # logs
-        if logger is not None : self.logger = logger
-        if self.Talkative : self.logger.LogTheLog("Filter " + self.name + " initialized with parameters " + str(self.parameters))
+        if logger is not None : 
+            self.logger = logger
+            self.Talkative = False
+        if self.Talkative : self.logger.LogTheLog("Filter '" + self.name + "' initialized with parameters " + str(self.parameters))
 
 
 

@@ -85,7 +85,7 @@ class TrajectoryGenerator:
         if TypeOfTraj =='linear':
             self.trajectory, self.speed, self.acceleration = self.TrajectoryLinear(N)
         elif TypeOfTraj[:10] == 'polynomial':
-            # last character can be polynom order
+            # last character can be the polynom's order
             k=5
             if TypeOfTraj[-1].isnumeric(): k = int(TypeOfTraj[-1])
             self.trajectory, self.speed, self.acceleration = self.TrajectoryPolynomial(N, T, order=k, amplitude=amplitude)
@@ -160,7 +160,7 @@ class TrajectoryGenerator:
     def TrajectorySinusoidal(self, N, T, amplitude=0.3):
         T_array = np.linspace(0, T, N)
         # randomly generates coeff that matches approx. speed and frequency
-        a = (np.random.random(1) + 0.5)*amplitude*self.T
+        a = (np.random.random(1) + 0.5)*amplitude
         omega = (np.random.random(1) +0.5)* 2*np.pi* self.avgfreq
         # trajectory to be followed
         traj = Sinus(a, omega)

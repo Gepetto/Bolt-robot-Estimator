@@ -2,11 +2,11 @@ import sys
 sys.path.append('/home/nalbrecht/Bolt-Estimator/Bolt-robot---Estimator/src/python')
 from Bolt_Utils import utils
 from Bolt_Utils import Log
+
 from TrajectoryGenerator import TrajectoryGenerator, Metal
 from Graphics import Graphics
 from Bolt_Filter_Complementary import ComplementaryFilter
 import numpy as np
-
 
 
 
@@ -57,6 +57,7 @@ def main(N=500, NoiseLevel=20, Drift=40):
     FilterDriftSpeed = np.array(FilterDriftSpeed).reshape(1, N)
     #FilterAccOffset = np.array(FilterAccOffset).reshape(1, N)
 
+
     dataset = [NoisySpeed, DriftNoisySpeed, TrueSpeed, DriftSpeed]
     grapher.SetLegend(["Noisy speed (" + str(NoiseLevel) + "%)", "Drifting noisy speed", "True speed", "Drifting Speed"], 1)
     grapher.CompareNDdatas(dataset, "speed", "Test CF, speed, sinusoidal", StyleAdapter=False, AutoLeg=False, width=0.8)
@@ -64,6 +65,7 @@ def main(N=500, NoiseLevel=20, Drift=40):
     dataset = [TrueSpeed, TrueAcc, DriftAcc, FilterDriftSpeed]
     grapher.SetLegend(["Theta ", "Omega", "Drifting Omega",  "Filter acting on\nnoisy Theta & Drifting noisy Omega"], 1)
     grapher.CompareNDdatas(dataset, "speed", "Test CF, theta, sinusoidal", StyleAdapter=True, AutoLeg=False, width=1.5)
+    grapher.end()
 
     return dataset
 
