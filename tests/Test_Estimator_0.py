@@ -1,12 +1,14 @@
 import sys
 sys.path.append('/home/nalbrecht/Bolt-Estimator/Bolt-robot---Estimator/src/python')
 import numpy as np
+from scipy.spatial.transform import Rotation as R
+
+
 from Bolt_Utils import Log
 from Graphics import Graphics
 from Bolt_Estimator_0 import Estimator
 from DeviceEmulator import DeviceEmulator
 from TrajectoryGenerator import TrajectoryGenerator
-
 
 
 
@@ -20,7 +22,7 @@ def main():
     device = DeviceEmulator(TrajectoryGenerator=generator, logger=testlogger)
 
     # generate traj
-    device.GenerateTrajectory(N=N+10, NoiseLevelXY=15, NoiseLevelZ=5, Drift=10, NoiseLevelAttitude=10, T=3)
+    device.GenerateTrajectory(N=N, NoiseLevelXY=15, NoiseLevelZ=5, Drift=10, NoiseLevelAttitude=10, T=3)
     # init estimator
     estimator = Estimator(device=device,
                     ModelPathth="",
@@ -32,25 +34,25 @@ def main():
                     SpeedFilterType = "complementary",
                     parametersSF = (0, 0, 0, 0),
                     TimeStep = None,
-                    IterNumber = N)
+                    IterNumber = 100)
     
     # plot the pseudo-measured (eg noisy and drifting) generated trajectories
     traj, speed, acc = device.GetTranslation()
     Inputs_translations = [traj.T, speed.T, acc.T]
     theta, omega, omegadot = device.GetRotation()
-    Inputs_rotations = [theta.T, omega.T, omegadot.T]
+    Inputs_rotations = [theta.T, omega.T]
 
     grapher.SetLegend(["traj", "speed", "acc"], 3)
     grapher.CompareNDdatas(Inputs_translations, "", "Trajectory, speed and acceleration as inputed", StyleAdapter=False, AutoLeg=False, width=1.)
 
-    grapher.SetLegend(["theta", "omega", "angular acc"], 3)
+    grapher.SetLegend(["theta", "omega"], 3)
     grapher.CompareNDdatas(Inputs_rotations, "", "rotation and derivatives as inputed", StyleAdapter=False, AutoLeg=False, width=1.)
 
     
     # run the estimator as if
     # device will iterate over generated data each time estimator calls it
-    #for j in range(N):
-    #    estimator.Estimate()
+    for j in range(N-1):
+        estimator.Estimate()
 
 
 

@@ -4,11 +4,12 @@ import pinocchio as pin
 
 class ContactEstimator():
     def __init__(self, robot, LeftFootFrameID, RightFootFrameID, logger) -> None:
-        print("Contact Forces Estimator started")
+        
         self.robot = robot # for pinocchio computations
         self.LeftFootFrameID = LeftFootFrameID
         self.RightFootFrameID = RightFootFrameID
         self.logger = logger
+        self.logger.LogTheLog("Contact Forces Estimator started", style="subtitle")
     
     def ContactForces(self, torques, position) -> tuple[np.ndarray, np.ndarray]:
         return None

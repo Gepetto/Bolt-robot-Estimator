@@ -31,7 +31,9 @@ class TrajectoryGenerator:
             self.talkative = False
         
         # amplitude of generated signals
-        self.amplitude = 0.3
+        self.amplitude = 1
+        self.NoiseLevel = 10    # %
+        self.Drift = 10         # %
 
         #initialize datas
         self.trajectory = np.zeros((3,1))
@@ -39,19 +41,22 @@ class TrajectoryGenerator:
         self.acceleration = np.zeros((3,1))
         self.noisy_trajectory, self.noisy_speed, self.noisy_acceleration = None, None, None
 
-        if self.talkative : self.logger.LogTheLog("started Trajectory Generator")
+        if self.talkative : self.logger.LogTheLog("started Trajectory Generator", style="subtitle")
     
-    def Generate(self, TypeOfTraj, N=1000, T=1, NoiseLevel=0.1, Drift=0.02, amplitude=0.3, avgfreq=3, relative=True, traj=None, speed=None, smooth=True):
+    def Generate(self, TypeOfTraj, N=1000, T=1, NoiseLevel=10, Drift=10, amplitude=1, avgfreq=3, relative=True, traj=None, speed=None, smooth=True):
         # time increment, in seconds
         self.dt = T/N
         self.N = N
         self.T = T
         # parameters
         self.avgfreq = avgfreq
+        self.amplitude = amplitude
+        self.NoiseLevel = NoiseLevel    # %
+        self.Drift = Drift              # %
         # set up trajectory type, create trajectory, speed and acceleration
         self.smooth = smooth
         self.TypeOfTraj = TypeOfTraj
-        self.TrajType(TypeOfTraj, self.N, self.T, amplitude=amplitude, traj=traj, speed=speed)
+        self.TrajType(TypeOfTraj, traj=traj, speed=speed)
         # create fake noise
         self.NoiseMaker = Metal(self.trajectory, self.speed, self.acceleration, NoiseLevel, DriftingCoeff=Drift, logger=self.logger)
         self.noisy_trajectory, self.noisy_speed, self.noisy_acceleration = self.NoiseMaker.NoisyFullTrajectory()
@@ -76,28 +81,28 @@ class TrajectoryGenerator:
     
 
         
-    def TrajType(self, TypeOfTraj, N, T, amplitude=0.3, traj=None, speed=None):
+    def TrajType(self, TypeOfTraj, traj=None, speed=None):
         # calls the appropriate trajectory generator
         self.TypeOfTraj = TypeOfTraj
         # wether or not speed and acceleration has to be derived analytically
         self.analytical=True
 
         if TypeOfTraj =='linear':
-            self.trajectory, self.speed, self.acceleration = self.TrajectoryLinear(N)
+            self.trajectory, self.speed, self.acceleration = self.TrajectoryLinear(self.N)
         elif TypeOfTraj[:10] == 'polynomial':
             # last character can be the polynom's order
             k=5
             if TypeOfTraj[-1].isnumeric(): k = int(TypeOfTraj[-1])
-            self.trajectory, self.speed, self.acceleration = self.TrajectoryPolynomial(N, T, order=k, amplitude=amplitude)
+            self.trajectory, self.speed, self.acceleration = self.TrajectoryPolynomial(order=k)
 
         elif TypeOfTraj == "sinus" or TypeOfTraj == "sinusoidal":
-            self.trajectory, self.speed, self.acceleration = self.TrajectorySinusoidal(N, T, amplitude=amplitude)
+            self.trajectory, self.speed, self.acceleration = self.TrajectorySinusoidal()
 
         elif TypeOfTraj == "exponential" or TypeOfTraj == "exp":
-            self.trajectory, self.speed, self.acceleration = self.TrajectoryExponential(N, T, amplitude=amplitude)
+            self.trajectory, self.speed, self.acceleration = self.TrajectoryExponential()
         
         elif TypeOfTraj == "multiexponential" or TypeOfTraj == "multiexp":
-            self.trajectory, self.speed, self.acceleration = self.TrajectoryMultiExponential(3, N, T)
+            self.trajectory, self.speed, self.acceleration = self.TrajectoryMultiExponential(3)
 
         elif TypeOfTraj == 'custom':
             self.analytical = False
@@ -126,87 +131,77 @@ class TrajectoryGenerator:
 
 
 
-    
-    def TrajectoryLinear(self, N):
-        # chose an angle
-        alpha = np.random.random() *np.pi/2
-        if self.talkative : self.logger.LogTheLog('angle chosen (°) : '+ str(alpha*180/np.pi))
-        self.trajectory = np.zeros((3,N))
-        def PositionLaw(x):
-            # so that speed is no constant
-            return np.sin(x/N/2*np.pi)
-        self.trajectory[0,:] = np.cos(alpha)*PositionLaw(np.linspace(0,N, num=N))
-        self.trajectory[1,:] = np.sin(alpha)*PositionLaw(np.linspace(0,N, num=N))
-        return self.trajectory, self.speed, self.acceleration
 
-
-
-    def TrajectoryPolynomial(self, N, T, order=5, amplitude=0.3):
-        T_array = np.linspace(0, T, N)
+    def TrajectoryPolynomial(self, order=5):
+        T_array = np.linspace(0, self.T, self.N)
         # randomly generates coeff that matches approx. speed
-        coeffs = (np.random.random(order) +0.5)*amplitude*self.T 
+        coeffs = np.random.random(order+1)
+        if self.T>1:
+            coeffs = coeffs * (self.amplitude / (coeffs[0] * self.T**order))
+        else :
+            coeffs = coeffs * (self.amplitude / coeffs[-1])
+
         # trajectory to be followed
         traj = Polynomial(coeffs)
         speed = traj.deriv()
         acc = speed.deriv()
         # evaluate polynomial functions
-        self.trajectory = traj(T_array).reshape((1, N))
-        self.speed = speed(T_array).reshape((1, N))
-        self.acceleration = acc(T_array).reshape((1, N))
+        self.trajectory = traj(T_array).reshape((1, self.N))
+        self.speed = speed(T_array).reshape((1, self.N))
+        self.acceleration = acc(T_array).reshape((1, self.N))
         # all done
         return self.trajectory, self.speed, self.acceleration
     
 
-    def TrajectorySinusoidal(self, N, T, amplitude=0.3):
-        T_array = np.linspace(0, T, N)
+    def TrajectorySinusoidal(self):
+        T_array = np.linspace(0, self.T, self.N)
         # randomly generates coeff that matches approx. speed and frequency
-        a = (np.random.random(1) + 0.5)*amplitude
-        omega = (np.random.random(1) +0.5)* 2*np.pi* self.avgfreq
+        a = (np.random.random(1) + 0.5)*self.amplitude
+        omega = 2*np.pi*self.avgfreq + 0.3*(np.random.random(1) - 0.5)*2*np.pi*self.avgfreq
         # trajectory to be followed
         traj = Sinus(a, omega)
         speed = traj.deriv()
         acc = speed.deriv()
         # evaluate sinusoidal functions
-        self.trajectory = traj.evaluate(T_array).reshape((1, N))
-        self.speed = speed.evaluate(T_array).reshape((1, N))
-        self.acceleration = acc.evaluate(T_array).reshape((1, N))
+        self.trajectory = traj.evaluate(T_array).reshape((1, self.N))
+        self.speed = speed.evaluate(T_array).reshape((1, self.N))
+        self.acceleration = acc.evaluate(T_array).reshape((1, self.N))
         # all done
         return self.trajectory, self.speed, self.acceleration
     
 
-    def TrajectoryExponential(self, N, T, w=5, amplitude=0.3, ImposedInit=0):
-        T_array = np.linspace(0, T, N)
+    def TrajectoryExponential(self, ImposedInit=0):
+        T_array = np.linspace(0, self.T, self.N)
         # randomly generates coeff that matches approx. speed and frequency
         if ImposedInit == 0:
             C = np.random.random(1)*amplitude*self.T
         else :
             C = ImposedInit
-        w = w + (np.random.random(1)-0.5)*w
+        w = (np.random.random(1)+0.5)*w
         # trajectory to be followed
         T = Exp(C, w)
         S = T.deriv()
         A = S.deriv()
         # evaluate exponential functions
-        trajectory = T.evaluate(T_array).reshape((1, N))
-        speed = S.evaluate(T_array).reshape((1, N))
-        acceleration = A.evaluate(T_array).reshape((1, N))
+        trajectory = T.evaluate(T_array).reshape((1, self.N))
+        speed = S.evaluate(T_array).reshape((1, self.N))
+        acceleration = A.evaluate(T_array).reshape((1, self.N))
         # all done
         return trajectory, speed, acceleration
     
 
-    def TrajectoryMultiExponential(self, k, N, T, w=5):
+    def TrajectoryMultiExponential(self, k, w=5): # will not work (because of changes in T and self.T)
         # for a succession of exponential
-        T_array = np.linspace(0, T, N)
+        T_array = np.linspace(0, self.T, self.N)
         # each line is a different exponential
-        n = int(np.floor(N/k)) +1 # n*k > N, data will be truncated
+        n = int(np.floor(self.N/k)) + 1 # n*k > N, data will be truncated
         self.trajectory, self.speed, self.acceleration = np.zeros((k, n)), np.zeros((k, n)), np.zeros((k, n))
-
+         
         self.trajectory[0,:], self.speed[0,:], self.acceleration[0,:] = self.TrajectoryExponential(n, T_array[n], w)
         for j in range(1, k):
-
             self.trajectory[j,:], self.speed[j,:], self.acceleration[j,:] = self.TrajectoryExponential(n, T_array[j*n], w, ImposedInit=self.trajectory[j-1, 0])
         # flatten and truncate
-        return self.trajectory.reshape((1, -1))[:, :N], self.speed.reshape((1, -1))[:, :N], self.acceleration.reshape((1, -1))[:, :N]
+        return self.trajectory.reshape((1, -1))[:, :self.N], self.speed.reshape((1, -1))[:, :self.N], self.acceleration.reshape((1, -1))[:, :self.N]
        
         
         
@@ -303,8 +298,8 @@ class Metal:
     def makeDrift(self, data, AutoAdjustAmplitude=True):
         drift = self.DriftingCoeff/100
         if AutoAdjustAmplitude : 
-            drift = np.std(abs(data)) * self.DriftingCoeff / 100
-        return data + np.linspace(np.zeros(self.D), self.N/1000*drift*np.ones(self.D), self.N).T
+            drift = (np.max(abs(data)) - np.min(data)) * self.DriftingCoeff / 100
+        return data + np.linspace(np.zeros(self.D), drift*np.ones(self.D), self.N).T
     
     def NoisyFullTrajectory(self):
         self.logger.LogTheLog("Adding noise on x, y, z provided data")

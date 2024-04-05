@@ -1,7 +1,7 @@
 import numpy as np
 import pinocchio as pin
 import time as t
-#from quaternion import quaternion, from_rotation_vector, rotate_vectors
+from scipy.spatial.transform import Rotation as R
 
 from Bolt_Utils import utils
 from Bolt_Utils import Log
@@ -12,7 +12,7 @@ from Bolt_Filter_Complementary import ComplementaryFilter
 
 
 """
-An dummy estimator for Bolt Bipedal Robot
+An estimator for Bolt Bipedal Robot
 
     Program description
 
@@ -48,6 +48,7 @@ class Estimator():
         self.logger.LogTheLog(" Starting log of" + self.MsgName, ToPrint=False)
         self.logger.LogTheLog("Initializing " + self.MsgName + "...", style="title", ToPrint=Talkative)
         self.IterNumber = IterNumber
+        self.iter = 0
         
         # loading data from file
         if UrdfPath=="" or ModelPath=="":
@@ -77,15 +78,18 @@ class Estimator():
         # check that sensors can be read 
         self.ReadSensor()
         self.logger.LogTheLog("Sensors read, initial data acquired", ToPrint=Talkative)
+        self.UpdateLogMatrixes()
+        self.iter += 1
+        self.logger.LogTheLog("Initial data stored in logs", ToPrint=Talkative)
         
         # set desired filters types for attitude and speed
         # for the time being, complementary only
         if AttitudeFilterType=="complementary":
-            self.AttitudeFilter = ComplementaryFilter(parameters=(0.001, 50), name="attitude complementary filter", talkative=Talkative, logger=self.logger)
+            self.AttitudeFilter = ComplementaryFilter(parameters=(0.001, 50), name="attitude complementary filter", talkative=Talkative, logger=self.logger, ndim=4)
         self.logger.LogTheLog("Attitude Filter of type '" + AttitudeFilterType + "' added.", ToPrint=Talkative)
         
         if SpeedFilterType=="complementary":
-            self.SpeedFilter = ComplementaryFilter(parameters=(0.001, 50), name="speed complementary filter", talkative=Talkative, logger=self.logger)
+            self.SpeedFilter = ComplementaryFilter(parameters=(0.001, 50), name="speed complementary filter", talkative=Talkative, logger=self.logger, ndim=3)
         self.logger.LogTheLog("Speed Filter of type '" + SpeedFilterType + "' added.", ToPrint=Talkative)
 
         # returns info on Slips, Contact Forces, Contact with the ground
@@ -109,18 +113,23 @@ class Estimator():
         # initialize data to the right format
         self.a_imu = np.zeros((3,))   
         self.ag_imu = np.zeros((3,))            
-        self.w_imu = np.zeros((3,))
+        self.w_imu = R.from_euler('xyz', np.zeros(3))
+        self.theta_imu = R.from_euler('xyz', np.zeros(3))
         # angles ? quaternion ?
-        self.DeltaTheta = np.zeros((3,))
+        self.DeltaTheta = R.from_euler('xyz', np.zeros(3))
         self.DeltaV = np.zeros((3,))
+        self.v_imu = np.zeros((3,))
+
+
+        self.ReferenceOrientation = np.zeros((4,))
         return None
 
     def InitOutData(self) -> None:
         # initialize filter out data
         self.v_out = np.zeros((3,)) 
         self.a_out = np.zeros((3,)) 
-        self.theta_out = np.zeros((3,)) 
-        self.w_out = np.zeros((3,)) 
+        self.theta_out = R.from_euler('xyz', np.zeros(3)) 
+        self.w_out = R.from_euler('xyz', np.zeros(3))
 
         self.c_out = np.zeros((3,)) 
         self.cdot_out = np.zeros((3,)) 
@@ -136,8 +145,8 @@ class Estimator():
         self.qdot = np.zeros((6, ))
         self.tau = np.zeros((6, ))
         # attitude from Kin
-        self.w_kin = np.zeros((3,))
-        self.theta_kin = np.zeros((3,))
+        self.w_kin = R.from_euler('xyz', np.zeros(3))
+        self.theta_kin = R.from_euler('xyz', np.zeros(3))
         return None
 
     def InitContactData(self) -> None:
@@ -151,56 +160,55 @@ class Estimator():
         # initialize data to the right format
         # base velocitie & co, post-filtering logs
         self.log_v_out = np.zeros([3, self.IterNumber])
-        self.log_w_out = np.zeros([3, self.IterNumber])
+        self.log_w_out = np.zeros([4, self.IterNumber])
         self.log_a_out = np.zeros([3, self.IterNumber])
-        self.log_theta_out = np.zeros([3, self.IterNumber])
+        self.log_theta_out = np.zeros([4, self.IterNumber])
         # imu data log
         self.log_v_imu = np.zeros([3, self.IterNumber])
-        self.log_w_imu = np.zeros([3, self.IterNumber])
+        self.log_w_imu = np.zeros([4, self.IterNumber])
         self.log_a_imu = np.zeros([3, self.IterNumber])
-        self.log_theta_imu = np.zeros([3, self.IterNumber])
+        self.log_theta_imu = np.zeros([4, self.IterNumber])
         # forward kinematics data log
         self.log_v_kin = np.zeros([3, self.IterNumber])
         self.log_z_kin = np.zeros([1, self.IterNumber])
         self.log_q = np.zeros([6, self.IterNumber])
         self.log_qdot = np.zeros([6, self.IterNumber])
-        self.log_theta_kin = np.zeros([3, self.IterNumber])
-        self.log_w_kin = np.zeros([3, self.IterNumber])
+        self.log_theta_kin = np.zeros([4, self.IterNumber])
+        self.log_w_kin = np.zeros([4, self.IterNumber])
         # other logs
-        self.log_c = np.zeros([3, self.IterNumber])
-        self.log_cdot = np.zeros([3, self.IterNumber])
+        self.log_c_out = np.zeros([3, self.IterNumber])
+        self.log_cdot_out = np.zeros([3, self.IterNumber])
         self.log_contactforces = np.zeros([6, self.IterNumber])
-        self.iter = 0.
         return None
 
     def UpdateLogMatrixes(self) -> None :
-        if self.iter > self.IterNumber:
+        if self.iter >= self.IterNumber:
             # Logs matrices' size will not be sufficient
             if Talkative : logs.LogTheLog("Excedind planned number of executions, IterNumber = " + str(self.IterNumber), style="warn", ToPrint=Talkative)
 
         # update logs with latest data
         # base velocitie & co, post-filtering logs
-        self.log_v_out[:, self.iter] = self.v
-        self.log_w_out[:, self.iter] = self.w
-        self.log_a_out[:, self.iter] = self.a
-        self.log_theta_out[:, self.iter] = self.theta
+        self.log_v_out[:, self.iter] = self.v_out[:]
+        self.log_w_out[:, self.iter] = self.w_out.as_quat()[:]
+        self.log_a_out[:, self.iter] = self.a_out[:]
+        self.log_theta_out[:, self.iter] = self.theta_out.as_quat()[:]
         # imu data log
-        self.log_v_imu[:, self.iter] = self.v_imu
-        self.log_w_imu[:, self.iter] = self.w_imu
-        self.log_a_imu[:, self.iter] = self.a_imu
-        self.log_theta_imu[:, self.iter] = self.theta_imu
+        self.log_v_imu[:, self.iter] = self.v_imu[:]
+        self.log_w_imu[:, self.iter] = self.w_imu.as_quat()[:]
+        self.log_a_imu[:, self.iter] = self.a_imu[:]
+        self.log_theta_imu[:, self.iter] = self.theta_imu.as_quat()[:]
         # forward kinematics data log
-        self.log_v_kin[:, self.iter] = self.v_kin
-        self.log_z_kin[:, self.iter] = self.z_kin
-        self.log_q[:, self.iter] = self.q
-        self.log_qdot[:, self.iter] = self.qdot
-        self.log_theta_kin[:, self.iter] = self.theta_kin
-        self.log_w_kin[:, self.iter] = self.w_kin
+        self.log_v_kin[:, self.iter] = self.v_kin[:]
+        self.log_z_kin[:, self.iter] = self.z_kin[:]
+        self.log_q[:, self.iter] = self.q[:]
+        self.log_qdot[:, self.iter] = self.qdot[:]
+        self.log_theta_kin[:, self.iter] = self.theta_kin.as_quat()[:]
+        self.log_w_kin[:, self.iter] = self.w_kin.as_quat()[:]
         # other
-        self.log_c[:, self.iter] = self.c
-        self.log_cdot[:, self.iter] = self.cdot
-        self.log_contactforces[:3, self.iter] = self.FLContact
-        self.log_contactforces[3:, self.iter] = self.FRContact
+        self.log_c_out[:, self.iter] = self.c_out[:]
+        self.log_cdot_out[:, self.iter] = self.cdot_out[:]
+        self.log_contactforces[:3, self.iter] = self.FLContact[:]
+        self.log_contactforces[3:, self.iter] = self.FRContact[:]
         return None
 
 
@@ -275,13 +283,14 @@ class Estimator():
 
 
     def ReadSensor(self) -> None:
-        self.device.Read() # FOR TESTING ONLY
+        # rotation are updated supposing the value returned by device is xyz euler angles, in radians
+        self.device.Read() # FOR TESTING ONLY #PPP
         # base acceleration, acceleration with gravity and rotation speed from IMU
         self.a_imu[:] = self.device.baseLinearAcceleration[:] # COPIED FROM SOLO CODE, CHECK CONSISTENCY WITH BOLT MASTERBOARD
         self.ag_imu[:] = self.device.baseLinearAccelerationGravity[:] # bs
-        self.w_imu[:] = self.device.baseAngularVelocity[:]
+        self.w_imu = R.from_euler('xyz', self.device.baseAngularVelocity) 
         # integrated data from IMU
-        self.DeltaTheta[:] = self.device.baseOrientation[:] - self.device.offset_yaw_IMU[:] # bs, to be found
+        self.DeltaTheta = R.from_euler('xyz', self.device.baseOrientation - self.device.offset_yaw_IMU) # bs, to be found
         self.DeltaV[:] = self.device.baseSpeed[:] - self.device.offset_speed_IMU[:] # bs
         # Kinematic data from encoders
         self.q[:] = self.device.q_mes[:]
@@ -304,16 +313,6 @@ class Estimator():
             self.LeftContcat, self.RightContact = self.ContactEstimator.LegsOnGround(self.q, self.a, self.Fcontact)
         elif TypeOfContactEstimator=="kin":
             self.LeftContcat, self.RightContact = self.ContactEstimator.LegsOnGroundKin(self.q, self.a_imu - self.ag_imu)
-
-
-    def AcquireInitialData(self) -> None:
-        # initializes averaged data while the robot starts
-        # might be useless
-        self.ReferenceAcceleration = np.average(self.AllTimeAcceleration, axis=0)
-        self.ReferenceKinematics = np.average(self.AllTimeq, axis=0)
-        self.ReferenceOrientation = 0.
-        return None
-
 
     
     def KinematicAttitude(self) -> np.ndarray:
@@ -349,19 +348,31 @@ class Estimator():
         return self.theta_kin
 
     
-    def IMUAttitude(self) -> np.ndarray :
-        # deduce
+    def IMUAttitudeDEPRECATED(self) -> np.ndarray :
         # IMU gives us acceleration and acceleration without gravity
-        g = utils. self.ag_imu - self.a_imu
+        g = self.ag_imu - self.a_imu
         r = np.linalg.norm(g)
         phi = np.arccos(g[3]/r)
         theta = np.arcsin(g[2]/(r*np.sin(phi)))
+
+
+    def IMUAttitude(self) -> np.ndarray :
+        # IMU gives us acceleration and acceleration without gravity
+        # measured gravity
+        g = self.ag_imu - self.a_imu
+        g0 = np.array([0, 0, 9.81])
+        # compute the quaternion to pass from g0 to g
+        gg0 = utils.cross(g, g0)
+        q0 = np.array( [np.linalg.norm(g) * np.linalg.norm(g0) + utils.scalar(g, g0)] )
+        q = R.from_quat( np.concatenate((gg0, q0), axis=0) )
+        self.theta_imu = q
+        return self.theta_imu.as_quat()
 
     
     def GyroAttitude(self) -> np.ndarray:
         # Uses integrated angular velocity to derive rotation angles 
         # 3DM-CX5-AHRS sensor returns Δθ
-        return self.ReferenceOrientation + self.DeltaTheta
+        return self.ReferenceOrientation + self.DeltaTheta.as_quat()
 
     
     def AttitudeFusion(self) -> None :
@@ -369,7 +380,7 @@ class Estimator():
         #PPP AttitudeFromKin = self.KinematicAttitude(KinPos)
         AttitudeFromIMU = self.IMUAttitude()
         AttitudeFromGyro = self.GyroAttitude()
-        self.AttitudeFilter.RunFilter(AttitudeFromIMU)
+        self.theta_out = R.from_quat(self.AttitudeFilter.RunFilter(AttitudeFromIMU, self.w_imu.as_quat()))
         return None
 
 
@@ -430,7 +441,7 @@ class Estimator():
         #PPP self.UpdateContactInformation()
 
         # counts iteration
-        self.iter += 1
+        
 
         # derive data & runs filter
         #PPP self.SpeedFusion()
@@ -439,7 +450,7 @@ class Estimator():
 
         # update all logs & past variables
         self.UpdateLogMatrixes()
-        self.UpdateMemory()
+        self.iter += 1
 
         return None
 

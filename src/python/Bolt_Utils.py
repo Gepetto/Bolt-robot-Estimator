@@ -50,6 +50,8 @@ class Log():
             log = "  *!* " + log
         elif style=="title":
             log = "\n\n***\n\n " + log + "\n\n***\n\n "
+        elif style=="subtitle":
+            log = " ····> " + log
         if ToPrint and self.PrintOnFlight: print(log)
         self.fulllog  +=  log + "\n"
     def GetLog(self):

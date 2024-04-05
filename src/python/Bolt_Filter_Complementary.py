@@ -80,7 +80,6 @@ class ComplementaryFilter():
         self.Estimate = self.b*self.Estimate + self.T*self.b*xdot + (1-self.b)*x
         # prepare offset correction
         self.ErrorHistory[self.k%self.MemorySize, :] = x-self.Estimate
-        #self.Offset = np.mean(self.ErrorHistory, axis=0) * self.OffsetGain
         self.Offset = np.true_divide(self.ErrorHistory.sum(axis=0), np.count_nonzero(self.ErrorHistory, axis=0)) 
         # offset correction
         self.Estimate += self.Offset * self.OffsetGain

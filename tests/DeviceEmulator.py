@@ -24,6 +24,8 @@ class DeviceEmulator():
         self.v_mes = np.zeros((6,))
 
 
+
+
         self.generator = TrajectoryGenerator
         if logger is not None :
             self.logger = logger
@@ -58,18 +60,18 @@ class DeviceEmulator():
         self.generator.Generate("sinus", NoiseLevel=NoiseLevelZ, N=N, amplitude=0.05, T=T)
         self.Z, self.Zd, self.Zdd = self.generator.GetTrueTraj()
         self.ZN, self.ZNd, self.ZNdd = self.generator.GetNoisyTraj()
-        # ATTITUDE IN DEGREE (? CHK)
+        # ATTITUDE IN RADIANS
         # data from generator are [[x0, x1, x2...]], removing 1D
         # generate X, Y attitude
-        self.generator.Generate("sinus", NoiseLevel=NoiseLevelAttitude, N=N, amplitude=15, T=T)
+        self.generator.Generate("sinus", NoiseLevel=NoiseLevelAttitude, N=N, amplitude=15/57, T=T)
         self.RX, self.RXd, self.RXdd = self.generator.GetTrueTraj()
         self.RXN, self.RXNd, self.RXNdd = self.generator.GetNoisyTraj()
 
-        self.generator.Generate("sinus", NoiseLevel=NoiseLevelAttitude, N=N, amplitude=10, T=T)
+        self.generator.Generate("sinus", NoiseLevel=NoiseLevelAttitude, N=N, amplitude=10/57, T=T)
         self.RY, self.RYd, self.RYdd = self.generator.GetTrueTraj()
         self.RYN, self.RYNd, self.RYNdd = self.generator.GetNoisyTraj()
         # generate Z attitude
-        self.generator.Generate("polynomial5", NoiseLevel=NoiseLevelAttitude/2, N=N, amplitude=5, Drift=Drift, T=T)
+        self.generator.Generate("polynomial5", NoiseLevel=NoiseLevelAttitude/2, N=N, amplitude=5/57, Drift=Drift, T=T)
         self.RZ, self.RZd, self.RZdd = self.generator.GetTrueTraj()
         self.RZN, self.RZNd, self.RZNdd = self.generator.GetDriftingNoisyTraj()
 
