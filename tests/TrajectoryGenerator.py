@@ -76,6 +76,8 @@ class TrajectoryGenerator:
         return self.drifting_trajectory, self.drifting_speed, self.drifting_acceleration
     def GetDriftingNoisyTraj(self):
         return self.noisy_drifting_trajectory, self.noisy_drifting_speed, self.noisy_drifting_acceleration
+    def GetGyroTraj(self):
+        return self.noisy_drifting_trajectory, self.noisy_speed, self.noisy_acceleration
        
 
     

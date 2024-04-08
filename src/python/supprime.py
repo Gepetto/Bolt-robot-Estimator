@@ -6,6 +6,10 @@ import matplotlib.pyplot as plt
 from scipy.spatial.transform import Rotation as R
 
 
+def rotation(EulerArray, ArrayToRotate) -> np.ndarray:
+        Rot = R.from_euler('xyz', EulerArray).as_matrix()
+        return Rot@ArrayToRotate
+
 
 
 
@@ -14,13 +18,9 @@ g = np.array([1.5, 0.0001, 3])
 
 
 gg0 = utils.cross(g, g0)
-print(gg0.shape)
 q0 = np.array( [np.linalg.norm(g) * np.linalg.norm(g0) + utils.scalar(g, g0)] )
-print(q0.shape)
 quat = np.concatenate((gg0, q0), axis=0)
-print(quat)
 q = R.from_quat( quat )
-print(q.as_quat())
 
 g_out = q.apply(g0) # bonne orientation mais pas la bonne norme
 g_out = g_out/np.linalg.norm(g_out) * np.linalg.norm(g)
@@ -30,7 +30,10 @@ print(g)
 print(g_out)
 
 
+grot = rotation(np.array([0.2, 0.2, 0]), g0)
 
+print(grot)
+print(np.linalg.norm(grot))
 
 
 

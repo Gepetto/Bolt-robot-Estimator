@@ -2,7 +2,7 @@ import numpy as np
 
 class ComplementaryFilter():
     def __init__(self,
-                parameters=(0.001, 2),
+                parameters=[0.001, 2],
                 name="[Complementary]",
                 ndim=1,
                 talkative=False,
@@ -16,7 +16,7 @@ class ComplementaryFilter():
         # number of filter run
         self.k = 0
         # sampling interval, cut-off frequency
-        self.T, self.a = self.parameters
+        self.T, self.a = self.parameters[0], self.parameters[1]
         self.b = self.a / (self.T + self.a)
         # initializing current output
         self.Estimate = np.zeros(self.ndim)

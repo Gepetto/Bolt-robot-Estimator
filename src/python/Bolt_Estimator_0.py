@@ -33,9 +33,9 @@ class Estimator():
                 Talkative=True,
                 logger=None,
                 AttitudeFilterType = "complementary",
-                parametersAF = (),
+                parametersAF = [2],
                 SpeedFilterType = "complementary",
-                parametersSF = (),
+                parametersSF = [2],
                 TimeStep = None,
                 IterNumber = 1000) -> None:
 
@@ -82,14 +82,18 @@ class Estimator():
         self.iter += 1
         self.logger.LogTheLog("Initial data stored in logs", ToPrint=Talkative)
         
+
+        # filter parameters
+        parametersAF = [self.TimeStep] + parametersAF
+        parametersSF = [self.TimeStep] + parametersSF
         # set desired filters types for attitude and speed
         # for the time being, complementary only
         if AttitudeFilterType=="complementary":
-            self.AttitudeFilter = ComplementaryFilter(parameters=(0.001, 50), name="attitude complementary filter", talkative=Talkative, logger=self.logger, ndim=4)
+            self.AttitudeFilter = ComplementaryFilter(parameters=parametersAF, name="attitude complementary filter", talkative=Talkative, logger=self.logger, ndim=3)
         self.logger.LogTheLog("Attitude Filter of type '" + AttitudeFilterType + "' added.", ToPrint=Talkative)
         
         if SpeedFilterType=="complementary":
-            self.SpeedFilter = ComplementaryFilter(parameters=(0.001, 50), name="speed complementary filter", talkative=Talkative, logger=self.logger, ndim=3)
+            self.SpeedFilter = ComplementaryFilter(parameters=parametersSF, name="speed complementary filter", talkative=Talkative, logger=self.logger, ndim=3)
         self.logger.LogTheLog("Speed Filter of type '" + SpeedFilterType + "' added.", ToPrint=Talkative)
 
         # returns info on Slips, Contact Forces, Contact with the ground
@@ -113,7 +117,7 @@ class Estimator():
         # initialize data to the right format
         self.a_imu = np.zeros((3,))   
         self.ag_imu = np.zeros((3,))            
-        self.w_imu = R.from_euler('xyz', np.zeros(3))
+        self.w_imu = np.zeros((3,)) #R.from_euler('xyz', np.zeros(3))
         self.theta_imu = R.from_euler('xyz', np.zeros(3))
         # angles ? quaternion ?
         self.DeltaTheta = R.from_euler('xyz', np.zeros(3))
@@ -129,7 +133,7 @@ class Estimator():
         self.v_out = np.zeros((3,)) 
         self.a_out = np.zeros((3,)) 
         self.theta_out = R.from_euler('xyz', np.zeros(3)) 
-        self.w_out = R.from_euler('xyz', np.zeros(3))
+        self.w_out = np.zeros((3,)) #R.from_euler('xyz', np.zeros(3))
 
         self.c_out = np.zeros((3,)) 
         self.cdot_out = np.zeros((3,)) 
@@ -160,12 +164,12 @@ class Estimator():
         # initialize data to the right format
         # base velocitie & co, post-filtering logs
         self.log_v_out = np.zeros([3, self.IterNumber])
-        self.log_w_out = np.zeros([4, self.IterNumber])
+        self.log_w_out = np.zeros([3, self.IterNumber])
         self.log_a_out = np.zeros([3, self.IterNumber])
         self.log_theta_out = np.zeros([4, self.IterNumber])
         # imu data log
         self.log_v_imu = np.zeros([3, self.IterNumber])
-        self.log_w_imu = np.zeros([4, self.IterNumber])
+        self.log_w_imu = np.zeros([3, self.IterNumber])
         self.log_a_imu = np.zeros([3, self.IterNumber])
         self.log_theta_imu = np.zeros([4, self.IterNumber])
         # forward kinematics data log
@@ -184,17 +188,17 @@ class Estimator():
     def UpdateLogMatrixes(self) -> None :
         if self.iter >= self.IterNumber:
             # Logs matrices' size will not be sufficient
-            if Talkative : logs.LogTheLog("Excedind planned number of executions, IterNumber = " + str(self.IterNumber), style="warn", ToPrint=Talkative)
+            if self.Talkative : self.logger.LogTheLog("Excedind planned number of executions, IterNumber = " + str(self.IterNumber), style="warn", ToPrint=self.Talkative)
 
         # update logs with latest data
         # base velocitie & co, post-filtering logs
         self.log_v_out[:, self.iter] = self.v_out[:]
-        self.log_w_out[:, self.iter] = self.w_out.as_quat()[:]
+        self.log_w_out[:, self.iter] = self.w_out[:]#self.w_out.as_quat()[:]
         self.log_a_out[:, self.iter] = self.a_out[:]
         self.log_theta_out[:, self.iter] = self.theta_out.as_quat()[:]
         # imu data log
         self.log_v_imu[:, self.iter] = self.v_imu[:]
-        self.log_w_imu[:, self.iter] = self.w_imu.as_quat()[:]
+        self.log_w_imu[:, self.iter] = self.w_imu[:]#self.w_imu.as_quat()[:]
         self.log_a_imu[:, self.iter] = self.a_imu[:]
         self.log_theta_imu[:, self.iter] = self.theta_imu.as_quat()[:]
         # forward kinematics data log
@@ -288,7 +292,7 @@ class Estimator():
         # base acceleration, acceleration with gravity and rotation speed from IMU
         self.a_imu[:] = self.device.baseLinearAcceleration[:] # COPIED FROM SOLO CODE, CHECK CONSISTENCY WITH BOLT MASTERBOARD
         self.ag_imu[:] = self.device.baseLinearAccelerationGravity[:] # bs
-        self.w_imu = R.from_euler('xyz', self.device.baseAngularVelocity) 
+        self.w_imu[:] = self.device.baseAngularVelocity[:]
         # integrated data from IMU
         self.DeltaTheta = R.from_euler('xyz', self.device.baseOrientation - self.device.offset_yaw_IMU) # bs, to be found
         self.DeltaV[:] = self.device.baseSpeed[:] - self.device.offset_speed_IMU[:] # bs
@@ -347,13 +351,6 @@ class Estimator():
 
         return self.theta_kin
 
-    
-    def IMUAttitudeDEPRECATED(self) -> np.ndarray :
-        # IMU gives us acceleration and acceleration without gravity
-        g = self.ag_imu - self.a_imu
-        r = np.linalg.norm(g)
-        phi = np.arccos(g[3]/r)
-        theta = np.arcsin(g[2]/(r*np.sin(phi)))
 
 
     def IMUAttitude(self) -> np.ndarray :
@@ -366,21 +363,30 @@ class Estimator():
         q0 = np.array( [np.linalg.norm(g) * np.linalg.norm(g0) + utils.scalar(g, g0)] )
         q = R.from_quat( np.concatenate((gg0, q0), axis=0) )
         self.theta_imu = q
-        return self.theta_imu.as_quat()
+        return self.theta_imu.as_euler('xyz')
 
     
     def GyroAttitude(self) -> np.ndarray:
         # Uses integrated angular velocity to derive rotation angles 
         # 3DM-CX5-AHRS sensor returns Δθ
-        return self.ReferenceOrientation + self.DeltaTheta.as_quat()
+        return self.DeltaTheta.as_euler('xyz')
 
     
-    def AttitudeFusion(self) -> None :
-        # uses attitude Kinematic estimate and gyro data to provide attitude estimate
-        #PPP AttitudeFromKin = self.KinematicAttitude(KinPos)
+    def AttitudeFusion_AG(self) -> np.ndarray :
+        # uses attitude from direction of gravity estimate and gyro data to provide attitude estimate
         AttitudeFromIMU = self.IMUAttitude()
-        AttitudeFromGyro = self.GyroAttitude()
-        self.theta_out = R.from_quat(self.AttitudeFilter.RunFilter(AttitudeFromIMU, self.w_imu.as_quat()))
+        self.theta_out_ag = R.from_euler('xyz', self.AttitudeFilter.RunFilter(AttitudeFromIMU, self.w_imu))
+        return self.theta_out_ag
+    
+    def AttitudeFusion_KG(self) -> np.ndarray :
+        # uses attitude Kinematic estimate and gyro data to provide attitude estimate
+        AttitudeFromKin = self.KinematicAttitude()
+        self.theta_out_kg = R.from_euler('xyz', self.AttitudeFilter.RunFilter(AttitudeFromKin, self.w_imu))
+        return self.theta_out_kg
+    
+    def AttitudeFusion(self, alpha=1) -> None :
+        # uses AttitudeFusion_AG and AttitudeFusion_KG to provide attitude estimate
+        self.theta_out = alpha*self.AttitudeFusion_AG() + (1-alpha)*self.AttitudeFusion_KG()
         return None
 
 
@@ -437,11 +443,8 @@ class Estimator():
         # this is the main function
         # updates all variables with latest available measurements
         self.ReadSensor()
-
         #PPP self.UpdateContactInformation()
 
-        # counts iteration
-        
 
         # derive data & runs filter
         #PPP self.SpeedFusion()
@@ -450,6 +453,7 @@ class Estimator():
 
         # update all logs & past variables
         self.UpdateLogMatrixes()
+        # count iteration
         self.iter += 1
 
         return None

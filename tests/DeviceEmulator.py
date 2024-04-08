@@ -48,32 +48,38 @@ class DeviceEmulator():
         self.Omega = np.zeros((N, 3))
         self.OmegaDot = np.zeros((N, 3))
         
+        # TRAJ IN M, M/S, M/S²
         # generate X trajectory
-        self.generator.Generate("polynomial5", NoiseLevel=NoiseLevelXY, N=N, amplitude=0.5, T=T)
+        self.generator.Generate("sinus", NoiseLevel=NoiseLevelXY, N=N, amplitude=0.5, T=T, avgfreq=0.05)
         self.X, self.Xd, self.Xdd = self.generator.GetTrueTraj()
         self.XN, self.XNd, self.XNdd = self.generator.GetNoisyTraj()
         # generate Y trajectory
-        self.generator.Generate("polynomial5", NoiseLevel=NoiseLevelXY, N=N, amplitude=0.5, T=T)
+        self.generator.Generate("sinus", NoiseLevel=NoiseLevelXY, N=N, amplitude=0.1, T=T, avgfreq=0.05)
         self.Y, self.Yd, self.Ydd = self.generator.GetTrueTraj()
         self.YN, self.YNd, self.YNdd = self.generator.GetNoisyTraj()
         # generate Z trajectory
-        self.generator.Generate("sinus", NoiseLevel=NoiseLevelZ, N=N, amplitude=0.05, T=T)
+        self.generator.Generate("sinus", NoiseLevel=NoiseLevelZ, N=N, amplitude=0.01, T=T, avgfreq=0.5)
         self.Z, self.Zd, self.Zdd = self.generator.GetTrueTraj()
         self.ZN, self.ZNd, self.ZNdd = self.generator.GetNoisyTraj()
+
+
         # ATTITUDE IN RADIANS
         # data from generator are [[x0, x1, x2...]], removing 1D
-        # generate X, Y attitude
-        self.generator.Generate("sinus", NoiseLevel=NoiseLevelAttitude, N=N, amplitude=15/57, T=T)
+        # generate X, Y attitude with noise and drift
+        self.generator.Generate("sinus", NoiseLevel=NoiseLevelAttitude, N=N, amplitude=0.08, Drift=Drift, T=T, avgfreq=1.5)
         self.RX, self.RXd, self.RXdd = self.generator.GetTrueTraj()
-        self.RXN, self.RXNd, self.RXNdd = self.generator.GetNoisyTraj()
+        self.RXN, self.RXNd, self.RXNdd = self.generator.GetGyroTraj()
+        # same traj without drift
+        self.RXNnondrift,*o = self.generator.GetNoisyTraj()
 
-        self.generator.Generate("sinus", NoiseLevel=NoiseLevelAttitude, N=N, amplitude=10/57, T=T)
+        self.generator.Generate("sinus", NoiseLevel=NoiseLevelAttitude, N=N, amplitude=0.05, Drift=Drift, T=T, avgfreq=1.5)
         self.RY, self.RYd, self.RYdd = self.generator.GetTrueTraj()
-        self.RYN, self.RYNd, self.RYNdd = self.generator.GetNoisyTraj()
+        self.RYN, self.RYNd, self.RYNdd = self.generator.GetGyroTraj()
+        self.RYNnondrift,*o = self.generator.GetNoisyTraj()
         # generate Z attitude
-        self.generator.Generate("polynomial5", NoiseLevel=NoiseLevelAttitude/2, N=N, amplitude=5/57, Drift=Drift, T=T)
+        self.generator.Generate("polynomial1", NoiseLevel=NoiseLevelAttitude/2, N=N, amplitude=0.3, Drift=Drift, T=T)
         self.RZ, self.RZd, self.RZdd = self.generator.GetTrueTraj()
-        self.RZN, self.RZNd, self.RZNdd = self.generator.GetDriftingNoisyTraj()
+        self.RZN, self.RZNd, self.RZNdd = self.generator.GetGyroTraj()
 
         # put all that noisy data in the right variables
         self.Traj[:, 0], self.Traj[:, 1], self.Traj[:, 2] = self.XN[0], self.YN[0], self.ZN[0]
@@ -84,10 +90,10 @@ class DeviceEmulator():
         self.Omega[:, 0], self.Omega[:, 1], self.Omega[:, 2] = self.RXNd[0], self.RYd[0], self.RZNd[0]
         self.OmegaDot[:, 0], self.OmegaDot[:, 1], self.OmegaDot[:, 2] = self.RXNdd[0], self.RYNdd[0], self.RZNdd[0]
 
-        # acceleration with gravity (ADDED WITHOUT ANY NOISE)
+        # acceleration with gravity (ADDED WITH NOISE BUT WITHOUT DRIFT)
 
         for j in range(N):
-            self.AccG[j, :] = self.Acc[j, :] + utils.rotation( np.array([0, 0, 9.81]), np.array([self.RX[0, j], self.RY[0, j], self.RZ[0, j]])  )
+            self.AccG[j, :] = self.Acc[j, :] + utils.rotation( np.array([self.RXNnondrift[0, j], self.RYNnondrift[0, j], 0]), np.array([0, 0, 9.81]) )
 
 
     def Read(self):

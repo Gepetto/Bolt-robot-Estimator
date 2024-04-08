@@ -30,7 +30,7 @@ class utils():
         return Rotation.from_euler('zyx', EulerArray).as_matrix()
     
     def rotation(EulerArray, ArrayToRotate) -> np.ndarray:
-        R = Rotation.from_euler('zyx', EulerArray).as_matrix()
+        R = Rotation.from_euler('xyz', EulerArray).as_matrix()
         return R@ArrayToRotate
 
 '''
