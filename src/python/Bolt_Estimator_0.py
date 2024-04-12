@@ -28,7 +28,7 @@ License, authors, LAAS
 class Estimator():
     def __init__(self,
                 device,
-                ModelPathth="",
+                ModelPath="",
                 UrdfPath="",
                 Talkative=True,
                 logger=None,
@@ -55,6 +55,9 @@ class Estimator():
             self.logger.LogTheLog("No URDF path or ModelPath added !", style="warn", ToPrint=True)
             self.robot=None
         else :
+            model, collision_model, visual_model = pin.buildModelsFromUrdf(
+                UrdfPath, ModelPath, pin.JointModelFreeFlyer())
+
             self.robot = pin.RobotWrapper.BuildFromURDF(UrdfPath, ModelPath)
             self.logger.LogTheLog("URDF built", ToPrint=Talkative)
         self.FeetIndexes = [0, 0] # Left, Right
@@ -103,6 +106,7 @@ class Estimator():
         
         #self.AllTimeAcceleration, self.AllTimeq = np.zeros((3, self.MemorySize)), np.zeros((3, self.MemorySize))
         self.logger.LogTheLog(self.MsgName +" initialized successfully.", ToPrint=Talkative)
+        return None
 
 
     def ExternalDataCaster(self, DataType, ReceivedData) -> None:
@@ -225,7 +229,7 @@ class Estimator():
         elif data=="rotation_speed" or data=="w" or data=="omega":
             return self.w_out
         elif data=="attitude" or data=="theta":
-            return quaternion(self.theta_out)
+            return self.theta_out
         elif data=="com_position" or data=="c":
             return self.c_out
         elif data=="com_speed" or data=="cdot":
@@ -281,7 +285,7 @@ class Estimator():
             return self.log_v_kin
         # ...
         else :
-            logs.LogTheLog("Could not get data '" + data + "'. Unrecognised data getter.", style="warn", ToPrint=Talkative)
+            self.logger.LogTheLog("Could not get data '" + data + "'. Unrecognised data getter.", style="warn", ToPrint=self.Talkative)
             return None
 
 
@@ -324,16 +328,16 @@ class Estimator():
         
         # consider the right contact frames, depending on which foot is in contact with the ground
         if self.LeftContact and self.RightContact :
-            self.logger.LogTheLog("Both feet are touching the ground", style="warn", ToPrint=Talkative)
+            self.logger.LogTheLog("Both feet are touching the ground", style="warn", ToPrint=self.Talkative)
             ContactFrames = [0,1]
         elif self.LeftContact :
-            self.logger.LogTheLog("left foot touching the ground", ToPrint=Talkative)
+            self.logger.LogTheLog("left foot touching the ground", ToPrint=self.Talkative)
             ContactFrames = [0]
         elif self.RightContact :
-            self.logger.LogTheLog("right foot touching the ground", ToPrint=Talkative)
+            self.logger.LogTheLog("right foot touching the ground", ToPrint=self.Talkative)
             ContactFrames = [1]
         else :
-            self.logger.LogTheLog("No feet are touching the ground", style="warn", ToPrint=Talkative)
+            self.logger.LogTheLog("No feet are touching the ground", style="warn", ToPrint=self.Talkative)
             ContactFrames = []
 
         # Compute the base's attitude for each foot in contact
@@ -401,16 +405,16 @@ class Estimator():
 
         # consider the right contact frames, depending on which foot is in contact with the ground
         if self.LeftContact and self.RightContact :
-            self.logger.LogTheLog("Both feet are touching the ground", style="warn", ToPrint=Talkative)
+            self.logger.LogTheLog("Both feet are touching the ground", style="warn", ToPrint=self.Talkative)
             ContactFrames = [0,1]
         elif self.LeftContact :
-            self.logger.LogTheLog("left foot touching the ground", ToPrint=Talkative)
+            self.logger.LogTheLog("left foot touching the ground", ToPrint=self.Talkative)
             ContactFrames = [0]
         elif self.RightContact :
-            self.logger.LogTheLog("right foot touching the ground", ToPrint=Talkative)
+            self.logger.LogTheLog("right foot touching the ground", ToPrint=self.Talkative)
             ContactFrames = [1]
         else :
-            self.logger.LogTheLog("No feet are touching the ground", style="warn", ToPrint=Talkative)
+            self.logger.LogTheLog("No feet are touching the ground", style="warn", ToPrint=self.Talkative)
             ContactFrames = []
 
         # Compute the base's speed for each foot in contact

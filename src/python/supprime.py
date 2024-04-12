@@ -42,8 +42,8 @@ print(np.linalg.norm(grot))
 
 
 def rotation(EulerArray, ArrayToRotate) -> np.ndarray:
-        R = Rotation.from_euler('zyx', EulerArray).as_matrix()
-        return R@ArrayToRotate
+        r = R.from_euler('zyx', EulerArray).as_matrix()
+        return r@ArrayToRotate
 
 
 
@@ -75,3 +75,11 @@ plt.legend()
 plt.show()
 
 '''
+
+
+
+
+
+
+
+
