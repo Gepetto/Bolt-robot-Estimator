@@ -14,9 +14,13 @@ from Bolt_Filter_Complementary import ComplementaryFilter
 """
 An estimator for Bolt Bipedal Robot
 
-    Program description
+    This code uses Pinocchio and IMU data to provide an estimate of Bolt's
+    base attitude and center of mass' speed.
 
-    Class estimator Description
+    The Estimator Class contains the different filters and sub-estimators 
+    needed to merge the relevant data. Its main method is Estimator.Estimate() .
+    
+    Documentation can be found at  $ $ $  G I T  $ $ $ 
 
 License, authors, LAAS
 
@@ -39,7 +43,7 @@ class Estimator():
                 TimeStep = None,
                 IterNumber = 1000) -> None:
 
-        self.MsgName = "Bolt Estimator v0.4"
+        self.MsgName = "Bolt Estimator v0.5"
         self.Talkative=Talkative
         if logger is not None :
             self.logger = logger
@@ -343,8 +347,13 @@ class Estimator():
         # Compute the base's attitude for each foot in contact
         FrameAttitude = []
         for foot in ContactFrames:
+            # attitude f the foot
+            
+            # attitude from foot to base
             pin.forwardKinematics(self.q, [self.v,[self.a]])
             FrameAttitude.append( - pin.updateFramePlacement(self.model, self.data, self.FeetIndexes[foot]).rotation)
+            
+            # combined attitude
         
         if self.LeftContact or self.RightContact :
             # averages results
@@ -376,21 +385,20 @@ class Estimator():
         return self.DeltaTheta.as_euler('xyz')
 
     
-    def AttitudeFusion_AG(self) -> np.ndarray :
-        # uses attitude from direction of gravity estimate and gyro data to provide attitude estimate
-        AttitudeFromIMU = self.IMUAttitude()
-        self.theta_out_ag = R.from_euler('xyz', self.AttitudeFilter.RunFilter(AttitudeFromIMU, self.w_imu))
-        return self.theta_out_ag
-    
-    def AttitudeFusion_KG(self) -> np.ndarray :
-        # uses attitude Kinematic estimate and gyro data to provide attitude estimate
-        AttitudeFromKin = self.KinematicAttitude()
-        self.theta_out_kg = R.from_euler('xyz', self.AttitudeFilter.RunFilter(AttitudeFromKin, self.w_imu))
-        return self.theta_out_kg
     
     def AttitudeFusion(self, alpha=1) -> None :
         # uses AttitudeFusion_AG and AttitudeFusion_KG to provide attitude estimate
-        self.theta_out = alpha*self.AttitudeFusion_AG() + (1-alpha)*self.AttitudeFusion_KG()
+        
+        # uses attitude from direction of gravity estimate and gyro data to provide attitude estimate
+        AttitudeFromIMU = self.IMUAttitude()
+        self.theta_out_ag = R.from_euler('xyz', self.AttitudeFilter.RunFilter(AttitudeFromIMU, self.w_imu))
+            
+        # uses attitude Kinematic estimate and gyro data to provide attitude estimate
+        AttitudeFromKin = self.KinematicAttitude()
+        self.theta_out_kg = R.from_euler('xyz', self.AttitudeFilter.RunFilter(AttitudeFromKin, self.w_imu))
+        
+        # average both
+        self.theta_out = alpha*self.theta_out_ag + (1-alpha)*self.theta_out_kg
         return None
 
 

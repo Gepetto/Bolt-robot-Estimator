@@ -11,6 +11,48 @@ def rotation(EulerArray, ArrayToRotate) -> np.ndarray:
         return Rot@ArrayToRotate
 
 
+RobotWeight = 10
+acc_coeff = .4
+N = 20
+
+MinForce = 0
+MaxForce = RobotWeight*9.81 * (1+acc_coeff)
+upper = int(np.floor(N*(1+acc_coeff)))
+lower = int(np.ceil(N*(1-acc_coeff/2)))
+
+print(f'upper : {upper}, lower : {lower}')
+
+PossibleForce_Left = np.linspace(MinForce, MaxForce, upper)
+PossibleForce_Right = PossibleForce_Left.copy()
+print(PossibleForce_Left)
+
+
+k = 0
+for i in range(upper):
+    FL = PossibleForce_Left[i]
+    ReasonnableMin = max(0, lower-i)
+    ReasonnableMax = max(0, upper-i)
+    for j in range( ReasonnableMin, ReasonnableMax):
+        weight = PossibleForce_Left[i] + PossibleForce_Right[j]
+        print(f'Indices :  {i} ; {j}     Valeur :  {np.floor(weight)}       Répartition :  {np.floor(PossibleForce_Left[i])}/{np.floor(PossibleForce_Right[j])}')
+        k +=1
+        
+        
+print(f'iteration totale : {k}')
+print(f'iteration sans optim : {len(PossibleForce_Left)**2}')
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 g0 = np.array([0, 0, 10])

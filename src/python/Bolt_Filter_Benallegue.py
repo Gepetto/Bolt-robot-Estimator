@@ -95,7 +95,7 @@ class BenallegueEstimator():
         self.x2 = self.x2 + self.dt * self.x2dot
         
         # convert x2 to exepcted data format
-        FootAttitude = self.x2
+        self.FootAttitude = self.x2
         self.k += 1
         return self.FootAttitude
     
