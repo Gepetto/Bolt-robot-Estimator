@@ -32,16 +32,16 @@ License, authors, LAAS
 class Estimator():
     def __init__(self,
                 device,
-                ModelPath="",
-                UrdfPath="",
-                Talkative=True,
-                logger=None,
-                AttitudeFilterType = "complementary",
-                parametersAF = [2],
-                SpeedFilterType = "complementary",
-                parametersSF = [2],
-                TimeStep = None,
-                IterNumber = 1000) -> None:
+                ModelPath           : str = "",
+                UrdfPath            : str = "",
+                Talkative           : bool = True,
+                logger              : bool = None,
+                AttitudeFilterType  : str = "complementary",
+                parametersAF        : list = [2],
+                SpeedFilterType     : str = "complementary",
+                parametersSF        : list = [2],
+                TimeStep            : float = None,
+                IterNumber          : int = 1000) -> None:
 
         self.MsgName = "Bolt Estimator v0.5"
         self.Talkative=Talkative
@@ -113,7 +113,7 @@ class Estimator():
         return None
 
 
-    def ExternalDataCaster(self, DataType, ReceivedData) -> None:
+    def ExternalDataCaster(self, DataType:str, ReceivedData) -> None:
         # In case data from elsewhere needs to be converted to another format, or truncated
         if DataType == "acceleration":
             self.a = np.array(ReceivedData)

@@ -104,7 +104,8 @@ def supersim(nsteps):
         viz1.display(q)
         viz1.drawFrameVelocities(frame_id=RF_id)
         
-        pin.forwardKinematics(model, data1, q)
+        #pin.forwardKinematics(model, data1, q)
+        pin.randomConfiguration(model, [np.zeros(model.nv, dtype=float), np.ones(model.nv, dtype=float)])
         pin.updateFramePlacement(model, data1, RF_id)
         
         RFAttitude.append( data1.oMf[RF_id].translation )
@@ -115,7 +116,7 @@ def supersim(nsteps):
 
 
 
-qs, RfootAttitude, LfootAttitude = supersim(250)
+qs, RfootAttitude, LfootAttitude = supersim(50)
 
 
 
