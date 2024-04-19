@@ -10,6 +10,10 @@ def rotation(EulerArray, ArrayToRotate) -> np.ndarray:
         Rot = R.from_euler('xyz', EulerArray).as_matrix()
         return Rot@ArrayToRotate
 
+def f(x):
+    b = 1.5
+    b0 = 8
+    return 1/ (1 + np.exp(-b*x + b0))
 
 RobotWeight = 10
 acc_coeff = .4
@@ -100,23 +104,22 @@ def rotation(EulerArray, ArrayToRotate) -> np.ndarray:
 def f(x, a, b):
     M = 100
     return (M/b - x)*a
+'''
+n= 100
+X = np.linspace(0, 12, n)
+Y = f(X)
+#Z = f(X, 0.15, 3)
+#Z = X + np.linspace(np.zeros(3), n*np.ones(3), n).T
 
-n= 20
-X = np.linspace(0, 100, n)
-Y = f(X, 0.6, 10)
-Z = f(X, 0.15, 3)
-Z = X + np.linspace(np.zeros(3), n*np.ones(3), n).T
 
-print(Z)
-
-plt.clf()
+plt.figure(dpi=200)
 plt.plot(X, Y, label="Y")
-plt.plot(X, Z[0], label="Z")
+#plt.plot(X, Z[0], label="Z")
 plt.grid()
 plt.legend()
 plt.show()
 
-'''
+
 
 
 

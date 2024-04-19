@@ -4,7 +4,7 @@ save_data_on_exit = True
 save_history = True
 save_non_project_files = False
 project_type = 'empty-project-type'
-recent_files = ['supprime.py', '../../../bipedal-control/bipedal-control/mpc_main.py', 'Solo/ForceMonitor.py', '../../pin/PinTest_6.py', 'Bolt_ContactEstimator.py']
+recent_files = ['Bolt_ContactEstimator.py', '../../pin/PinTest_6.py', '../../../bipedal-control/bipedal-control/mpc_main.py', '../../../bipedal-control/bipedal-control/motion/plotter.py', '../../data/DataReader.py', '../../tests/Graphics.py']
 
 [main]
 version = 0.2.0

@@ -55,10 +55,61 @@ class ContactEstimator():
                 if Deltas[-1] < DeltaMin:
                     # error is minimal
                     DeltaMin = Deltas[-1]
-                    CF = LcF, RcF    
-
+                    CF = (LcF, RcF)
         return CF
-
+    
+    
+    def ContactForces3d(self, Torques, Positions, frames=[10,18]) -> tuple[np.ndarray, np.ndarray]:
+        # simply uses jacobian and torques
+        # set left foot and right foot data apart
+        LF_id, RF_id = frames[0], frames[1]
+        
+        # compute jacobian matrixes for both feet
+        JL = pin.computeFrameJacobian(self.bolt.model, self.bolt.data, self.q, LF_id).copy()
+        JR = pin.computeFrameJacobian(self.bolt.model, self.bolt.data, self.q, RF_id).copy()
+        
+        # compute 6d contact wrenches
+        LcF = np.linalg.inv(np.transpose(JL))@Torques
+        RcF = np.linalg.inv(np.transpose(JR))@Torques
+        
+        return LcF[:3], RcF[:3]
+    
+    
+    def ConsistencyChecker(self, thresold=0.2):
+        
+        thresold = weight*9.81*thresold
+        LeftConfidence, RightConfidence = 0.5, 0.5
+        
+        LcF_1, RcF_1 = self.ContactForces1d()
+        LcF_3, RcF_3 = self.ContactForces3d()
+        # average vertical force
+        RcF = (RcF_1[2] + RcF_3[2]) * 0.5
+        
+        self.logger.LogTheLog("checking forces estimation consistency")
+        
+        # deltas between forces
+        DeltaR = np.linalg.norm(RcF_1) - np.linalg.norm(RcF_3)
+        DeltaR3d = np.linalg.norm(RcF_1 - RcF_3)
+        DeltaRv = np.linalg.norm(RcF_1[2] - RcF_3[2])
+        # confidence in non-silp : horizontal norm over vertical norm
+        MuR = np.sqrt(RcF_3[0]**2 + RcF_3[1]**2) / RcF_3[2]
+        
+        # to tune
+        b, b0 = 1.5, 8.0
+        PR = 1/ (1 + np.exp(-b*RcF + b0))
+        
+        RightConfidence = 1.0 - ( 0.1*DeltaR + 0.2*DeltaR3d + 0.1*DeltaRv + 0.1*MuR)
+        
+        if DeltaR < thresold :
+             # norms are consistent
+             pass
+         
+         
+            
+             
+        
+        
+    
 
 
     def LegsOnGround(self, Kinpos, Acc, Fcontact) -> tuple[bool, bool]:
@@ -72,15 +123,15 @@ class ContactEstimator():
         # uses the z distance from foot to base, with kinematics only and a vertical direction provided by IMU
         
         self.robot.framesForwardKinematics(q=Kinpos)
-        robot.updateFramePlacements()
+        self.robot.updateFramePlacements()
 
-        LeftFootPos = gait.rdata.oMf[self.LeftFootFrameID].translation
-        RightFootPos = gait.rdata.oMf[self.RightFootFrameID].translation
+        LeftFootPos = self.robot.gait.rdata.oMf[self.LeftFootFrameID].translation
+        RightFootPos = self.robot.gait.rdata.oMf[self.RightFootFrameID].translation
         
         VerticalDistLeft = scalar(LeftFootPos, vertical)
         VerticalDistRight = scalar(RightFootPos, vertical)
 
-        if isapprox(VerticalDistLeft, VerticalDistRight, eps=3e-3):
+        if pin.isapprox(VerticalDistLeft, VerticalDistRight, eps=3e-3):
             # both feet might be in contact
             LeftContact, RightContact = True, True
         elif VerticalDistLeft > VerticalDistRight :
@@ -97,6 +148,11 @@ class ContactEstimator():
         # uses Kinematics to compute feet acceleration and determin if the feet is slipping
         LeftSlipProb, RightSlipProb = 0.0, 0.0
         # 0 , 0.8 : Left feet stable, right feet potentially slipping
+        
+        
+        LcF_3, RcF_3 = self.ContactForces3d()
+        # slipery level : horizontal norm over vertical norm
+        MuR = np.sqrt(RcF_3[0]**2 + RcF_3[1]**2) / RcF_3[2]       
         return LeftSlipProb, RightSlipProb
 
     def FeetPositions(self) -> tuple[np.ndarray, np.ndarray]:

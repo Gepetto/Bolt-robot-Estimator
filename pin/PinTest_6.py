@@ -9,6 +9,9 @@ from pinocchio.visualize import MeshcatVisualizer
 import matplotlib.pyplot as plt
 import time
 
+
+
+
 class boltomatic():
     def __init__(self):
         # Load the URDF model.
@@ -17,7 +20,7 @@ class boltomatic():
         self.qd = pin.utils.zero(self.bolt.model.nv)
         self.qdd = np.zeros(self.bolt.model.nv)
         self.q = pin.neutral(self.bolt.model)
-        self.T = np.zeros(self.bolt.model.nv)
+        self.tau = np.zeros(self.bolt.model.nv)
         
         
         self.RF_id = self.bolt.model.getFrameId("FR_FOOT")
@@ -25,16 +28,22 @@ class boltomatic():
         self.LF_id = self.bolt.model.getFrameId("FL_FOOT")
         print("left foot frame id ", self.LF_id)
         self.C_id = [self.LF_id, self.RF_id]
-        
-        print('AAAA')
-        print(self.bolt.model.frames[3])
+        #self.C_id = [1]
+        #for j in range(19):
+        #    print(j)
+        #    print('--  ', self.bolt.model.frames[j].parent)
         
         self.initView()
         self.initLog()
         
         self.bolt.model.gravity.linear[:] = 0.0
         self.t = 0.
-        self.applyForce((np.zeros(3),np.zeros(3)))
+        self.applyForce([np.zeros(3)])
+        self.dt = 0.01
+        self.qs = []
+        
+        #self.q[-6] = 1.
+        
         
 
         
@@ -58,11 +67,12 @@ class boltomatic():
     
     def initLog(self, n=500):
         self.log_q = np.zeros((self.bolt.model.nv+1, n))
+        self.log_tau = np.zeros((n, self.bolt.model.nv, 3))
     
 
     def superupdateView(self, k, dt=0.1, Tdisp=50e-3):
         # display evry Tdisp
-        if not k % int(Tdisp/dt):
+        if dt > Tdisp or not k % int(Tdisp/dt):
             self.viz.display(self.q)
             time.sleep(Tdisp)
     
@@ -75,10 +85,15 @@ class boltomatic():
         pin.updateFramePlacements(self.bolt.model, self.bolt.data)
         pin.centerOfMass(self.bolt.model, self.bolt.data, self.q)
         com = self.bolt.data.com[0]
+    
+    def Qcompare(self, newq_angular):
+        print(self.lastq_angular - newq_angular)
+        lastq_angular = newq_angular
         
         
     def updateLog(self, k):
         self.log_q[:, k] = self.q[:]
+        self.log_tau[k, :, :]  =self.tau[:]
         #print(self.q)
     
     def plotlog(self, fidlist):
@@ -86,6 +101,12 @@ class boltomatic():
         plt.grid()
         for fid in fidlist :
             plt.plot(self.log_q[fid, :])
+        plt.show()
+    def plottorque(self, jidlist):
+        plt.figure(3, dpi=200)
+        plt.grid()
+        for jid in jidlist :
+            plt.plot(self.log_tau[jid, :])
         plt.show()
     
     def kinMove(self, qf, n=10):
@@ -96,13 +117,17 @@ class boltomatic():
             self.updateMove()
             self.updateView(k)
             self.updateLog(k)
-        self.plotlog([7,8,9,10])
+            self.qs.append(self.q)
+            
+            self.tau = [self.bolt.data.f[j].angular for j in range(8)]
+        #self.plotlog([7,8,9,10])
     
     def torqueMove(self, Tf, dt, n=10000):
-        Ts = np.linspace(self.T, Tf, n)
+        Ts = np.linspace(self.tau, Tf, n)
+        self.dt = dt
         self.initLog(n)
         for k in range(n):
-            self.qdd = pin.aba(self.bolt.model, self.bolt.data, self.q, self.qd, self.T, self.forces)
+            self.qdd = pin.aba(self.bolt.model, self.bolt.data, self.q, self.qd, self.tau, self.forces)
             self.qd += self.qdd*dt
             self.q = pin.integrate(self.bolt.model, self.q, self.qd*dt)
             #print(self.qdd)
@@ -111,7 +136,30 @@ class boltomatic():
             self.superupdateView(k, dt=dt)
             self.updateLog(k)
             self.t += dt
-            self.T = Ts[k]
+            self.tau = Ts[k]
+            
+            self.qs.append(self.q)
+            
+        self.plotlog([7,8,9,10])
+    
+    def forceMove(self, F, dt, n=10000):
+        self.dt = dt
+        self.initLog(n)
+        self.applyForce(F)
+        
+        for k in range(n):
+            self.qdd = pin.aba(self.bolt.model, self.bolt.data, self.q, self.qd, self.tau, self.forces)
+            self.qd += self.qdd*dt
+            self.q = pin.integrate(self.bolt.model, self.q, self.qd*dt)
+            #print(self.qdd)
+            
+            self.updateMove()
+            self.superupdateView(k, dt=dt)
+            self.updateLog(k)
+            self.t += dt
+            self.qs.append(self.q)
+            
+            #print(self.bolt.model.joints[4])
             
         self.plotlog([7,8,9,10])
     
@@ -124,10 +172,26 @@ class boltomatic():
         
         for f,idf in zip(ContactForces,self.C_id):
             # Contact forces introduced in ABA as spatial forces at joint frame.
-            forces[self.bolt.model.frames[idf].parent] = self.bolt.model.frames[idf].placement * pin.Force(f,0*f)
+            forces[self.bolt.model.frames[idf].parent] = self.bolt.model.frames[idf].placement * pin.Force(f, 0.*f)
         self.forces = pin.StdVec_Force()
         for f in forces:
             self.forces.append(f)
+    
+    def video(self):
+        with self.viz.create_video_ctx("../manualeap.mp4"):
+            self.viz.play(self.qs, self.dt, callback=self.callback)
+    
+    def callback(self, i, *args):
+        self.viz.drawFrameVelocities(self.RF_id)
+    
+    def jacob(self, fid):
+        print('\n JACOBIAN \n')
+        J = pin.computeFrameJacobian(self.bolt.model, self.bolt.data, self.q, fid)
+        print(J)
+        print(J.transpose())
+    
+    def PrintFrame(self,j):
+        print(self.bolt.data.oMf[j].rotation)
 
 
     
@@ -139,18 +203,20 @@ def datagenerator(n, j=7, sp=-1):
     if sp==-1:
         x[j:] = np.random.random(n-j)*2 - 1
     else:
-        x[sp] = np.random.random(1)*2 - 1
+        x[sp] = np.random.random(1)[0]*2 - 1
     return x
 
-tau = datagenerator(12, 7)/100
-qf = datagenerator(13, 7)
+tau = datagenerator(12, sp=7)/1000
+qf = datagenerator(13, 8)
 #tau = datagenerator(12, sp=11)/100
 
-print(tau)
 bolt = boltomatic()
-bolt.torqueMove(tau, dt=0.001, n=10000)
-#bolt.kinMove(qf)
-
+#bolt.torqueMove(tau, dt=0.1, n=80)
+bolt.kinMove(qf)
+bolt.plottorque([2, 3, 4]) # left leg torques
+#bolt.forceMove([np.array([0., 0., 0.01]), np.array([0., 0., 0.]),], dt=0.01, n=100)
+#bolt.jacob(10)
+#bolt.video()
 
 
 

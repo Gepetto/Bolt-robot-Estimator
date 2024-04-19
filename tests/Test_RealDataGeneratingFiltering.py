@@ -97,8 +97,8 @@ def main(N=1000, NoiseLevel=50):
     # run filter over time, with noisy data as inputs
     for k in range(N):
         FilterTraj1[:, k] = ComplementaryFilter1.RunFilterOffset(np.array(NoisyTraj[:,k]), np.array(NoisySpeed[:,k]) )
-        FilterTraj2[:, k] = ComplementaryFilter2.RunFilterOffset2(np.array(NoisyTraj[:,k]), np.array(NoisySpeed[:,k]) )
-        FilterTraj3[:, k] = ComplementaryFilter3.RunFilterOffset3(np.array(NoisyTraj[:,k]), np.array(NoisySpeed[:,k]) )
+        FilterTraj2[:, k] = ComplementaryFilter2.RunFilterOffset(np.array(NoisyTraj[:,k]), np.array(NoisySpeed[:,k]) )
+        FilterTraj3[:, k] = ComplementaryFilter3.RunFilterOffset(np.array(NoisyTraj[:,k]), np.array(NoisySpeed[:,k]) )
 
 
 
@@ -134,6 +134,7 @@ def main(N=1000, NoiseLevel=50):
     dataset = [abs(TrueTraj-FilterTraj1)/scaler , abs(TrueTraj-FilterTraj2)/scaler, abs(TrueTraj-FilterTraj3)/scaler]
     grapher.SetLegend(["error with offset", "errror with nonzero mean",  "error with quick convergence gain"], ndim)
     grapher.CompareNDdatas(dataset, "position", "Error for different offset compensator", StyleAdapter=False, AutoLeg=False, width=1.5)
+    grapher.end()
 
 
 

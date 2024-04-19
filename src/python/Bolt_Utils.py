@@ -46,6 +46,8 @@ class Log():
     def LogTheLog(self, log, style="info", ToPrint=True):
         if style=="info":
             log = "  -> " + log
+        elif style=="subinfo":
+            log = "    ...  " + log
         elif style=="warn":
             log = "  *!* " + log
         elif style=="title":

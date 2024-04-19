@@ -95,7 +95,11 @@ class DeviceEmulator():
         for j in range(N):
             self.AccG[j, :] = self.Acc[j, :] + utils.rotation( np.array([self.RXNnondrift[0, j], self.RYNnondrift[0, j], 0]), np.array([0, 0, 9.81]) )
 
-
+    def GetSimulatedData(self, Reader):
+        
+        return None
+    
+    
     def Read(self):
         # iterate over the data as if it were real time, and get it ready to be provided to the estimator
 
