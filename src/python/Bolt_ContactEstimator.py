@@ -10,11 +10,60 @@ class ContactEstimator():
         self.RightFootFrameID = RightFootFrameID
         self.logger = logger
         self.logger.LogTheLog("Contact Forces Estimator started", style="subtitle")
+        
+        self.mass = pin.computeTotalMass(self.robot.model)
+        self.logger.LogTheLog("Mass of robot : " + str(self.mass), style="subinfo")
+
+        self.InitVariables()
+        self.InitLogMatrixes()
+    
+    def InitLogMatrixes(self):
+        # contact forces logs
+        self.RcF3d = np.zeros([3, self.IterNumber])
+        self.RcF1d = np.zeros([3, self.IterNumber])
+        self.LcF3d = np.zeros([3, self.IterNumber])
+        self.LcF1d = np.zeros([3, self.IterNumber])
+        # left and right trust in contacts logs
+        self.Delta1D = np.zeros([2, self.IterNumber])
+        self.Delta3D = np.zeros([2, self.IterNumber])
+        self.DeltaVertical = np.zeros([2, self.IterNumber])
+        # left and right slip probability (aka mistrust in contact) logs
+        self.Mu = np.zeros([2, self.IterNumber])
+        # probability of contact and trust in contact
+        
+    
+    def UpdateLogMatrixes(self):
+        pass
+        
+        
+        
+    def InitVariables(self):
+        # deltas and slips
+        self.DeltaL, self.DeltaL3d, self.DeltaLV, self.MuL, self.TrustL = 0., 0., 0., 0., 0.
+        self.DeltaR, self.DeltaR3d, self.DeltaRV, self.MuR, self.TrustR = 0., 0., 0., 0., 0.
+        self.SlipProbL = 0.
+        self.SlipProbR = 0.
+        # contact and trust
+        self.ContactProbL = 0.
+        self.ContactProbR = 0.
+        self.TrustL = 0.
+        self.TrustR = 0.
+
+        # contact forces
+        self.LcF_1d = np.zeros(3)
+        self.RcF_1d = np.zeros(3)
+        self.LcF_3d = np.zeros(3)
+        self.RcF_3d = np.zeros(3)
+        
+        
+    def __ProbSmoother(self, x, center, stiffness=5):
+        """Bring x data between 0 and 1, such that P(x=center)=0.5. The greater stiffness, the greater dP/dx (esp. around x=center)"""
+        b0 = stiffness
+        b = b0/center
+        return 1/ (1 + np.exp(-b*x + b0))
     
     
-    
-    
-    def ContactForces1d(self, RobotWeight, Torques, Positions, Dynamic=0.4, Resolution=10) -> tuple[np.ndarray, np.ndarray]:
+    def ContactForces1d(self, Torques, Positions, Dynamic=0.4, Resolution=10) -> tuple[np.ndarray, np.ndarray]:
         # this function assumes that the weight is somehow distributed over both feet, and search an approximation of that distribution
         # NO EXTERNAL FORCES
         # contact forces ASSUMED VERTICAL
@@ -27,7 +76,7 @@ class ContactEstimator():
         # minimal contact force is 0
         MinForce = 0
         # maximal contact force is weight * (1+dynamic)
-        MaxForce = RobotWeight*9.81 * (1+Dynamic)
+        MaxForce = self.mass*9.81 * (1+Dynamic)
         # the lower and upper indices such that contact forces sum is in [weight * (1-dynamic) , weight * (1+dynamic)]
         upper = int(np.floor(Resolution*(1+Dynamic)))
         lower = int(np.ceil(Resolution*(1-Dynamic/2)))
@@ -73,48 +122,91 @@ class ContactEstimator():
         RcF = np.linalg.inv(np.transpose(JR))@Torques
         
         return LcF[:3], RcF[:3]
+
+
+    def ConsistencyChecker(self, ContactForce1d, ContactForce3d) -> tuple[float, float, float]:
+        """ Check the consistency of a contact force computed by two functions."""
+        # difference between both contact forces
+        Delta = np.abs(np.linalg.norm(ContactForce1d) - np.linalg.norm(ContactForce3d))
+        Delta3d = np.linalg.norm(ContactForce1d - ContactForce3d)
+        DeltaVertical = np.linalg.norm(ContactForce1d[2] - ContactForce3d[2])
+        
+        return Delta, Delta3d, DeltaVertical
     
     
-    def ConsistencyChecker(self, thresold=0.2):
-        
-        thresold = weight*9.81*thresold
-        LeftConfidence, RightConfidence = 0.5, 0.5
-        
-        LcF_1, RcF_1 = self.ContactForces1d()
-        LcF_3, RcF_3 = self.ContactForces3d()
+    def ContactProbability(self, ContactForce1d, ContactForce3d, thresold=0.3):
+        # check consistency in contact forces estimates
+        # warning thresold
+        thresold = self.mass*9.81*thresold
+
         # average vertical force
-        RcF = (RcF_1[2] + RcF_3[2]) * 0.5
-        
-        self.logger.LogTheLog("checking forces estimation consistency")
-        
-        # deltas between forces
-        DeltaR = np.linalg.norm(RcF_1) - np.linalg.norm(RcF_3)
-        DeltaR3d = np.linalg.norm(RcF_1 - RcF_3)
-        DeltaRv = np.linalg.norm(RcF_1[2] - RcF_3[2])
-        # confidence in non-silp : horizontal norm over vertical norm
-        MuR = np.sqrt(RcF_3[0]**2 + RcF_3[1]**2) / RcF_3[2]
-        
-        # to tune
-        b, b0 = 1.5, 8.0
-        PR = 1/ (1 + np.exp(-b*RcF + b0))
-        
-        RightConfidence = 1.0 - ( 0.1*DeltaR + 0.2*DeltaR3d + 0.1*DeltaRv + 0.1*MuR)
-        
-        if DeltaR < thresold :
-             # norms are consistent
-             pass
-         
+        VerticalForce = (ContactForce1d[2] + ContactForce3d[2]) * 0.5
+        return self.__ProbSmoother(VerticalForce, thresold, 5)
          
             
-             
+    def Slips(self, ContactForce3d, MuTrigger=0.2, FootAcc=0., AccTrigger=2., mingler=1.) -> float:
+        """ Compute a coefficient about wether or not foot is slipping
+        Args :
+        Return : an average (weighted with mingler) of computed slipping probabilities
+        """   
+        # slipery level : horizontal norm over vertical norm
+        Mu = np.sqrt(ContactForce3d[0]**2 + ContactForce3d[1]**2 / ContactForce3d[2]**2) # CHK
+        Slip0 = self.__ProbSmoother(Mu, MuTrigger, 7)
+        
+        # uses Kinematics to compute feet acceleration and determin if the feet is slipping
+        HorizontalAcc = np.linalg.norm(FootAcc[:2])
+        Slip1 = self.__ProbSmoother(HorizontalAcc, AccTrigger, 5)
+        # 0 , 0.8 : feet stable, feet potentially slipping
+        SlipProb = mingler * Slip0 + (1-mingler) * Slip1    
+  
+        return SlipProb 
         
         
-    
+    def TrustContact(self,Delta, Delta3d, DeltaVertical, Mu, coeffs = (0.1, 0.2, 0.1, 0.1)):
+        c1, c2, c3, c4 = coeffs
+        Trust = 1.0 - ( c1*Delta + c2*Delta3d + c3*DeltaVertical + c4*Mu)
+        return Trust
 
 
-    def LegsOnGround(self, Kinpos, Acc, Fcontact) -> tuple[bool, bool]:
-        # return wether or not left and right legs are in contact with the ground
+    def LegsOnGround(self, Kinpos, Acc, Torques, ProbaThresold=0.5, TrustThresold=0.5) -> tuple[bool, bool]:
+        """Return wether or not left and right legs are in contact with the ground
+        Args = 
+        Return = 
+        """
         LeftContact, RightContact = False, False
+        
+        # get the contact forces
+        self.LcF_1d, self.RcF_1d = self.ContactForces1d(Torques=Torques, Positions=KinPos, Dynamic=0.4, Resolution=10)
+        self.LcF_3d, self.RcF_3d = self.ContactForces3d(Torques=Torques, Positions=KinPos, frames=[self.LeftFootFrameID, self.RightFootFrameID])
+
+        # get deltas
+        self.DeltaL, self.DeltaL3d, self.DeltaLV = self.ConsistencyChecker(self.LcF_1d, self.LcF_3d)
+        self.DeltaR, self.DeltaR3d, self.DeltaRV = self.ConsistencyChecker(self.RcF_1d, self.RcF_3d)
+
+        # get probability of slip
+        self.SlipProbL = self.Slips(self.LcF_3d, MuTrigger=0.2, FootAcc=0., AccTrigger=2., mingler=1.)
+        self.SlipProbR = self.Slips(self.RcF_3d, MuTrigger=0.2, FootAcc=0., AccTrigger=2., mingler=1.)
+
+        # compute probability of contact based on god's sacred will and some meth
+        self.ContactProbL = self.ContactProbability()
+
+
+
+        # log contact forces and deltas
+        self.UpdateLogMatrixes()
+        
+        if LeftContactProb > thresold :
+            if LeftContactProb > 1.1*thresold:
+                # high probability of contact
+                True
+            elif Trust > 0.5:
+                # mid probability but high trust
+                True
+            else :
+                # mid probability and low trust
+                True
+                
+        
         return LeftContact, RightContact
 
 
@@ -144,16 +236,7 @@ class ContactEstimator():
 
 
     
-    def Slips(self) -> tuple[bool, bool]:
-        # uses Kinematics to compute feet acceleration and determin if the feet is slipping
-        LeftSlipProb, RightSlipProb = 0.0, 0.0
-        # 0 , 0.8 : Left feet stable, right feet potentially slipping
-        
-        
-        LcF_3, RcF_3 = self.ContactForces3d()
-        # slipery level : horizontal norm over vertical norm
-        MuR = np.sqrt(RcF_3[0]**2 + RcF_3[1]**2) / RcF_3[2]       
-        return LeftSlipProb, RightSlipProb
+
 
     def FeetPositions(self) -> tuple[np.ndarray, np.ndarray]:
         # parce que Constant en a besoin

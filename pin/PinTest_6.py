@@ -93,7 +93,7 @@ class boltomatic():
         
     def updateLog(self, k):
         self.log_q[:, k] = self.q[:]
-        self.log_tau[k, :, :]  =self.tau[:]
+        #self.log_tau[k, :, :]  =self.tau[:]
         #print(self.q)
     
     def plotlog(self, fidlist):
@@ -112,14 +112,23 @@ class boltomatic():
     def kinMove(self, qf, n=10):
         qs = np.linspace( self.q, qf, n )
         self.initLog(n)
+        v = 0
+        preq = qs[0]
         for k in range(n):
+            preq = self.q.copy()
             self.q = qs[k]
             self.updateMove()
             self.updateView(k)
             self.updateLog(k)
-            self.qs.append(self.q)
             
-            self.tau = [self.bolt.data.f[j].angular for j in range(8)]
+            #self.qs.append(self.q)
+            prev = v
+            v = (self.q - preq)/self.dt
+            a = (v - prev)/self.dt
+            
+            pin.rnea(self.bolt.model, self.bolt.data, self.q, v, a, self.forces)
+            self.tau_out = [self.bolt.data.f[j].angular for j in range(8)]
+            print(self.tau_out)
         #self.plotlog([7,8,9,10])
     
     def torqueMove(self, Tf, dt, n=10000):
@@ -148,9 +157,12 @@ class boltomatic():
         self.applyForce(F)
         
         for k in range(n):
+            preq = self.q.copy()
             self.qdd = pin.aba(self.bolt.model, self.bolt.data, self.q, self.qd, self.tau, self.forces)
             self.qd += self.qdd*dt
+            print(self.qd)
             self.q = pin.integrate(self.bolt.model, self.q, self.qd*dt)
+            print((self.q - preq)/dt)
             #print(self.qdd)
             
             self.updateMove()
@@ -212,9 +224,9 @@ qf = datagenerator(13, 8)
 
 bolt = boltomatic()
 #bolt.torqueMove(tau, dt=0.1, n=80)
-bolt.kinMove(qf)
-bolt.plottorque([2, 3, 4]) # left leg torques
-#bolt.forceMove([np.array([0., 0., 0.01]), np.array([0., 0., 0.]),], dt=0.01, n=100)
+#bolt.kinMove(qf)
+#bolt.plottorque([2, 3, 4]) # left leg torques
+bolt.forceMove([np.array([0., 0., 0.01]), np.array([0., 0., 0.]),], dt=0.01, n=100)
 #bolt.jacob(10)
 #bolt.video()
 

@@ -41,7 +41,7 @@ class Graphics:
         plt.ylabel('Y')
         plt.show()
     
-    def CompareNDdatas(self, dataset, datatype="speed", title='', StyleAdapter=False, width=1, selectmarker=[]):
+    def CompareNDdatas(self, dataset, datatype="speed", title='', StyleAdapter=False, width=1, selectmarker=[], ignore=[]):
         # plot a X or X,Y or X,Y,Z dataset evolving over time
         # enable StyleAdapter when datas are not very different from one another
         # data : [ [data1: [x][y][z]   ] [data2: [x][y][z]   ] ]
@@ -65,16 +65,22 @@ class Graphics:
             Width = [width/2] + [width]
         else:
             Width = [width]
-        k,j=0,0
+        k,j,c=0,0,0
         for data in dataset :
             for line in data :
+                if c in ignore :
+                    alpha=0
+                else : 
+                    alpha=1
                 if marker : # select marker
-                    plt.plot(line, self.colors[self.currentColor], linewidth=Width[j], marker='D', markevery=selectmarker)
+                    plt.plot(line, self.colors[self.currentColor], linewidth=Width[j], marker='D', markevery=selectmarker, alpha=alpha)
                 else :
-                    plt.plot(line, self.colors[self.currentColor], linestyle=style[k], linewidth=Width[j])
+                    plt.plot(line, self.colors[self.currentColor], linestyle=style[k], linewidth=Width[j], alpha=alpha)
                 self.currentColor = (self.currentColor+1)%len(self.colors)
+                c +=1
             k = (k+1)%len(style)
             j = min(len(Width)-1, j+1)
+            
         
 
         plt.legend(self.legend, fontsize=legsize)

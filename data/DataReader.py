@@ -79,6 +79,12 @@ class DataReader():
 
         self.Load(t_file=t_file,  q_file=q_file,  qd_file=qd_file,  x_file=x_file, 
                   v_file=v_file,  a_file=None,    w_file=w_file,    tau_file=tau_file)
+        
+    def Get(self):
+        return self.Tau
+    
+    def EndPlot(self):
+        self.grapher.end()
     
     def Contact(self):
         # use position of feet to determin which one is touching the ground
@@ -98,11 +104,11 @@ class DataReader():
     
     def PlotContact(self):
         self.grapher.SetLegend(['position'], ndim=3)
-        self.grapher.CompareNDdatas([self.X[:, 18, :].transpose()], datatype='position')#, selectmarker=self.Rcontactindex)
-        self.grapher.CompareNDdatas([self.X[:, 10, :].transpose()], datatype='position')#, selectmarker=self.Lcontactindex)
+        self.grapher.CompareNDdatas([self.X[:, 18, :].transpose()], datatype='position', title='right foot position')#, selectmarker=self.Rcontactindex)
+        self.grapher.CompareNDdatas([self.X[:, 10, :].transpose()], datatype='position', title='left foot position')#, selectmarker=self.Lcontactindex)
         self.grapher.SetLegend(['contact R', 'contact L'], ndim=1)
-        self.grapher.CompareNDdatas([self.RContact, self.LContact], datatype='position', width=1.5, StyleAdapter=True)
-        self.grapher.end()
+        self.grapher.CompareNDdatas([self.RContact, self.LContact], datatype='position', width=1.5, StyleAdapter=True, title='ground contacts')
+        #self.grapher.end()
     
     def PlotBaseTrajectory(self):
         self.PlotTrajectory(1, "base")
@@ -114,13 +120,27 @@ class DataReader():
         self.grapher.SetLegend(["position of bolt's " + frameName], ndim=3)
         self.grapher.CompareNDdatas([self.X[:, frameID, :].transpose()], datatype='position', title= frameName + ' Position')#' with Right foot contact times highlighted', selectmarker=self.Rcontactindex)
         self.grapher.SetLegend(["speed of bolt's " + frameName], ndim=3)
-        self.grapher.CompareNDdatas([self.V[:, frameID, :].transpose()], datatype='speed')
-        self.grapher.end()
+        self.grapher.CompareNDdatas([self.V[:, frameID, :].transpose()], datatype='speed', title='base speed')
+        #self.grapher.end()
         
-    def PlotTorques(self, k):
-        self.grapher.SetLegend(["Torques"], ndim=3)
-        self.grapher.CompareNDdatas([self.Tau[:, 5, :].transpose()], datatype='torques')
-        self.grapher.end()
+    def PlotTorques(self, side='L'):
+        if side=='L':
+            self.grapher.SetLegend(["Torques, left leg"], ndim=3)
+            self.grapher.CompareNDdatas([self.Tau[:, 0:3].transpose()], datatype='torque', title='left torques', selectmarker=self.Lcontactindex[0:])
+        elif side=='R' :
+            self.grapher.SetLegend(["Torques, right leg"], ndim=3)
+            self.grapher.CompareNDdatas([self.Tau[:, 3:].transpose()], datatype='torque', title='right torques')
+        elif side=='both':
+            self.grapher.SetLegend(["Torques, left leg", "Torques, right leg"], ndim=3)
+            self.grapher.CompareNDdatas([self.Tau[:, :3].transpose(), self.Tau[:, 3:].transpose()], datatype='torque', title='both legs torques')
+        #self.grapher.end()
+    
+    def PlotTorquesAndFeet(self):
+        self.grapher.SetLegend(["Right foot position", "Torques, right leg"], ndim=3)
+        self.grapher.CompareNDdatas([self.X[:,10, :].transpose(), self.Tau[:self.SampleLength, 3:].transpose()], datatype='torques, pos', title='right torques and traj', ignore=[0,1])
+        
+        self.grapher.SetLegend(["Left foot position", "Torques, left leg"], ndim=3)
+        self.grapher.CompareNDdatas([self.X[:,18, :].transpose(), self.Tau[:self.SampleLength, 0:3].transpose()], datatype='torques, pos', title='left torques and traj', ignore=[0,1])
         
 
 
@@ -133,16 +153,17 @@ def main():
     Reader = DataReader(logger=logger)
     
     # loading .npy files in DataReader
-    Reader.AutoLoad(0)
+    Reader.AutoLoad(3)
     # check for contact indexes
     Reader.Contact()
     Reader.PlotContact()
     # plot base position and speed
     #Reader.PlotBaseTrajectory()
-    Reader.PlotFeetTrajectory()
-    Reader.PlotTorques(4)
+    #Reader.PlotFeetTrajectory()
+    Reader.PlotTorques('both')
+    #Reader.PlotTorquesAndFeet()
+    Reader.EndPlot()
     
-    return Reader.Q, Reader.Tau
     
 
-Q, Tau = main()
+Tau = main()
