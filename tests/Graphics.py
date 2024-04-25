@@ -41,7 +41,7 @@ class Graphics:
         plt.ylabel('Y')
         plt.show()
     
-    def CompareNDdatas(self, dataset, datatype="speed", title='', StyleAdapter=False, width=1, selectmarker=[], ignore=[]):
+    def CompareNDdatas(self, dataset, datatype="speed", title='', StyleAdapter=False, width=1, selectmarker=[], ignore=[], mitigate=[]):
         # plot a X or X,Y or X,Y,Z dataset evolving over time
         # enable StyleAdapter when datas are not very different from one another
         # data : [ [data1: [x][y][z]   ] [data2: [x][y][z]   ] ]
@@ -59,6 +59,10 @@ class Graphics:
             style = ['solid', 'dotted', 'solid', 'solid', 'dashed', 'dotted']
         else :
             style = ['-']
+            if mitigate !=[]:
+                style = ['solid']*30
+                for index in mitigate :
+                    style[index] = 'dotted'
 
         if "Noisy" in self.legend[0] or "noisy" in self.legend[0] or "true" in self.legend[0]:
             # adjust width 

@@ -2,6 +2,8 @@ import numpy as np
 import pinocchio as pin
 import time as t
 from scipy.spatial.transform import Rotation as R
+import example_robot_data
+
 
 from Bolt_Utils import utils
 from Bolt_Utils import Log
@@ -35,12 +37,12 @@ class Estimator():
                 ModelPath           : str = "",
                 UrdfPath            : str = "",
                 Talkative           : bool = True,
-                logger              : bool = None,
+                logger              : Log = None,
                 AttitudeFilterType  : str = "complementary",
                 parametersAF        : list = [2],
                 SpeedFilterType     : str = "complementary",
                 parametersSF        : list = [2],
-                TimeStep            : float = None,
+                TimeStep            : float = 0.01,
                 IterNumber          : int = 1000) -> None:
 
         self.MsgName = "Bolt Estimator v0.5"
@@ -57,23 +59,22 @@ class Estimator():
         # loading data from file
         if UrdfPath=="" or ModelPath=="":
             self.logger.LogTheLog("No URDF path or ModelPath added !", style="warn", ToPrint=True)
-            self.robot=None
+            self.robot = example_robot_data.load("bolt")
         else :
-            model, collision_model, visual_model = pin.buildModelsFromUrdf(
-                UrdfPath, ModelPath, pin.JointModelFreeFlyer())
+            #model, collision_model, visual_model = pin.buildModelsFromUrdf(UrdfPath, ModelPath, pin.JointModelFreeFlyer())
+            self.logger.LogTheLog("Bypassing URDF path or ModelPath", style="warn", ToPrint=True)
+            self.robot = example_robot_data.load("bolt")
 
             self.robot = pin.RobotWrapper.BuildFromURDF(UrdfPath, ModelPath)
             self.logger.LogTheLog("URDF built", ToPrint=Talkative)
-        self.FeetIndexes = [0, 0] # Left, Right
+        self.FeetIndexes = [self.robot.model.getFrameId("FL_FOOT"), self.robot.model.getFrameId("FR_FOOT")] # Left, Right
         
 
         # interfacing with masterboard (?)
         self.device = device
 
-        if TimeStep is not None :
-            self.TimeStep = TimeStep
-        else:
-            self.TimeStep = 0.001 # 1 kHz
+        # 1 kHz by default
+        self.TimeStep = TimeStep
         
         # initializes data & logs with np.zeros arrays
         self.InitImuData()
@@ -104,7 +105,7 @@ class Estimator():
         self.logger.LogTheLog("Speed Filter of type '" + SpeedFilterType + "' added.", ToPrint=Talkative)
 
         # returns info on Slips, Contact Forces, Contact with the ground
-        self.ContactEstimator = ContactEstimator(self.robot, self.FeetIndexes[0], self.FeetIndexes[1], self.logger)
+        self.ContactEstimator = ContactEstimator(self.robot, self.FeetIndexes[0], self.FeetIndexes[1], self.IterNumber, self.logger)
         self.logger.LogTheLog("Contact Estimator added.", ToPrint=Talkative)
 
         

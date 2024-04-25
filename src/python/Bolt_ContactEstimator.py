@@ -3,9 +3,15 @@ import pinocchio as pin
 
 
 class ContactEstimator():
-    def __init__(self, robot, LeftFootFrameID, RightFootFrameID, logger) -> None:
+    def __init__(self, 
+                robot, 
+                LeftFootFrameID  : int, 
+                RightFootFrameID : int, 
+                IterNumber       : int, 
+                logger           ) -> None:
         
         self.robot = robot # for pinocchio computations
+        # feet id
         self.LeftFootFrameID = LeftFootFrameID
         self.RightFootFrameID = RightFootFrameID
         self.logger = logger
@@ -16,28 +22,51 @@ class ContactEstimator():
 
         self.InitVariables()
         self.InitLogMatrixes()
+        self.IterNumber = IterNumber
+        self.iter = 0
     
-    def InitLogMatrixes(self):
+    def InitLogMatrixes(self) -> None:
         # contact forces logs
-        self.RcF3d = np.zeros([3, self.IterNumber])
-        self.RcF1d = np.zeros([3, self.IterNumber])
-        self.LcF3d = np.zeros([3, self.IterNumber])
-        self.LcF1d = np.zeros([3, self.IterNumber])
+        self.Log_LcF_3d = np.zeros([3, self.IterNumber])
+        self.Log_LcF_1d = np.zeros([3, self.IterNumber])
+        self.Log_RcF_3d = np.zeros([3, self.IterNumber])
+        self.Log_RcF_1d = np.zeros([3, self.IterNumber])
         # left and right trust in contacts logs
-        self.Delta1D = np.zeros([2, self.IterNumber])
-        self.Delta3D = np.zeros([2, self.IterNumber])
-        self.DeltaVertical = np.zeros([2, self.IterNumber])
-        # left and right slip probability (aka mistrust in contact) logs
-        self.Mu = np.zeros([2, self.IterNumber])
+        self.Log_Delta1D = np.zeros([2, self.IterNumber])
+        self.Log_Delta3D = np.zeros([2, self.IterNumber])
+        self.Log_DeltaVertical = np.zeros([2, self.IterNumber])
+        # slipping logs
+        self.Log_Mu = np.zeros([2, self.IterNumber])
+        self.Log_SlipProb = np.zeros([2, self.IterNumber])
         # probability of contact and trust in contact
-        
+        self.Log_Contact = np.zeros([2, self.IterNumber], dtype=bool)
+        self.Log_Trust = np.zeros([2, self.IterNumber])
+        return None
     
-    def UpdateLogMatrixes(self):
-        pass
+
+    def UpdateLogMatrixes(self) -> None:
+        # contact forces logs
+        self.Log_LcF_3d[:, self.iter] = self.LcF_3d
+        self.Log_LcF_1d[:, self.iter] = self.LcF_1d
+        self.Log_RcF_3d[:, self.iter] = self.RcF_3d
+        self.Log_RcF_1d[:, self.iter] = self.RcF_1d
+        # left and right trust in contacts logs
+        self.Log_Delta1D[:, self.iter] = [self.DeltaL, self.DeltaR]
+        self.Log_Delta3D[:, self.iter] = [self.DeltaL3d, self.DeltaR3d]
+        self.Log_DeltaVertical[:, self.iter] = [self.DeltaLV, self.DeltaRV]
+        # slipping logs
+        self.Log_Mu[:, self.iter] = [self.MuL, self.MuR]
+        self.Log_SlipProb[:, self.iter] = [self.SlipProbL, self.SlipProbR]
+        # probability of contact and trust in contact
+        self.Log_Contact[:, self.iter] = [self.LeftContact, self.RightContact]
+        self.Log_Trust[:, self.iter] = [self.TrustL, self.TrustR]
+        # number of updates
+        self.iter += 1
+        return None
         
         
         
-    def InitVariables(self):
+    def InitVariables(self) -> None:
         # deltas and slips
         self.DeltaL, self.DeltaL3d, self.DeltaLV, self.MuL, self.TrustL = 0., 0., 0., 0., 0.
         self.DeltaR, self.DeltaR3d, self.DeltaRV, self.MuR, self.TrustR = 0., 0., 0., 0., 0.
@@ -48,15 +77,22 @@ class ContactEstimator():
         self.ContactProbR = 0.
         self.TrustL = 0.
         self.TrustR = 0.
+        self.LeftContact = False
+        self.RightContact = False
 
         # contact forces
         self.LcF_1d = np.zeros(3)
         self.RcF_1d = np.zeros(3)
         self.LcF_3d = np.zeros(3)
         self.RcF_3d = np.zeros(3)
+
+        # foot position
+        self.RightFootPos = np.zeros(3)
+        self.LeftFootPos = np.zeros(3)
+
         
         
-    def __ProbSmoother(self, x, center, stiffness=5):
+    def __ProbDiscriminator(self, x, center, stiffness=5):
         """Bring x data between 0 and 1, such that P(x=center)=0.5. The greater stiffness, the greater dP/dx (esp. around x=center)"""
         b0 = stiffness
         b = b0/center
@@ -134,46 +170,70 @@ class ContactEstimator():
         return Delta, Delta3d, DeltaVertical
     
     
-    def ContactProbability(self, ContactForce1d, ContactForce3d, thresold=0.3):
+    def ContactProbability(self, ContactForce1d, ContactForce3d, thresold=0.3) -> float:
         # check consistency in contact forces estimates
         # warning thresold
         thresold = self.mass*9.81*thresold
 
         # average vertical force
         VerticalForce = (ContactForce1d[2] + ContactForce3d[2]) * 0.5
-        return self.__ProbSmoother(VerticalForce, thresold, 5)
+        return self.__ProbDiscriminator(VerticalForce, thresold, 5)
          
             
-    def Slips(self, ContactForce3d, MuTrigger=0.2, FootAcc=0., AccTrigger=2., mingler=1.) -> float:
+    def Slips(self, ContactForce3d, FootFrameID, MuTrigger=0.2, FootAcc=0., AccTrigger=2., mingler=1.) -> float:
         """ Compute a coefficient about wether or not foot is slipping
         Args :
         Return : an average (weighted with mingler) of computed slipping probabilities
         """   
-        # slipery level : horizontal norm over vertical norm
-        Mu = np.sqrt(ContactForce3d[0]**2 + ContactForce3d[1]**2 / ContactForce3d[2]**2) # CHK
-        Slip0 = self.__ProbSmoother(Mu, MuTrigger, 7)
+        # slipery level : horizontal norm over vertical DISTANCE
+        # can be < 0
+        Mu = np.sqrt(ContactForce3d[0]**2 + ContactForce3d[1]**2) / ContactForce3d[2]
+        Slip0 = self.__ProbDiscriminator(Mu, MuTrigger, 7)
+
+        # uses kinematics to compute foot horizontal speed
         
-        # uses Kinematics to compute feet acceleration and determin if the feet is slipping
+        # uses Kinematics to compute foot acceleration and determin if the feet is slipping
         HorizontalAcc = np.linalg.norm(FootAcc[:2])
-        Slip1 = self.__ProbSmoother(HorizontalAcc, AccTrigger, 5)
+        Slip1 = self.__ProbDiscriminator(HorizontalAcc, AccTrigger, 5)
         # 0 , 0.8 : feet stable, feet potentially slipping
         SlipProb = mingler * Slip0 + (1-mingler) * Slip1    
   
         return SlipProb 
         
         
-    def TrustContact(self,Delta, Delta3d, DeltaVertical, Mu, coeffs = (0.1, 0.2, 0.1, 0.1)):
+    def TrustContact(self,Delta, Delta3d, DeltaVertical, Mu, coeffs = (0.1, 0.2, 0.1, 0.1)) -> float:
         c1, c2, c3, c4 = coeffs
         Trust = 1.0 - ( c1*Delta + c2*Delta3d + c3*DeltaVertical + c4*Mu)
         return Trust
 
 
-    def LegsOnGround(self, Kinpos, Acc, Torques, ProbaThresold=0.5, TrustThresold=0.5) -> tuple[bool, bool]:
+    def ContactBool(self, Contact, ContactProb, Trust, ProbThresold, TrustThresold) -> bool:
+        if ContactProb > ProbThresold :
+            if ContactProb > 1.2*ProbThresold:
+                # high probability of contact
+                Contact = True
+            elif Trust > TrustThresold:
+                # mid probability but high trust
+                Contact = True
+            else :
+                # mid probability and low trust
+                pass # no change to variable (keeping previous state)
+        else :
+            # low contact probability
+            if Trust < TrustThresold:
+                # low trust
+                pass # no change
+            else :
+                # high trust
+                Contact = False
+        return Contact
+
+
+    def LegsOnGround(self, KinPos, Acc, Torques, ProbThresold=0.5, TrustThresold=0.5) -> tuple[bool, bool]:
         """Return wether or not left and right legs are in contact with the ground
         Args = 
         Return = 
         """
-        LeftContact, RightContact = False, False
         
         # get the contact forces
         self.LcF_1d, self.RcF_1d = self.ContactForces1d(Torques=Torques, Positions=KinPos, Dynamic=0.4, Resolution=10)
@@ -184,30 +244,35 @@ class ContactEstimator():
         self.DeltaR, self.DeltaR3d, self.DeltaRV = self.ConsistencyChecker(self.RcF_1d, self.RcF_3d)
 
         # get probability of slip
-        self.SlipProbL = self.Slips(self.LcF_3d, MuTrigger=0.2, FootAcc=0., AccTrigger=2., mingler=1.)
-        self.SlipProbR = self.Slips(self.RcF_3d, MuTrigger=0.2, FootAcc=0., AccTrigger=2., mingler=1.)
+        self.SlipProbL = self.Slips(self.LcF_3d, self.LeftFootFrameID, MuTrigger=0.2, FootAcc=0., AccTrigger=2., mingler=1.)
+        self.SlipProbR = self.Slips(self.RcF_3d, self.RightFootFrameID, MuTrigger=0.2, FootAcc=0., AccTrigger=2., mingler=1.)
 
         # compute probability of contact based on god's sacred will and some meth
-        self.ContactProbL = self.ContactProbability()
+        self.ContactProbL = self.ContactProbability(self.LcF_1d, self.LcF_3d, thresold=0.3)
+        self.ContactProbR = self.ContactProbability(self.RcF_1d, self.RcF_3d, thresold=0.3)
+
+        # compute trust in contact
+        self.TrustL = self.TrustContact(self.DeltaL, self.DeltaL3d, self.DeltaLV, self.MuL, coeffs=(0.1, 0.2, 0.1, 0.1))
+        self.TrustR = self.TrustContact(self.DeltaR, self.DeltaR3d, self.DeltaRV, self.MuR, coeffs=(0.1, 0.2, 0.1, 0.1))
 
 
 
         # log contact forces and deltas
         self.UpdateLogMatrixes()
         
-        if LeftContactProb > thresold :
-            if LeftContactProb > 1.1*thresold:
-                # high probability of contact
-                True
-            elif Trust > 0.5:
-                # mid probability but high trust
-                True
-            else :
-                # mid probability and low trust
-                True
-                
+        self.LeftContact = self.ContactBool(self.LeftContact, self.ContactProbL, self.TrustL, ProbThresold, TrustThresold)
+        self.RightContact = self.ContactBool(self.RightContact, self.ContactProbR, self.TrustR, ProbThresold, TrustThresold)
+         
         
-        return LeftContact, RightContact
+        return self.LeftContact, self.RightContact
+    
+    def LegsOnGroundTorque(self, Torques, LowerThresold=0.3, UpperThresold=1.2)-> tuple[bool, bool]:
+        # knees torques index
+        LeftKneeID, RightKneeID = 2, 4
+        
+
+
+
 
 
     def LegsOnGroundKin(self, Kinpos, vertical) -> tuple[bool, bool]:
@@ -235,9 +300,6 @@ class ContactEstimator():
         return LeftContact, RightContact
 
 
-    
-
-
     def FeetPositions(self) -> tuple[np.ndarray, np.ndarray]:
         # parce que Constant en a besoin
-        pass
+        return self.LeftFootPos, self.RightFootPos

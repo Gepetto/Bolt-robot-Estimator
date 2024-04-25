@@ -10,9 +10,7 @@ def rotation(EulerArray, ArrayToRotate) -> np.ndarray:
         Rot = R.from_euler('xyz', EulerArray).as_matrix()
         return Rot@ArrayToRotate
 
-def f(x):
-    center = 1
-    b0 = 5
+def f(x, center=1, b0=5):
     b = b0/center
     return 1/ (1 + np.exp(-b*x + b0))
 
@@ -107,17 +105,20 @@ def f(x, a, b):
     return (M/b - x)*a
 '''
 n= 100
-X = np.linspace(-1, 3, n)
-Y = f(X)
-#Z = f(X, 0.15, 3)
+X = np.linspace(-1, 6, n)
+Y = f(X, 3, 5)
+Z = f(X, 3, 10)
 #Z = X + np.linspace(np.zeros(3), n*np.ones(3), n).T
 
 
 plt.figure(dpi=200)
-plt.plot(X, Y, label="Y")
-#plt.plot(X, Z[0], label="Z")
+plt.plot(X, Y, label="Pd with center=3, b0=5")
+plt.plot(X, Z, label="Pd with center=3, b0=10")
 plt.grid()
 plt.legend()
+plt.title("Probability discriminator")
+plt.xlabel('x')
+plt.ylabel('Pd(x)')
 plt.show()
 
 
