@@ -22,11 +22,17 @@ class Graphics:
             plt.title(titre)
         self.counter += 1
     
-    def SetLegend(self, legend, ndim=0):
+    def SetLegend(self, legend, ndim=0, autodir=True):
         if ndim != 0: self.ndim=ndim
         self.legend = []
+        
+        if autodir :
+            direction  = [" - x", " - y", " - z"]
+        if not autodir or ndim==1 :
+            direction = [""]
+
         for l in legend:
-            for dir in [" - x", " - y", " - z"][:self.ndim]:
+            for dir in direction[:self.ndim]:
                 self.legend = self.legend + [l+dir]
         
         

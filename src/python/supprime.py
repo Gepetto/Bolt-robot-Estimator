@@ -95,32 +95,27 @@ def rotation(EulerArray, ArrayToRotate) -> np.ndarray:
 
 
 
-
-
-
-'''
 # quick gain model
-def f(x, a, b):
+def g(x, a, b):
     M = 100
     return (M/b - x)*a
-'''
+
 n= 100
-X = np.linspace(-1, 6, n)
+X = np.linspace(-1, 7, n)
 Y = f(X, 3, 5)
 Z = f(X, 3, 10)
 #Z = X + np.linspace(np.zeros(3), n*np.ones(3), n).T
 
 
 plt.figure(dpi=200)
-plt.plot(X, Y, label="Pd with center=3, b0=5")
-plt.plot(X, Z, label="Pd with center=3, b0=10")
+plt.plot(X, Y, label="Ps with center=3, b0=5")
+plt.plot(X, Z, label="Ps with center=3, b0=10")
 plt.grid()
 plt.legend()
-plt.title("Probability discriminator")
+plt.title("Sigmoid discriminator")
 plt.xlabel('x')
-plt.ylabel('Pd(x)')
+plt.ylabel('Ps(x)')
 plt.show()
-
 
 
 

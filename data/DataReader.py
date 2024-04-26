@@ -180,6 +180,34 @@ class DataReader():
         self.grapher.SetLegend(["Left Z force x1", "Left Torque n°2 x8", "Left foot pos x50", "Right foot pos x50"], ndim=1)
         self.grapher.CompareNDdatas([self.LCF[:,2].reshape(1, -1), self.Tau[:, 2].reshape(1, -1)*8, self.X[:,self.LeftFootID, 2].reshape(1, -1)*50, self.X[:,self.RightFootID, 2].reshape(1, -1)*50], datatype='torques, force, position', title='left contact force, torque and pos comparison (dimensionless)', StyleAdapter=True)
 
+    def SuperPlotLeftFootCorrelation(self):
+        self.grapher.SetLegend(["Left Foot contact force, z", "Left Knee Torque", "Left foot height", "Contact Probability using Trigger", "Contact Probability using Sigmoid"], ndim=1)
+        #y = self.__SigmoidDiscriminator(self.Tau[:, 2], center=0.8, stiffness=6)
+        y = self.__TriggerDiscrimination(self.LCF[:, 2], 4, 10)
+        z = self.__SigmoidDiscriminator(self.LCF[:, 2], center= 4, stiffness=6)
+        self.grapher.CompareNDdatas([self.LCF[:,2].reshape(1, -1)/6, self.Tau[:, 2].reshape(1, -1), self.X[:,self.LeftFootID, 2].reshape(1, -1)*5, y.reshape(1, -1),  z.reshape(1, -1)], datatype='torques, force, position', title='left contact force, torque and pos comparison (dimensionless)', StyleAdapter=True)
+
+        
+    def __SigmoidDiscriminator(self, x, center, stiffness=5):
+        """Bring x data between 0 and 1, such that P(x=center)=0.5. The greater stiffness, the greater dP/dx (esp. around x=center)"""
+        b0 = stiffness
+        b = b0/center
+        return 1/ (1 + np.exp(-b*x + b0))
+    
+    def __TriggerDiscrimination(self, x, LowerThresold=4, UpperThresold=10):
+        y = np.zeros(len(x))
+        for i in range(1, len(y)):
+            if x[i] < LowerThresold :
+                y[i] = 0
+            elif x[i] > UpperThresold :
+                y[i] = 1
+            else :
+                y[i] = y[i-1]
+        return y
+
+
+    
+    
 
 
 
@@ -189,18 +217,18 @@ def main():
     Reader = DataReader(logger=logger)
     
     # loading .npy files in DataReader
-    Reader.AutoLoad(2)
+    Reader.AutoLoad(3)
     # check for contact indexes
     Reader.Contact()
-    Reader.PlotContact()
+    # Reader.PlotContact()
     # plot base position and speed
     # Reader.PlotBaseTrajectory()
     # Reader.PlotFeetTrajectory()
-    Reader.PlotTorques('left')
+    # Reader.PlotTorques('left')
     # Reader.PlotTorquesAndFeet()
     # Reader.PlotForces()
     # Reader.PlotTorqueForce()
-    Reader.PlotLeftFootCorrelation()
+    Reader.SuperPlotLeftFootCorrelation()
     Reader.EndPlot()
     
     return Reader.Get()

@@ -105,7 +105,15 @@ class Estimator():
         self.logger.LogTheLog("Speed Filter of type '" + SpeedFilterType + "' added.", ToPrint=Talkative)
 
         # returns info on Slips, Contact Forces, Contact with the ground
-        self.ContactEstimator = ContactEstimator(self.robot, self.FeetIndexes[0], self.FeetIndexes[1], self.IterNumber, self.logger)
+        self.ContactEstimator = ContactEstimator(robot=self.robot, 
+                                                 LeftFootFrameID=self.FeetIndexes[0], 
+                                                 RightFootFrameID=self.FeetIndexes[1], 
+                                                 LeftKneeFrameID=self.robot.model.getFrameId("FL_KNEE"),
+                                                 RightKneeFrameID=self.robot.model.getFrameId("FR_KNEE"),
+                                                 LeftKneeTorqueID=2,
+                                                 RightKneeTorqueID=5,
+                                                 IterNumber=self.IterNumber, 
+                                                 logger=self.logger)
         self.logger.LogTheLog("Contact Estimator added.", ToPrint=Talkative)
 
         
