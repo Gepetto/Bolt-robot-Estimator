@@ -3,6 +3,8 @@ sys.path.append('/home/nalbrecht/Bolt-Estimator/Bolt-robot---Estimator/src/pytho
 from Bolt_Utils import utils
 from Bolt_Utils import Log
 
+from DataReader import DataReader
+
 from TrajectoryGenerator import TrajectoryGenerator, Metal
 from Graphics import Graphics
 from Bolt_Filter_Complementary import ComplementaryFilter
@@ -52,6 +54,80 @@ def main(N=500, NoiseLevel=20, Drift=40):
 
 
     return dataset
+
+
+def improve_constant_data():
+    '''add acceleration to data'''
+    
+    # directory to load and add data to
+    kfile = 2
+    prefix = "/home/nalbrecht/Bolt-Estimator/bipedal-control/bipedal-control/Données cancer niels/" + str(kfile) + "/"
+    N = 1000
+    T = 10
+    
+    
+    # generate useful objects
+    testlogger = Log("test", PrintOnFlight=True)
+    grapher = Graphics(logger=testlogger)
+    
+    # prepare reader
+    Reader = DataReader(logger=testlogger)
+    
+    # loading .npy files in DataReader
+    Reader.AutoLoad(kfile)
+    
+    # get base traj and speed
+    Traj = Reader.X[:, 1, :]
+    print(Traj)
+    print(Traj.shape)
+    Speed = Reader.V[:, 1, :]
+
+    # start generator
+    generator = TrajectoryGenerator(logger=testlogger)
+    generator.Generate("custom", N=N, T=T, NoiseLevel=10, Drift=20, amplitude=10, 
+                       avgfreq=0.5, relative=True, traj=Traj, speed=Speed, smooth=True)
+    
+    # compute speed to check consistency
+    s = generator.MakeSpeedFromTrajectory(Traj)
+    # computing acceleration
+    a = generator.MakeAccelerationFromSpeed(Speed)
+    # saving acceleration to X and V shape
+    Acc = np.zeros(N, 19, 3)
+    Acc[:, 1, :] = a
+    
+   
+    np.save(prefix + "A_array_" + str(kfile) )
+    
+    grapher.SetLegend(["True", "computed"], ndim=3)
+    grapher.CompareNDdatas([Speed[:, 1, :].transpose(), s], datatype="speed of bolt's base")
+    grapher.end()
+
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

@@ -119,7 +119,7 @@ class TrajectoryGenerator:
                 # speed is given
                 if speed.shape != self.trajectory.shape :
                     # check if data are consistent
-                    self.logger.LogTheLog("Wrong dimensions for given custom speed and trajectory, deriving speed from traj", style="warn")
+                    self.logger.LogTheLog("Wrong dimensions for given custom speed and trajectory, deriving speed and acceleration from traj", style="warn")
                     self.MakeAccelerationFromTrajectory(traj)
                 else:
                     self.speed = speed.copy()
@@ -176,7 +176,7 @@ class TrajectoryGenerator:
         T_array = np.linspace(0, self.T, self.N)
         # randomly generates coeff that matches approx. speed and frequency
         if ImposedInit == 0:
-            C = np.random.random(1)*amplitude*self.T
+            C = np.random.random(1)*self.amplitude*self.T
         else :
             C = ImposedInit
         w = (np.random.random(1)+0.5)*w
@@ -219,6 +219,7 @@ class TrajectoryGenerator:
     def MakeAccelerationFromTrajectory(self, traj):
         # derives the acceleration and the speed
         D, N= np.shape(traj)
+        if self.talkative : self.logger.LogTheLog("Acceleration and speed are derived numerically from trajectory", style="warn")
         self.acceleration = np.zeros((D,N))
         self.MakeSpeedFromTrajectory(traj)
         self.acceleration[:, 1:] = (self.speed[:, 1:] - self.speed[:, 0:-1])/self.dt
@@ -227,7 +228,7 @@ class TrajectoryGenerator:
 
     def MakeAccelerationFromSpeed(self, speed):
         # derives the acceleration and the speed
-        if self.talkative : logger.LogTheLog("Acceleration is derived numerically from speed", style="warn")
+        if self.talkative : self.logger.LogTheLog("Acceleration is derived numerically from speed", style="warn")
         D, N= np.shape(speed)
         self.acceleration = np.zeros((D,N))
         self.acceleration[:, 1:] = (speed[:, 1:] - speed[:, 0:-1])/self.dt

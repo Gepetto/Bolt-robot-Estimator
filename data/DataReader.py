@@ -7,6 +7,8 @@ from Graphics import Graphics
 sys.path.append('/home/nalbrecht/Bolt-Estimator/Bolt-robot---Estimator/src/python')
 from Bolt_Utils import Log
 
+from DataImprover import improve
+
 
 class DataReader():
     def __init__(self, logger):
@@ -74,32 +76,53 @@ class DataReader():
         if contact_file is not None :
             self.LeftContact = np.load(contact_file)[:3]
             self.Printer(contact_file, self.LeftContact)
-            print(self.LeftContact)
+            #print(self.LeftContact)
       
         self.SampleLength = len(self.T)
         self.logger.LogTheLog("DataReader : loaded data, number of samples = " + str(self.SampleLength))
+        
+
     
-    def AutoLoad(self, k):
+    def AutoLoad(self, k, acc_file=None):
         self.logger.LogTheLog("DataReader : Auto loading")
         kfile = str(k)
         #prefix = "/home/nalbrecht/Bolt-Estimator/bipedal-control/bipedal-control/"
-        prefix = "/home/nalbrecht/Bolt-Estimator/bipedal-control/bipedal-control/Données cancer niels/" + kfile + "/"
-        t_file = prefix + "T_array_" + kfile + ".npy"
-        q_file = prefix + "Q_array_" + kfile + ".npy"
-        qd_file = prefix + "Qd_array_" + kfile + ".npy"
-        x_file = prefix + "X_array_" + kfile + ".npy"
-        v_file = prefix + "V_array_" + kfile + ".npy"
-        a_file = prefix + "A_array_" + kfile + ".npy"
-        w_file = prefix + "W_array_" + kfile + ".npy"
-        tau_file = prefix + "Tau_array_" + kfile + ".npy"
-        rcf_file = prefix + "RCF_array_" + kfile + ".npy"
-        lcf_file = prefix + "LCF_array_" + kfile + ".npy"
-        leftcontact_file = prefix + "C_array_" + kfile + ".npy"
-
-        self.Load(t_file=t_file,  q_file=q_file,  qd_file=qd_file,  x_file=x_file, 
-                  v_file=v_file,  a_file=None,    w_file=w_file,    tau_file=tau_file,
-                  lcf_file=lcf_file,  rcf_file=rcf_file,  contact_file=leftcontact_file)
+        #prefix = "/home/nalbrecht/Bolt-Estimator/bipedal-control/bipedal-control/Données cancer niels/" + kfile + "/"
+        prefix = "/home/nalbrecht/Bolt-Estimator/Bolt-robot---Estimator/data/" + kfile + "/"
         
+        self.t_file = prefix + "T_array_" + kfile + ".npy"
+        self.q_file = prefix + "Q_array_" + kfile + ".npy"
+        self.qd_file = prefix + "Qd_array_" + kfile + ".npy"
+        self.x_file = prefix + "X_array_" + kfile + ".npy"
+        self.v_file = prefix + "V_array_" + kfile + ".npy"
+        '''self.a_file = prefix + "A_array_" + kfile + ".npy"'''
+        self.a_file = acc_file
+        self.w_file = prefix + "W_array_" + kfile + ".npy"
+        self.tau_file = prefix + "Tau_array_" + kfile + ".npy"
+        self.rcf_file = prefix + "RCF_array_" + kfile + ".npy"
+        self.lcf_file = prefix + "LCF_array_" + kfile + ".npy"
+        self.leftcontact_file = prefix + "C_array_" + kfile + ".npy"
+
+        self.Load(t_file=self.t_file,  q_file=self.q_file,  qd_file=self.qd_file,  x_file=self.x_file, 
+                  v_file=self.v_file,  a_file=self.a_file,    w_file=self.w_file,    tau_file=self.tau_file,
+                  lcf_file=self.lcf_file,  rcf_file=self.rcf_file,  contact_file=self.leftcontact_file)
+        
+        self.filenames = [self.t_file,    self.q_file,   self.qd_file,   self.x_file, 
+                          self.v_file,    #self.a_file,   
+                          self.w_file,    self.tau_file,
+                          self.lcf_file,  self.rcf_file]
+    
+    def AutoImproveData(self, k, N=1000):
+        self.logger.LogTheLog("DataReader : Improving data resolution to N="+str(N), "info")
+        j, = self.T.shape
+        if N ==j:
+            self.logger.LogTheLog("DataReader : data seems to be of the right size already", "warn")
+        for filename in self.filenames :
+            improve(N, filename, filename, talk=False)
+            self.logger.LogTheLog("improved ..."+ filename[-23:], "subinfo")
+        self.AutoLoad(k)
+        
+    
     def Get(self):
         return self.Tau, self.LCF
     
@@ -140,6 +163,8 @@ class DataReader():
     def PlotTrajectory(self, frameID=1, frameName="base"):
         self.grapher.SetLegend(["position of bolt's " + frameName], ndim=3)
         self.grapher.CompareNDdatas([self.X[:, frameID, :].transpose()], datatype='position', title= frameName + ' Position')#' with Right foot contact times highlighted', selectmarker=self.Rcontactindex)
+    
+    def PlotSpeed(self, frameID=1, frameName="base"):
         self.grapher.SetLegend(["speed of bolt's " + frameName], ndim=3)
         self.grapher.CompareNDdatas([self.V[:, frameID, :].transpose()], datatype='speed', title=frameName + ' speed')
         #self.grapher.end()
@@ -211,19 +236,22 @@ class DataReader():
 
 
 
-def main():
+def main(k=2):
     # getting ready
     logger = Log(PrintOnFlight=True)
     Reader = DataReader(logger=logger)
     
     # loading .npy files in DataReader
-    Reader.AutoLoad(3)
+    Reader.AutoLoad(k)
+    # improve resolution of .npy files (to execute only once per set of files)
+    Reader.AutoImproveData(k, 10000)
     # check for contact indexes
-    Reader.Contact()
+    # Reader.Contact()
     # Reader.PlotContact()
     # plot base position and speed
     # Reader.PlotBaseTrajectory()
-    # Reader.PlotFeetTrajectory()
+    Reader.PlotSpeed(1, "base")
+    Reader.PlotFeetTrajectory()
     # Reader.PlotTorques('left')
     # Reader.PlotTorquesAndFeet()
     # Reader.PlotForces()
