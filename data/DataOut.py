@@ -10,6 +10,7 @@ class DataOut():
         # data
         self.t_vec = []
         self.all_pos_l = []
+        self.all_theta_l = []
         self.all_vel_l = []
         self.all_q_l = []
         self.all_qd_l = []
@@ -19,9 +20,10 @@ class DataOut():
         self.all_rcf = []
         self.all_left_contact = []
     
-    def store(self, t, pos, vel, q, qd, w, tau, lcf, rcf, left_contact):
+    def store(self, t, pos, theta, vel, q, qd, w, tau, lcf, rcf, left_contact):
         self.t_vec.append(t)
         self.all_pos_l.append(pos.copy())
+        self.all_theta_l.append(pos.copy())
         self.all_vel_l.append(vel.copy())
         self.all_q_l.append(q.copy())
         self.all_qd_l.append(qd.copy())
@@ -46,6 +48,7 @@ class DataOut():
     def save(self):
         np.save(self.dir + 'T_array_'+self.k, np.array(self.t_vec))
         np.save(self.dir + 'X_array_'+self.k, np.array(self.all_pos_l))
+        np.save(self.dir + 'Theta_array_'+self.k, np.array(self.all_theta_l))
         np.save(self.dir + 'V_array_'+self.k, np.array(self.all_vel_l))
         np.save(self.dir + 'Q_array_'+self.k, np.array(self.all_q_l))
         np.save(self.dir + 'Qd_array_'+self.k, np.array(self.all_qd_l))

@@ -17,14 +17,12 @@ Send the estimator pseudo-data from IMU
 
 class DeviceEmulator():
     def __init__(self, TrajectoryGenerator, logger) -> None:
+        # instant data to be fed to the estimator
         self.baseLinearAcceleration = np.zeros((3,))
         self.baseAngularVelocity = np.zeros((3,))
         self.baseOrientation = np.zeros((3,))
         self.q_mes = np.zeros((6,))
         self.v_mes = np.zeros((6,))
-
-
-
 
         self.generator = TrajectoryGenerator
         if logger is not None :
@@ -95,13 +93,74 @@ class DeviceEmulator():
         for j in range(N):
             self.AccG[j, :] = self.Acc[j, :] + utils.rotation( np.array([self.RXNnondrift[0, j], self.RYNnondrift[0, j], 0]), np.array([0, 0, 9.81]) )
 
-    def GetSimulatedData(self, Reader):
+
+
+
+
+
+
+
+
+    def LoadSimulatedData(self, Reader, kfile) -> None:
+        # fetch .npy files
+        Reader.AutoLoad(kfile, 'included')
+        # base frame id
+        base_id = 1
         
+        # DATA THAT ESTIMATOR WILL NOT ACCESS
+        # base acceleration
+        self.Acc_true = Reader.A[:, base_id, :].copy
+        self.AccG_true = Reader.A[:, base_id, :].copy
+        n, _ = self.Acc_true.shape
+        for j in range(n):
+            glocal = Reader.Theta
+            self.AccG_true += glocal
+
+        # base rotation speed
+        self.Omega_true = Reader.W[:, base_id, :].copy
+        # base speed and attitude (IMU has an integrator)
+        self.V_true = Reader.V[:, base_id, :].copy
+        self.Theta_true = Reader.W[:, base_id, :].copy
+        # encoders
+        self.Q_true = Reader.Q
+        # torques
+        self.Tau_true = Reader.Tau
+
+
+
+
+        # start noise generator
+        noise = Metal(traj=self.Acc_True, NoiseLevel=0.5, DriftingCoeff=0.)
+        
+
+        # DATA THAT ESTIMATOR WILL ACCESS
+        # base acceleration
+        noise.SetNoise(NoiseLevel=0.5, DriftingCoeff=0.)
+        self.Acc = noise.makeNoise(self.Acc_true)
+        self.AccG = noise.makeNoise(self.Acc_true)
+        # base rotation speed
+        noise.SetNoise(NoiseLevel=0.5, DriftingCoeff=0.)
+        self.Omega = noise.makeNoise(self.Omega_true)
+        # base speed and attitude (IMU has an integrator)
+        noise.SetNoise(NoiseLevel=0.5, DriftingCoeff=0.)
+        self.V = noise.makeNoise(self.V_true)
+        self.Theta = noise.makeNoise(self.Theta_true)
+        # encoders
+        noise.SetNoise(NoiseLevel=0.5, DriftingCoeff=0.)
+        self.Q = noise.makeNoise(self.Q_true)
+        # torques
+        noise.SetNoise(NoiseLevel=0.5, DriftingCoeff=0.)
+        self.Tau = noise.makeNoise(self.Tau_true)
+
+
+
+
         return None
     
     
     def Read(self):
         # iterate over the data as if it were real time, and get it ready to be provided to the estimator
+        # estimator calls this method everytime
 
         self.baseLinearAcceleration = self.Acc[self.iter, :]
         self.baseLinearAccelerationGravity = self.AccG[self.iter, :]

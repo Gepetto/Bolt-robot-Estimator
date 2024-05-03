@@ -29,7 +29,7 @@ def main():
     device.GenerateTrajectory(N=N, NoiseLevelXY=10, NoiseLevelZ=10, Drift=30, NoiseLevelAttitude=10, T=T)
     # init estimator
     estimator = Estimator(device=device,
-                    ModelPathth="",
+                    ModelPath="",
                     UrdfPath="",
                     Talkative=True,
                     logger=testlogger,
@@ -47,10 +47,10 @@ def main():
     Inputs_rotations = [theta.T, omega.T]
 
     grapher.SetLegend(["traj", "speed", "acc"], 3)
-    grapher.CompareNDdatas(Inputs_translations, "", "Trajectory, speed and acceleration as inputed", StyleAdapter=False, AutoLeg=False, width=1.)
+    grapher.CompareNDdatas(Inputs_translations, "", "Trajectory, speed and acceleration as inputed", StyleAdapter=False, width=1.)
 
     grapher.SetLegend(["theta", "omega"], 3)
-    grapher.CompareNDdatas(Inputs_rotations, "", "rotation and rotation speed as inputed", StyleAdapter=False, AutoLeg=False, width=1.)
+    grapher.CompareNDdatas(Inputs_rotations, "", "rotation and rotation speed as inputed", StyleAdapter=False, width=1.)
 
     
     
@@ -70,12 +70,12 @@ def main():
     
     InOut_rotations = [theta.T[:2, :], theta_imu[:2, :], theta_estimator[:2, :]]
     grapher.SetLegend(["theta in", "theta imu","theta out"], 2)
-    grapher.CompareNDdatas(InOut_rotations, "theta", "Noisy rot and out rot", StyleAdapter=True, AutoLeg=False, width=1.)
+    grapher.CompareNDdatas(InOut_rotations, "theta", "Noisy rot and out rot", StyleAdapter=True, width=1.)
     
     ag = device.AccG
     a = device.Acc
     grapher.SetLegend(["ag", "a"], 3)
-    grapher.CompareNDdatas([ag.T, a.T], "acceleration", "g", StyleAdapter=True, AutoLeg=False, width=1.)
+    grapher.CompareNDdatas([ag.T, a.T], "acceleration", "g", StyleAdapter=True, width=1.)
 
     '''
 

@@ -108,8 +108,8 @@ class Estimator():
         self.ContactEstimator = ContactEstimator(robot=self.robot, 
                                                  LeftFootFrameID=self.FeetIndexes[0], 
                                                  RightFootFrameID=self.FeetIndexes[1], 
-                                                 LeftKneeFrameID=self.robot.model.getFrameId("FL_KNEE"),
-                                                 RightKneeFrameID=self.robot.model.getFrameId("FR_KNEE"),
+                                                 LeftKneeFrameID=7, # self.robot.model.getFrameId("FL_KNEE"),
+                                                 RightKneeFrameID=15, # self.robot.model.getFrameId("FR_KNEE"),
                                                  LeftKneeTorqueID=2,
                                                  RightKneeTorqueID=5,
                                                  IterNumber=self.IterNumber, 
@@ -329,9 +329,18 @@ class Estimator():
 
 
     def UpdateContactInformation(self, TypeOfContactEstimator="default"):
-        self.Fcontact = self.ContactEstimator.ContactForces(self.tau, self.q)
+
         if TypeOfContactEstimator=="default":
-            self.LeftContcat, self.RightContact = self.ContactEstimator.LegsOnGround(self.q, self.a, self.Fcontact)
+            self.LeftContcat, self.RightContact = self.ContactEstimator.LegsOnGround(self.q, 
+                                                                                     self.qdot,
+                                                                                     self.a_imu, 
+                                                                                     self.tau,
+                                                                                     self.a_imu - self.ag_imu + np.array([0, 0, 10]),
+                                                                                     TorqueForceMingler=0.6, 
+                                                                                     ProbThresold=0.5, 
+                                                                                     TrustThresold=0.5
+                                                                                     )
+            
         elif TypeOfContactEstimator=="kin":
             self.LeftContcat, self.RightContact = self.ContactEstimator.LegsOnGroundKin(self.q, self.a_imu - self.ag_imu)
 
@@ -371,7 +380,7 @@ class Estimator():
             # no foot touching the ground, keeping old attitude data
             self.theta_kin = self.theta_kin
 
-        return self.theta_kin
+        return self.theta_kin.as_euler('xyz') 
 
 
 
@@ -407,7 +416,7 @@ class Estimator():
         self.theta_out_kg = R.from_euler('xyz', self.AttitudeFilter.RunFilter(AttitudeFromKin, self.w_imu))
         
         # average both
-        self.theta_out = alpha*self.theta_out_ag + (1-alpha)*self.theta_out_kg
+        self.theta_out = R.from_euler('xyz', alpha*self.theta_out_ag.as_euler('xyz') + (1-alpha)*self.theta_out_kg.as_euler('xyz'))
         return None
 
 
@@ -464,7 +473,7 @@ class Estimator():
         # this is the main function
         # updates all variables with latest available measurements
         self.ReadSensor()
-        #PPP self.UpdateContactInformation()
+        self.UpdateContactInformation()
 
 
         # derive data & runs filter

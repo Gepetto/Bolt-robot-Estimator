@@ -137,9 +137,16 @@ class boltomatic():
         self.initLog(n)
         for k in range(n):
             self.qdd = pin.aba(self.bolt.model, self.bolt.data, self.q, self.qd, self.tau, self.forces)
+            
+            # pour avoir l'accélération des frames
+            pin.forwardKinematics(self.bolt.model, self.bolt.data, self.q, self.qd, np.zeros(self.bolt.model.nv))
+
+            print("\n acc 2 et 7: \n")
+            print(pin.getFrameAcceleration(self.bolt.model, self.bolt.data, 6, pin.ReferenceFrame.WORLD))
+            print(pin.getFrameAcceleration(self.bolt.model, self.bolt.data, 6, pin.ReferenceFrame.LOCAL))
             self.qd += self.qdd*dt
             self.q = pin.integrate(self.bolt.model, self.q, self.qd*dt)
-            #print(self.qdd)
+            
             
             self.updateMove()
             self.superupdateView(k, dt=dt)
@@ -160,9 +167,9 @@ class boltomatic():
             preq = self.q.copy()
             self.qdd = pin.aba(self.bolt.model, self.bolt.data, self.q, self.qd, self.tau, self.forces)
             self.qd += self.qdd*dt
-            print(self.qd)
+            #print(self.qd)
             self.q = pin.integrate(self.bolt.model, self.q, self.qd*dt)
-            print((self.q - preq)/dt)
+            #print((self.q - preq)/dt)
             #print(self.qdd)
             
             self.updateMove()
@@ -218,15 +225,15 @@ def datagenerator(n, j=7, sp=-1):
         x[sp] = np.random.random(1)[0]*2 - 1
     return x
 
-tau = datagenerator(12, sp=7)/1000
+tau = datagenerator(12, sp=11)/100
 qf = datagenerator(13, 8)
 #tau = datagenerator(12, sp=11)/100
 
 bolt = boltomatic()
-#bolt.torqueMove(tau, dt=0.1, n=80)
+bolt.torqueMove(tau, dt=0.1, n=80)
 #bolt.kinMove(qf)
 #bolt.plottorque([2, 3, 4]) # left leg torques
-bolt.forceMove([np.array([0., 0., 0.01]), np.array([0., 0., 0.]),], dt=0.01, n=100)
+#bolt.forceMove( [ np.array([0., 0., 0.01]), np.array([0., 0., 0.]) ], dt=0.01, n=300)
 #bolt.jacob(10)
 #bolt.video()
 

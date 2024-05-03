@@ -114,16 +114,16 @@ class TrajectoryGenerator:
                 self.logger.LogTheLog("No trajectory given !", style="warn")
             if speed is None:
                 # speed is not given, derive speed and acceleration
-                self.acceleration = self.MakeSpeedFromTrajectory(traj)
+                self.acceleration = self.MakeSpeedFromTrajectory(traj, self.dt)
             else :
                 # speed is given
                 if speed.shape != self.trajectory.shape :
                     # check if data are consistent
                     self.logger.LogTheLog("Wrong dimensions for given custom speed and trajectory, deriving speed and acceleration from traj", style="warn")
-                    self.MakeAccelerationFromTrajectory(traj)
+                    self.MakeAccelerationFromTrajectory(traj, self.dt)
                 else:
                     self.speed = speed.copy()
-                    self.acceleration = self.MakeAccelerationFromSpeed(speed)
+                    self.acceleration = self.MakeAccelerationFromSpeed(speed, self.dt)
         else:
             self.logger.LogTheLog("undetermined trajectory type", style="warn")
             return None, None, None
@@ -207,31 +207,31 @@ class TrajectoryGenerator:
        
         
         
-    def MakeSpeedFromTrajectory(self, traj):
+    def MakeSpeedFromTrajectory(self, traj, dt):
         # derives the speed
         if self.talkative : self.logger.LogTheLog("Speed is derived numerically from trajectory", style="warn")
         D, N= np.shape(traj)
         self.speed = np.zeros((D,N))
-        self.speed[:, 1:] = (traj[:, 1:] - traj[:, 0:-1])/self.dt
+        self.speed[:, 1:] = (traj[:, 1:] - traj[:, 0:-1])/dt
         if self.smooth : self.speed = self.SimpleSmoother(self.speed)
         return self.speed
         
-    def MakeAccelerationFromTrajectory(self, traj):
+    def MakeAccelerationFromTrajectory(self, traj, dt):
         # derives the acceleration and the speed
         D, N= np.shape(traj)
         if self.talkative : self.logger.LogTheLog("Acceleration and speed are derived numerically from trajectory", style="warn")
         self.acceleration = np.zeros((D,N))
         self.MakeSpeedFromTrajectory(traj)
-        self.acceleration[:, 1:] = (self.speed[:, 1:] - self.speed[:, 0:-1])/self.dt
+        self.acceleration[:, 1:] = (self.speed[:, 1:] - self.speed[:, 0:-1])/dt
         if self.smooth : self.acceleration = self.SimpleSmoother(self.acceleration)
         return self.acceleration
 
-    def MakeAccelerationFromSpeed(self, speed):
+    def MakeAccelerationFromSpeed(self, speed, dt):
         # derives the acceleration and the speed
         if self.talkative : self.logger.LogTheLog("Acceleration is derived numerically from speed", style="warn")
         D, N= np.shape(speed)
         self.acceleration = np.zeros((D,N))
-        self.acceleration[:, 1:] = (speed[:, 1:] - speed[:, 0:-1])/self.dt
+        self.acceleration[:, 1:] = (speed[:, 1:] - speed[:, 0:-1])/dt
         if self.smooth : self.acceleration = self.SimpleSmoother(self.acceleration)
         return self.acceleration
     
@@ -287,10 +287,15 @@ class Metal:
             if acc is None : logger.LogTheLog("no acceleration provided", style="warn")
         else:
             self.talkative = False
-        
+    
+    def SetNoise(self, NoiseLevel=0.1, DriftingCoeff=0.05):
+        # the absolute or relative noise to add to the data
+        self.NoiseLevel = NoiseLevel
+        self.DriftingCoeff = DriftingCoeff
 
         
     def makeNoise(self, data, AutoAdjustAmplitude=True):
+        self.D, self.N = np.shape(data)
         # tune the noise level (absolute or proportionnal to signal)
         amplitude = self.NoiseLevel/100
         if AutoAdjustAmplitude : 
@@ -299,6 +304,7 @@ class Metal:
         return data + np.random.normal(loc=0.0, scale=amplitude, size=(self.D,self.N))
     
     def makeDrift(self, data, AutoAdjustAmplitude=True):
+        self.D, self.N = np.shape(data)
         drift = self.DriftingCoeff/100
         if AutoAdjustAmplitude : 
             drift = (np.max(abs(data)) - np.min(data)) * self.DriftingCoeff / 100

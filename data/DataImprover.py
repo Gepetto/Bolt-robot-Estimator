@@ -229,7 +229,7 @@ def improve_4(N=1000, filename = "", outname="", talk=True):
 
 
 
-if True:
+if __name__ =='main':
     main()
 
 

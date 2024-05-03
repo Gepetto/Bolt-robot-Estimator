@@ -8,6 +8,7 @@ sys.path.append('/home/nalbrecht/Bolt-Estimator/Bolt-robot---Estimator/src/pytho
 from Bolt_Utils import Log
 
 from DataImprover import improve
+from TrajectoryGenerator import TrajectoryGenerator, Metal
 
 
 class DataReader():
@@ -38,12 +39,15 @@ class DataReader():
         self.logger.LogTheLog(file[-25:] + '  of shape  '+str(Z.shape), "subinfo")
         
 
-    def Load(self,   t_file=None, q_file=None, qd_file=None, x_file=None, v_file=None, a_file=None, 
+    def Load(self,   t_file=None, q_file=None, qd_file=None, x_file=None, theta_file=None, v_file=None, a_file=None, 
                      w_file=None, tau_file=None, lcf_file=None, rcf_file=None, contact_file=None):
         self.logger.LogTheLog("DataReader : loading...")
         if t_file is not None :
             self.T = np.load(t_file)
             self.Printer(t_file, self.T)
+            t0 = self.T[0]
+            t1 = self.T[-1]
+            self.logger.LogTheLog(f"time ranging from {t0} to {t1} ", "subinfo")
         if q_file is not None :
             self.Q = np.load(q_file)
             self.Printer(q_file, self.Q)
@@ -55,6 +59,9 @@ class DataReader():
             self.Printer(x_file, self.X)
             self.groundH = self.X[0,self.RightFootID,2] + 0.002
             self.logger.LogTheLog("ground height is "+ str(self.groundH), "subinfo")
+        if theta_file is not None :
+            self.Theta = np.load(theta_file)
+            self.Printer(theta_file, self.Theta)
         if v_file is not None :
             self.V = np.load(v_file)
             self.Printer(v_file, self.V)
@@ -79,38 +86,44 @@ class DataReader():
             #print(self.LeftContact)
       
         self.SampleLength = len(self.T)
-        self.logger.LogTheLog("DataReader : loaded data, number of samples = " + str(self.SampleLength))
+        self.dt = (t1-t0)/self.SampleLength
+        self.logger.LogTheLog("DataReader : loaded data, number of samples = " + str(self.SampleLength) + ", dt = " + str(self.dt))
         
 
     
-    def AutoLoad(self, k, acc_file=None):
+    def AutoLoad(self, k, acc_file='included'):
         self.logger.LogTheLog("DataReader : Auto loading")
         kfile = str(k)
         #prefix = "/home/nalbrecht/Bolt-Estimator/bipedal-control/bipedal-control/"
         #prefix = "/home/nalbrecht/Bolt-Estimator/bipedal-control/bipedal-control/Données cancer niels/" + kfile + "/"
         prefix = "/home/nalbrecht/Bolt-Estimator/Bolt-robot---Estimator/data/" + kfile + "/"
+        self.prefix=prefix
         
         self.t_file = prefix + "T_array_" + kfile + ".npy"
         self.q_file = prefix + "Q_array_" + kfile + ".npy"
         self.qd_file = prefix + "Qd_array_" + kfile + ".npy"
         self.x_file = prefix + "X_array_" + kfile + ".npy"
+        self.theta_file = prefix + "Theta_array_" + kfile + ".npy"
         self.v_file = prefix + "V_array_" + kfile + ".npy"
-        '''self.a_file = prefix + "A_array_" + kfile + ".npy"'''
-        self.a_file = acc_file
+        if acc_file != 'included':
+            self.a_file = None
+        else :
+            self.a_file = prefix + "A_array_" + kfile + ".npy"
         self.w_file = prefix + "W_array_" + kfile + ".npy"
         self.tau_file = prefix + "Tau_array_" + kfile + ".npy"
         self.rcf_file = prefix + "RCF_array_" + kfile + ".npy"
         self.lcf_file = prefix + "LCF_array_" + kfile + ".npy"
         self.leftcontact_file = prefix + "C_array_" + kfile + ".npy"
 
-        self.Load(t_file=self.t_file,  q_file=self.q_file,  qd_file=self.qd_file,  x_file=self.x_file, 
+        self.Load(t_file=self.t_file,  q_file=self.q_file,  qd_file=self.qd_file,  x_file=self.x_file, theta_file=self.theta_file,
                   v_file=self.v_file,  a_file=self.a_file,    w_file=self.w_file,    tau_file=self.tau_file,
                   lcf_file=self.lcf_file,  rcf_file=self.rcf_file,  contact_file=self.leftcontact_file)
         
         self.filenames = [self.t_file,    self.q_file,   self.qd_file,   self.x_file, 
-                          self.v_file,    #self.a_file,   
+                          self.theta_file,self.v_file,    self.a_file,   
                           self.w_file,    self.tau_file,
                           self.lcf_file,  self.rcf_file]
+        
     
     def AutoImproveData(self, k, N=1000):
         self.logger.LogTheLog("DataReader : Improving data resolution to N="+str(N), "info")
@@ -118,10 +131,49 @@ class DataReader():
         if N ==j:
             self.logger.LogTheLog("DataReader : data seems to be of the right size already", "warn")
         for filename in self.filenames :
-            improve(N, filename, filename, talk=False)
-            self.logger.LogTheLog("improved ..."+ filename[-23:], "subinfo")
+            if filename is not None:
+                improve(N, filename, filename, talk=False)
+                self.logger.LogTheLog("improved ..."+ filename[-23:], "subinfo")
+            else :
+                self.logger.LogTheLog("DataReader : nonexistent filename in AutoImproveData, skipped it", "warn")
+
         self.AutoLoad(k)
         
+    
+    
+    def AddAcceleration(self, k):
+        """ create an acceleration data on every frame by deriving speed, and load it"""
+        self.logger.LogTheLog("DataReader : Adding acceleration to dataset", "info")
+        # get dimensions
+        N, nframe, _ = self.X.shape
+        
+        Acc = np.zeros(self.V.shape)
+        generator = TrajectoryGenerator(logger=self.logger)
+        
+        for FrameID in range(nframe):
+            # prepare data
+            Traj = self.X[:, FrameID, :].copy()
+            Speed = self.V[:, FrameID, :].copy()        
+            # load data in generator
+            generator.Generate("custom", N=1, T=1, NoiseLevel=10, Drift=20, amplitude=10, 
+                               avgfreq=0.5, relative=True, traj=Traj, speed=Speed, smooth=False)
+            
+            # compute speed to check consistency
+            s = generator.MakeSpeedFromTrajectory(Traj, 1e-3)
+            # computing acceleration
+            a = generator.MakeAccelerationFromSpeed(Speed, 1e-3)
+            # saving acceleration to X and V shape
+            
+            Acc[:, FrameID, :] = a
+        
+       
+        np.save(self.prefix + "A_array_" + str(k), Acc)
+        
+        self.grapher.SetLegend(["True", "computed"], ndim=3)
+        self.grapher.CompareNDdatas([Speed.transpose(), [s]], datatype="speed of bolt's base", mitigate=[0])
+
+        self.AutoLoad(k, acc_file='included')
+    
     
     def Get(self):
         return self.Tau, self.LCF
@@ -168,7 +220,17 @@ class DataReader():
         self.grapher.SetLegend(["speed of bolt's " + frameName], ndim=3)
         self.grapher.CompareNDdatas([self.V[:, frameID, :].transpose()], datatype='speed', title=frameName + ' speed')
         #self.grapher.end()
-        
+    
+    def PlotAcceleration(self, frameID=1, frameName="base"):
+        self.grapher.SetLegend(["acceleration of bolt's " + frameName], ndim=3)
+        self.grapher.CompareNDdatas([self.A[:, frameID, :].transpose()], datatype='acceleration', title= frameName + ' acceleration')
+  
+
+    def PlotTorqueJoint(self, jointID=3):
+        self.grapher.SetLegend(["Torques, left leg"], ndim=1)
+        Tau = self.Tau[:, jointID:jointID+1].copy()
+        self.grapher.CompareNDdatas([Tau.T], datatype='torque', title='torques in joint '+ str(jointID))#, selectmarker=self.Lcontactindex[0:25])
+
     def PlotTorques(self, side='left'):
         if side=='left':
             self.grapher.SetLegend(["Torques, left leg"], ndim=3)
@@ -241,22 +303,41 @@ def main(k=2):
     logger = Log(PrintOnFlight=True)
     Reader = DataReader(logger=logger)
     
-    # loading .npy files in DataReader
-    Reader.AutoLoad(k)
+    
+    
+    
+    # in case data is straight out of a simulation, improve sampling and add acceleration
+    # load without acceleration
+    Reader.AutoLoad(k, 'not included')
     # improve resolution of .npy files (to execute only once per set of files)
-    Reader.AutoImproveData(k, 10000)
+    Reader.AddAcceleration(k)
+    Reader.AutoImproveData(k, 1000)
+    
+
+    # loading .npy files in DataReader
+    Reader.AutoLoad(k, 'included')
+    
+    
     # check for contact indexes
-    # Reader.Contact()
+    Reader.Contact()
     # Reader.PlotContact()
+    
     # plot base position and speed
-    # Reader.PlotBaseTrajectory()
+    Reader.PlotBaseTrajectory()
     Reader.PlotSpeed(1, "base")
-    Reader.PlotFeetTrajectory()
-    # Reader.PlotTorques('left')
+    # Reader.PlotFeetTrajectory()
+    Reader.PlotAcceleration(1, "base")
+    # Reader.PlotAcceleration(4, "leg")
+    
+    # plotting torques and forces
+    Reader.PlotTorques('left')
+    # Reader.PlotTorqueJoint(0)
     # Reader.PlotTorquesAndFeet()
     # Reader.PlotForces()
     # Reader.PlotTorqueForce()
-    Reader.SuperPlotLeftFootCorrelation()
+    # Reader.SuperPlotLeftFootCorrelation()
+    
+    
     Reader.EndPlot()
     
     return Reader.Get()
