@@ -37,6 +37,7 @@ class DeviceEmulator():
     
     def GenerateTrajectory(self,N, NoiseLevelXY, NoiseLevelZ, Drift, NoiseLevelAttitude, T) -> None:
         # generate trajectories and attitudes that are supposed to look like real ones
+        
         self.Traj = np.zeros((N, 3))
         self.Speed = np.zeros((N, 3))
         self.Acc = np.zeros((N, 3))
@@ -103,57 +104,58 @@ class DeviceEmulator():
 
     def LoadSimulatedData(self, Reader, kfile) -> None:
         # fetch .npy files
-        Reader.AutoLoad(kfile, 'included')
+        Reader.AutoLoad(kfile, acc='included', q_angular="included")
         # base frame id
         base_id = 1
         
         # DATA THAT ESTIMATOR WILL NOT ACCESS
         # base acceleration
-        self.Acc_true = Reader.A[:, base_id, :].copy
-        self.AccG_true = Reader.A[:, base_id, :].copy
+        self.Acc_true = Reader.Get("a")[:, base_id, :].copy()
+        self.AccG_true = Reader.Get("a")[:, base_id, :].copy()
         n, _ = self.Acc_true.shape
         for j in range(n):
-            glocal = Reader.Theta
-            self.AccG_true += glocal
+            glocal = np.array([0, 0, 10])
+            self.AccG_true[j, :] += glocal
 
-        # base rotation speed
-        self.Omega_true = Reader.W[:, base_id, :].copy
-        # base speed and attitude (IMU has an integrator)
-        self.V_true = Reader.V[:, base_id, :].copy
-        self.Theta_true = Reader.W[:, base_id, :].copy
+        # base attitude and rotation speed
+        self.Theta_true = Reader.Get("theta")[:, base_id, :].copy()
+        self.Omega_true = Reader.Get("omega")[:, base_id, :].copy()
+        # base speed (IMU has an integrator)
+        self.Speed_true = Reader.Get("v")[:, base_id, :].copy()
+        
         # encoders
-        self.Q_true = Reader.Q
+        self.Q_true = Reader.Get("q")[:, 2:].copy()
         # torques
-        self.Tau_true = Reader.Tau
-
-
+        self.Tau_true = Reader.Get("tau").copy()
+        # position
+        self.Traj_true = Reader.Get("x")[:, base_id, :].copy()
+        # rotation acceleration
+        self.OmegaDot_true = np.zeros(self.Omega_true.shape)
 
 
         # start noise generator
-        noise = Metal(traj=self.Acc_True, NoiseLevel=0.5, DriftingCoeff=0.)
+        noise = Metal(traj=self.Acc_true, NoiseLevel=0.5, DriftingCoeff=0.)
         
 
         # DATA THAT ESTIMATOR WILL ACCESS
         # base acceleration
-        noise.SetNoise(NoiseLevel=0.5, DriftingCoeff=0.)
+        noise.SetNoise(NoiseLevel=0., DriftingCoeff=0.)
         self.Acc = noise.makeNoise(self.Acc_true)
         self.AccG = noise.makeNoise(self.Acc_true)
         # base rotation speed
-        noise.SetNoise(NoiseLevel=0.5, DriftingCoeff=0.)
+        noise.SetNoise(NoiseLevel=0., DriftingCoeff=0.)
         self.Omega = noise.makeNoise(self.Omega_true)
         # base speed and attitude (IMU has an integrator)
-        noise.SetNoise(NoiseLevel=0.5, DriftingCoeff=0.)
-        self.V = noise.makeNoise(self.V_true)
+        noise.SetNoise(NoiseLevel=0., DriftingCoeff=0.)
+        self.Speed = noise.makeNoise(self.Speed_true)
         self.Theta = noise.makeNoise(self.Theta_true)
         # encoders
-        noise.SetNoise(NoiseLevel=0.5, DriftingCoeff=0.)
+        noise.SetNoise(NoiseLevel=0., DriftingCoeff=0.)
         self.Q = noise.makeNoise(self.Q_true)
         # torques
-        noise.SetNoise(NoiseLevel=0.5, DriftingCoeff=0.)
+        noise.SetNoise(NoiseLevel=0., DriftingCoeff=0.)
         self.Tau = noise.makeNoise(self.Tau_true)
-
-
-
+        
 
         return None
     
@@ -168,21 +170,23 @@ class DeviceEmulator():
 
         self.baseAngularVelocity = self.Omega[self.iter, :]
         self.baseOrientation = self.Theta[self.iter, :]
-        self.q_mes = np.zeros((6,))
-        self.v_mes = np.zeros((6,))
+        self.q_mes = self.Q[self.iter, :]
+        self.v_mes = np.zeros(6) #self.Qd[self.iter, :] # TODO add
 
         self.offset_yaw_IMU = np.zeros(3)
         self.offset_speed_IMU = np.zeros(3)
+        
+        self.tau_mes = self.Tau[self.iter, :]
 
         self.iter += 1
     
     def GetTranslation(self):
         # outputs data
-        return self.Traj, self.Speed, self.Acc
+        return self.Traj_true, self.Speed_true, self.Acc_true
     
     def GetRotation(self):
         # outputs data
-        return self.Theta, self.Omega, self.OmegaDot
+        return self.Theta_true, self.Omega_true, self.OmegaDot_true
 
 
 

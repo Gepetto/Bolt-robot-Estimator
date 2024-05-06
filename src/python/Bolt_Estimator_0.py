@@ -133,7 +133,7 @@ class Estimator():
     def InitImuData(self) -> None :
         # initialize data to the right format
         self.a_imu = np.zeros((3,))   
-        self.ag_imu = np.zeros((3,))            
+        self.ag_imu = np.array([0, 0, 10])            
         self.w_imu = np.zeros((3,)) #R.from_euler('xyz', np.zeros(3))
         self.theta_imu = R.from_euler('xyz', np.zeros(3))
         # angles ? quaternion ?
@@ -320,7 +320,7 @@ class Estimator():
         self.v_kin[:] = np.zeros(3)[:]
         self.z_kin[:] = np.zeros(1)[:]
         # torques from motors
-        self.tau[:] = np.zeros(6)[:]
+        self.tau[:] = self.device.tau_mes[:] #np.zeros(6)[:]
 
         #self.ExternalDataCaster("acceleration", self.a)
 

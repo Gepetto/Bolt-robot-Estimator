@@ -1,5 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
+from scipy.spatial.transform import Rotation as R
+
 
 import sys
 sys.path.append('/home/nalbrecht/Bolt-Estimator/Bolt-robot---Estimator/tests')
@@ -39,8 +41,8 @@ class DataReader():
         self.logger.LogTheLog(file[-25:] + '  of shape  '+str(Z.shape), "subinfo")
         
 
-    def Load(self,   t_file=None, q_file=None, qd_file=None, x_file=None, theta_file=None, v_file=None, a_file=None, 
-                     w_file=None, tau_file=None, lcf_file=None, rcf_file=None, contact_file=None):
+    def Load(self,   t_file=None, q_file=None, qang_file=None, qd_file=None, x_file=None, theta_file=None, 
+             v_file=None, a_file=None, w_file=None, tau_file=None, lcf_file=None, rcf_file=None, contact_file=None):
         self.logger.LogTheLog("DataReader : loading...")
         if t_file is not None :
             self.T = np.load(t_file)
@@ -51,6 +53,9 @@ class DataReader():
         if q_file is not None :
             self.Q = np.load(q_file)
             self.Printer(q_file, self.Q)
+        if qang_file is not None :
+            self.Qang = np.load(qang_file)
+            self.Printer(qang_file, self.Qang)
         if qd_file is not None :
             self.Qd = np.load(qd_file)
             self.Printer(qd_file, self.Qd)
@@ -91,7 +96,7 @@ class DataReader():
         
 
     
-    def AutoLoad(self, k, acc_file='included'):
+    def AutoLoad(self, k, acc='included', q_angular="not included"):
         self.logger.LogTheLog("DataReader : Auto loading")
         kfile = str(k)
         #prefix = "/home/nalbrecht/Bolt-Estimator/bipedal-control/bipedal-control/"
@@ -105,21 +110,26 @@ class DataReader():
         self.x_file = prefix + "X_array_" + kfile + ".npy"
         self.theta_file = prefix + "Theta_array_" + kfile + ".npy"
         self.v_file = prefix + "V_array_" + kfile + ".npy"
-        if acc_file != 'included':
+        if acc != 'included':
             self.a_file = None
         else :
             self.a_file = prefix + "A_array_" + kfile + ".npy"
+        if q_angular != 'included':
+            self.qang_file = None
+        else :
+            self.qang_file = prefix + "Qang_array_" + kfile + ".npy"
         self.w_file = prefix + "W_array_" + kfile + ".npy"
         self.tau_file = prefix + "Tau_array_" + kfile + ".npy"
         self.rcf_file = prefix + "RCF_array_" + kfile + ".npy"
         self.lcf_file = prefix + "LCF_array_" + kfile + ".npy"
         self.leftcontact_file = prefix + "C_array_" + kfile + ".npy"
 
-        self.Load(t_file=self.t_file,  q_file=self.q_file,  qd_file=self.qd_file,  x_file=self.x_file, theta_file=self.theta_file,
+        self.Load(t_file=self.t_file,  q_file=self.q_file,  qang_file=self.qang_file, qd_file=self.qd_file,  
+                  x_file=self.x_file, theta_file=self.theta_file,
                   v_file=self.v_file,  a_file=self.a_file,    w_file=self.w_file,    tau_file=self.tau_file,
                   lcf_file=self.lcf_file,  rcf_file=self.rcf_file,  contact_file=self.leftcontact_file)
         
-        self.filenames = [self.t_file,    self.q_file,   self.qd_file,   self.x_file, 
+        self.filenames = [self.t_file,    self.q_file,   self.qang_file, self.qd_file,   self.x_file, 
                           self.theta_file,self.v_file,    self.a_file,   
                           self.w_file,    self.tau_file,
                           self.lcf_file,  self.rcf_file]
@@ -137,16 +147,15 @@ class DataReader():
             else :
                 self.logger.LogTheLog("DataReader : nonexistent filename in AutoImproveData, skipped it", "warn")
 
-        self.AutoLoad(k)
+        self.AutoLoad(k, acc="included", q_angular="included")
         
     
     
     def AddAcceleration(self, k):
-        """ create an acceleration data on every frame by deriving speed, and load it"""
+        """ create an acceleration data on every frame by deriving speed, and save it"""
         self.logger.LogTheLog("DataReader : Adding acceleration to dataset", "info")
         # get dimensions
         N, nframe, _ = self.X.shape
-        
         Acc = np.zeros(self.V.shape)
         generator = TrajectoryGenerator(logger=self.logger)
         
@@ -162,21 +171,62 @@ class DataReader():
             s = generator.MakeSpeedFromTrajectory(Traj, 1e-3)
             # computing acceleration
             a = generator.MakeAccelerationFromSpeed(Speed, 1e-3)
-            # saving acceleration to X and V shape
-            
+            # saving acceleration to X and V shape    
             Acc[:, FrameID, :] = a
-        
-       
         np.save(self.prefix + "A_array_" + str(k), Acc)
-        
         self.grapher.SetLegend(["True", "computed"], ndim=3)
         self.grapher.CompareNDdatas([Speed.transpose(), [s]], datatype="speed of bolt's base", mitigate=[0])
 
-        self.AutoLoad(k, acc_file='included')
+        #self.AutoLoad(k, acc='included', q_angular="not included")
+    
+    def AddAngularQ(self, k):
+        """ Q from simulation is a rotation matrix. We need the encoder angle."""
+        self.logger.LogTheLog("DataReader : Adding angular q to dataset as Qang", "info")
+        # get dimensions
+        N, nq, _, _ = self.Q.shape
+        Qang = np.zeros((N, nq))
+        generator = TrajectoryGenerator(logger=self.logger)
+        
+        for Qid in range(nq):
+            # prepare data
+            RotMatrixes = self.Q[:, Qid, :, :].copy()
+            Rotation = R.from_matrix(RotMatrixes)
+            # rotation to an angle (quaternion is in scalar-last format)
+            angle = np.arccos(Rotation.as_quat()[:, -1]) * 2
+            #print(RotMatrixes)
+            #print(angle)
+            Qang[:, Qid] = angle
+            
+        np.save(self.prefix + "Qang_array_" + str(k), Qang)
+        self.grapher.SetLegend(["left hip", "left knee"], ndim=1)
+        self.grapher.CompareNDdatas([[Qang[:, 3]], [Qang[:, 4]]], title="angle from bolt articulation")
+
+        #self.AutoLoad(k, acc_file='included')
     
     
-    def Get(self):
-        return self.Tau, self.LCF
+    def Get(self, data):
+        if data=="x":
+            return self.X
+        elif data=="v":
+            return self.V
+        elif data=="a":
+            return self.A
+        elif data=="q":
+            return self.Qang
+        elif data=="qd":
+            return None#self.Qd
+        elif data=="theta":
+            return self.Theta
+        elif data=="omega":
+            return self.W
+        elif data=="tau":
+            return self.Tau
+        elif data=="rcf":
+            return self.RCF
+        elif data=="lcf":
+            return self.LCF
+        
+        
     
     def EndPlot(self):
         self.grapher.end()
@@ -298,24 +348,26 @@ class DataReader():
 
 
 
-def main(k=2):
+def main(k=1):
     # getting ready
     logger = Log(PrintOnFlight=True)
     Reader = DataReader(logger=logger)
+
     
-    
-    
-    
+    """
     # in case data is straight out of a simulation, improve sampling and add acceleration
     # load without acceleration
-    Reader.AutoLoad(k, 'not included')
+    Reader.AutoLoad(k, acc='not included', q_angular="not included")
     # improve resolution of .npy files (to execute only once per set of files)
     Reader.AddAcceleration(k)
-    Reader.AutoImproveData(k, 1000)
+    Reader.AddAngularQ(k)
+    Reader.AutoLoad(k, acc="included", q_angular="included")
+    Reader.AutoImproveData(k, 5000)
     
+    """
 
     # loading .npy files in DataReader
-    Reader.AutoLoad(k, 'included')
+    Reader.AutoLoad(k, acc='included', q_angular="included")
     
     
     # check for contact indexes
@@ -323,10 +375,10 @@ def main(k=2):
     # Reader.PlotContact()
     
     # plot base position and speed
-    Reader.PlotBaseTrajectory()
-    Reader.PlotSpeed(1, "base")
+    # Reader.PlotBaseTrajectory()
+    # Reader.PlotSpeed(1, "base")
     # Reader.PlotFeetTrajectory()
-    Reader.PlotAcceleration(1, "base")
+    # Reader.PlotAcceleration(1, "base")
     # Reader.PlotAcceleration(4, "leg")
     
     # plotting torques and forces
@@ -340,8 +392,10 @@ def main(k=2):
     
     Reader.EndPlot()
     
-    return Reader.Get()
-    
-    
+    return Reader.Get("q")
 
-Tau, LCF = main()
+    
+    
+if __name__ == "__main__":
+    Qang = main()
+    #A = Q[:, 3, :, :]

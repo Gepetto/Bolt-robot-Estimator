@@ -91,6 +91,30 @@ class ContactEstimator():
         # number of updates
         self.iter += 1
         return None
+    
+    def Get(self, data="cf_1d"):
+        # contact forces log
+        if data=='cf_1d':
+            return self.Log_LcF_1d, self.Log_RcF_1d
+        elif data=='cf_3d':
+            return self.Log_LcF_3d, self.Log_RcF_3d
+        elif data=='cf_torques':
+            return self.Log_LcF_T, self.Log_RcF_T
+        
+        # trusts and co
+        elif data=='delta_1d':
+            return self.Log_Delta1D
+        elif data=='delta_3d':
+            return self.Log_Delta3D
+        elif data=='mu':
+            return self.Log_Mu
+        elif data=='slip_prob':
+            return self.Log_SlipProb
+        elif data=="trust":
+            return self.Log_Trust
+                
+        
+        
         
         
     def InitVariables(self) -> None:
@@ -195,11 +219,12 @@ class ContactEstimator():
                 a_pin = pin.getFrameAcceleration(self.bolt.model, self.bolt.data, 1, pin.ReferenceFrame.LOCAL).linear
                 
                 Deltas.append( np.linalg.norm(a_pin-a_mes))
-                print(Deltas[-1])
+                #print(Deltas[-1])
                 if Deltas[-1] < DeltaMin:
                     # error is minimal
                     DeltaMin = Deltas[-1]
                     CF = (LcF, RcF)
+                    print("gougi")
         return CF
     
     
@@ -220,8 +245,8 @@ class ContactEstimator():
         #LcF = -np.linalg.pinv(JL.T)@Torques # TODO check dimension et logique de cette équation
         #RcF = -np.linalg.pinv(JR.T)@Torques
         
-        LcF = JL.T@Torques 
-        RcF = JR.T@Torques
+        LcF = -JL.T@Torques 
+        RcF = -JR.T@Torques
         
         return LcF[:3], RcF[:3]
 
@@ -275,13 +300,15 @@ class ContactEstimator():
         
     def ContactProbability_Torque(self, Vertical, KneeTorque, KneeID = 8, FootID=10, Center=4, Stiffness=5)-> tuple[np.ndarray, float]:
         pin.updateFramePlacements(self.bolt.model, self.bolt.data)
+        # normalized vertical vector
+        Vertical = Vertical / np.linalg.norm(Vertical)
         
         # knee to foot vector (both expressed in world frame)
         delta = self.bolt.data.oMf[KneeID].translation - self.bolt.data.oMf[FootID].translation
         # norm of horizontal components
-        hdist = np.linalg.norm(delta -  utils.scalar(delta, Vertical))
+        hdist = np.linalg.norm(delta -  utils.scalar(delta, Vertical)*Vertical)
         if hdist < 0.07 or hdist > 0.18 : 
-            self.logger.LogTheLog(f"Computed distance from knee : {KneeID} to foot : {FootID} is anormal :: {hdist}m")
+            self.logger.LogTheLog(f"Computed distance from knee : {KneeID} to foot : {FootID} is anormal :: {hdist} m")
             hdist = 0.12
 
         # compute force
@@ -381,8 +408,8 @@ class ContactEstimator():
 
 
         # compute trust in contact
-        self.TrustL = self.TrustContact(self.DeltaL, self.DeltaL3d, self.DeltaLV, self.MuL, coeffs=self.coeffs)
-        self.TrustR = self.TrustContact(self.DeltaR, self.DeltaR3d, self.DeltaRV, self.MuR, coeffs=self.coeffs)
+        self.TrustL = self.TrustContact(self.DeltaL, self.DeltaL3d, self.DeltaLV, self.MuL, coeffs=(0.1, 0.1, 0.2, 0.1))
+        self.TrustR = self.TrustContact(self.DeltaR, self.DeltaR3d, self.DeltaRV, self.MuR, coeffs=(0.1, 0.1, 0.2, 0.1))
         
         self.LeftContact = self.ContactBool(self.LeftContact, self.ContactProbL, self.TrustL, ProbThresold, TrustThresold)
         self.RightContact = self.ContactBool(self.RightContact, self.ContactProbR, self.TrustR, ProbThresold, TrustThresold)

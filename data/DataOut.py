@@ -46,6 +46,7 @@ class DataOut():
         
     
     def save(self):
+        print("saving to " +self.dir)
         np.save(self.dir + 'T_array_'+self.k, np.array(self.t_vec))
         np.save(self.dir + 'X_array_'+self.k, np.array(self.all_pos_l))
         np.save(self.dir + 'Theta_array_'+self.k, np.array(self.all_theta_l))
