@@ -348,7 +348,7 @@ class DataReader():
 
 
 
-def main(k=1):
+def main(k=6):
     # getting ready
     logger = Log(PrintOnFlight=True)
     Reader = DataReader(logger=logger)
@@ -363,8 +363,8 @@ def main(k=1):
     Reader.AddAngularQ(k)
     Reader.AutoLoad(k, acc="included", q_angular="included")
     Reader.AutoImproveData(k, 5000)
-    
     """
+    
 
     # loading .npy files in DataReader
     Reader.AutoLoad(k, acc='included', q_angular="included")
@@ -392,7 +392,7 @@ def main(k=1):
     
     Reader.EndPlot()
     
-    return Reader.Get("q")
+    return Reader.Get("qd")
 
     
     

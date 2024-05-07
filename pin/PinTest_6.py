@@ -141,9 +141,9 @@ class boltomatic():
             # pour avoir l'accélération des frames
             pin.forwardKinematics(self.bolt.model, self.bolt.data, self.q, self.qd, np.zeros(self.bolt.model.nv))
 
-            print("\n acc 2 et 7: \n")
-            print(pin.getFrameAcceleration(self.bolt.model, self.bolt.data, 6, pin.ReferenceFrame.WORLD))
-            print(pin.getFrameAcceleration(self.bolt.model, self.bolt.data, 6, pin.ReferenceFrame.LOCAL))
+            print("\n acc 1 et 3: \n")
+            print(pin.getFrameAcceleration(self.bolt.model, self.bolt.data, 1, pin.ReferenceFrame.WORLD))
+            print(pin.getFrameAcceleration(self.bolt.model, self.bolt.data, 3, pin.ReferenceFrame.LOCAL))
             self.qd += self.qdd*dt
             self.q = pin.integrate(self.bolt.model, self.q, self.qd*dt)
             
@@ -225,7 +225,7 @@ def datagenerator(n, j=7, sp=-1):
         x[sp] = np.random.random(1)[0]*2 - 1
     return x
 
-tau = datagenerator(12, sp=11)/100
+tau = datagenerator(12, sp=11)/500
 qf = datagenerator(13, 8)
 #tau = datagenerator(12, sp=11)/100
 

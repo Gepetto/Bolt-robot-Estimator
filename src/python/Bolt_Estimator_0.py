@@ -112,7 +112,8 @@ class Estimator():
                                                  RightKneeFrameID=15, # self.robot.model.getFrameId("FR_KNEE"),
                                                  LeftKneeTorqueID=2,
                                                  RightKneeTorqueID=5,
-                                                 IterNumber=self.IterNumber, 
+                                                 IterNumber=self.IterNumber,
+                                                 dt=self.TimeStep,
                                                  logger=self.logger)
         self.logger.LogTheLog("Contact Estimator added.", ToPrint=Talkative)
 
@@ -479,7 +480,7 @@ class Estimator():
         # derive data & runs filter
         #PPP self.SpeedFusion()
 
-        self.AttitudeFusion()
+        #self.AttitudeFusion()
 
         # update all logs & past variables
         self.UpdateLogMatrixes()
