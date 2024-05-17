@@ -210,7 +210,7 @@ class boltomatic():
         print(J.transpose())
     
     def PrintFrame(self,j):
-        print(self.bolt.data.oMf[j].rotation)
+        print(self.bolt.data.oMf[j].translation)
 
 
     
@@ -230,10 +230,14 @@ qf = datagenerator(13, 8)
 #tau = datagenerator(12, sp=11)/100
 
 bolt = boltomatic()
-bolt.torqueMove(tau, dt=0.1, n=80)
+bolt.forceMove( [ np.array([0., 0., 0.0]), np.array([0., 0., 0.0]) ], dt=0.5, n=3)
+# bolt.torqueMove(tau, dt=0.1, n=30)
+bolt.PrintFrame(1)
+bolt.PrintFrame(10)
+
 #bolt.kinMove(qf)
 #bolt.plottorque([2, 3, 4]) # left leg torques
-#bolt.forceMove( [ np.array([0., 0., 0.01]), np.array([0., 0., 0.]) ], dt=0.01, n=300)
+#
 #bolt.jacob(10)
 #bolt.video()
 

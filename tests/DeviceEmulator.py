@@ -104,7 +104,7 @@ class DeviceEmulator():
 
     def LoadSimulatedData(self, Reader, kfile) -> None:
         # fetch .npy files
-        Reader.AutoLoad(kfile, acc='included', q_angular="included")
+        Reader.AutoLoad(kfile, acc='included', q_angular="not included")
         # base frame id
         base_id = 1
         
@@ -125,6 +125,7 @@ class DeviceEmulator():
         
         # encoders
         self.Q_true = Reader.Get("q")[:, 2:].copy()
+        self.Qd_true = Reader.Get("qd")[:, 2:].copy()
         # torques
         self.Tau_true = Reader.Get("tau").copy()
         # position
@@ -170,8 +171,8 @@ class DeviceEmulator():
 
         self.baseAngularVelocity = self.Omega[self.iter, :]
         self.baseOrientation = self.Theta[self.iter, :]
-        self.q_mes = self.Q[self.iter, :]
-        self.v_mes = np.zeros(6) #self.Qd[self.iter, :] # TODO add
+        self.q_mes = self.Q_true[self.iter, -6:]
+        self.v_mes = self.Qd_true[self.iter, -6:]
 
         self.offset_yaw_IMU = np.zeros(3)
         self.offset_speed_IMU = np.zeros(3)

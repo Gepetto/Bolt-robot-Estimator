@@ -147,7 +147,7 @@ class DataReader():
             else :
                 self.logger.LogTheLog("DataReader : nonexistent filename in AutoImproveData, skipped it", "warn")
 
-        self.AutoLoad(k, acc="included", q_angular="included")
+        self.AutoLoad(k, acc="included", q_angular="not included")
         
     
     
@@ -177,10 +177,9 @@ class DataReader():
         self.grapher.SetLegend(["True", "computed"], ndim=3)
         self.grapher.CompareNDdatas([Speed.transpose(), [s]], datatype="speed of bolt's base", mitigate=[0])
 
-        #self.AutoLoad(k, acc='included', q_angular="not included")
     
     def AddAngularQ(self, k):
-        """ Q from simulation is a rotation matrix. We need the encoder angle."""
+        """ the old Q from simulation was a rotation matrix. We need the encoder angle."""
         self.logger.LogTheLog("DataReader : Adding angular q to dataset as Qang", "info")
         # get dimensions
         N, nq, _, _ = self.Q.shape
@@ -201,7 +200,22 @@ class DataReader():
         self.grapher.SetLegend(["left hip", "left knee"], ndim=1)
         self.grapher.CompareNDdatas([[Qang[:, 3]], [Qang[:, 4]]], title="angle from bolt articulation")
 
-        #self.AutoLoad(k, acc_file='included')
+    
+    
+    def __AdaptDimQlike(self, Q_like):
+        SampleLength, _, n = Q_like.shape 
+        NewQ_like = np.zeros((SampleLength, n))
+        NewQ_like[:, :] = Q_like[:, 0, :]
+        return NewQ_like
+    
+    
+    def AdaptDimQQd(self, k):
+        """ adapt dimension of loaded Q and Qd arrays and save them"""
+        self.logger.LogTheLog("DataReader : Adapting shape of Q and Qd", "info")
+        Q = self.__AdaptDimQlike(self.Q)
+        Qd = self.__AdaptDimQlike(self.Qd)
+        np.save(self.prefix + "Q_array_" + str(k), Q)
+        np.save(self.prefix + "Qd_array_" + str(k), Qd)
     
     
     def Get(self, data):
@@ -212,9 +226,9 @@ class DataReader():
         elif data=="a":
             return self.A
         elif data=="q":
-            return self.Qang
+            return self.Q
         elif data=="qd":
-            return None#self.Qd
+            return self.Qd
         elif data=="theta":
             return self.Theta
         elif data=="omega":
@@ -275,7 +289,14 @@ class DataReader():
         self.grapher.SetLegend(["acceleration of bolt's " + frameName], ndim=3)
         self.grapher.CompareNDdatas([self.A[:, frameID, :].transpose()], datatype='acceleration', title= frameName + ' acceleration')
   
-
+    def PlotQ(self):
+        self.grapher.SetLegend(["left joints", "right joints"], ndim=3)
+        self.grapher.CompareNDdatas([self.Q[:, -6:-3].transpose(), self.Q[:, -3:].transpose()], datatype='radian', title= 'joints angle')
+  
+        
+        
+        
+        
     def PlotTorqueJoint(self, jointID=3):
         self.grapher.SetLegend(["Torques, left leg"], ndim=1)
         Tau = self.Tau[:, jointID:jointID+1].copy()
@@ -354,20 +375,24 @@ def main(k=6):
     Reader = DataReader(logger=logger)
 
     
-    """
+    
     # in case data is straight out of a simulation, improve sampling and add acceleration
     # load without acceleration
+    
     Reader.AutoLoad(k, acc='not included', q_angular="not included")
-    # improve resolution of .npy files (to execute only once per set of files)
+    
     Reader.AddAcceleration(k)
-    Reader.AddAngularQ(k)
-    Reader.AutoLoad(k, acc="included", q_angular="included")
+    
+    Reader.AdaptDimQQd(k)
+    """
+    # improve resolution of .npy files (to execute only once per set of files)
+    Reader.AutoLoad(k, acc="included", q_angular="not included")
     Reader.AutoImproveData(k, 5000)
     """
     
 
     # loading .npy files in DataReader
-    Reader.AutoLoad(k, acc='included', q_angular="included")
+    Reader.AutoLoad(k, acc='included', q_angular="not included")
     
     
     # check for contact indexes
@@ -388,14 +413,15 @@ def main(k=6):
     # Reader.PlotForces()
     # Reader.PlotTorqueForce()
     # Reader.SuperPlotLeftFootCorrelation()
+    Reader.PlotQ()
     
     
     Reader.EndPlot()
     
-    return Reader.Get("qd")
+    return Reader.Get("q")
 
     
     
 if __name__ == "__main__":
-    Qang = main()
+    ZZ = main()
     #A = Q[:, 3, :, :]

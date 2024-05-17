@@ -61,6 +61,7 @@ def main():
     # device will iterate over generated data each time estimator calls it
     for j in range(N-1):
         estimator.Estimate()
+        #print(f'iter : {j}')
     
     # get logs from estimator
         # rotations
@@ -86,8 +87,10 @@ def main():
     for j in range(N-1):
         theta_estimator[:, j] = R.from_quat(Qtheta_estimator[:, j]).as_euler('xyz')
         theta_imu[:, j] = R.from_quat(Qtheta_imu[:, j]).as_euler('xyz')
+        
+
     
-    
+    """
     # plot rotation
     InOut_rotations = [theta.T[:2, :], theta_imu[:2, :], theta_estimator[:2, :]]
     grapher.SetLegend(["theta in", "theta imu","theta out"], 2)
@@ -98,6 +101,7 @@ def main():
     a = device.Acc
     grapher.SetLegend(["ag", "a"], 3)
     grapher.CompareNDdatas([ag.T, a.T], "acceleration", "g", StyleAdapter=True, width=1.)
+    """
     
     # plot true base trajectory
     reader.PlotBaseTrajectory()

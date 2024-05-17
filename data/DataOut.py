@@ -14,19 +14,21 @@ class DataOut():
         self.all_vel_l = []
         self.all_q_l = []
         self.all_qd_l = []
+        self.all_qdd_l = []
         self.all_w_l = []
         self.all_tau_l = []
         self.all_lcf = []
         self.all_rcf = []
         self.all_left_contact = []
     
-    def store(self, t, pos, theta, vel, q, qd, w, tau, lcf, rcf, left_contact):
+    def store(self, t, pos, theta, vel, q, qd, qdd, w, tau, lcf, rcf, left_contact):
         self.t_vec.append(t)
         self.all_pos_l.append(pos.copy())
         self.all_theta_l.append(pos.copy())
         self.all_vel_l.append(vel.copy())
         self.all_q_l.append(q.copy())
         self.all_qd_l.append(qd.copy())
+        self.all_qdd_l.append(qd.copy())
         self.all_w_l.append(w.copy())
         self.all_tau_l.append(tau.copy())
         self.all_lcf.append(lcf.copy())
@@ -53,6 +55,7 @@ class DataOut():
         np.save(self.dir + 'V_array_'+self.k, np.array(self.all_vel_l))
         np.save(self.dir + 'Q_array_'+self.k, np.array(self.all_q_l))
         np.save(self.dir + 'Qd_array_'+self.k, np.array(self.all_qd_l))
+        np.save(self.dir + 'Qdd_array_'+self.k, np.array(self.all_qdd_l))
         np.save(self.dir + 'W_array_'+self.k, np.array(self.all_w_l))
         np.save(self.dir + 'Tau_array_'+self.k, np.array(self.all_tau_l))
         np.save(self.dir + 'LCF_array_'+self.k, np.array(self.all_lcf))
