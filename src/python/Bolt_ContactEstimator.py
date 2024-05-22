@@ -18,11 +18,18 @@ class ContactEstimator():
         
         # pinocchio
         self.bolt = robot
+        self.nq = self.bolt.model.nq
+        self.nv = self.bolt.model.nv
+        # data for different computations
+        self.data1D = self.bolt.model.createData()
+        self.data3D = self.bolt.model.createData()
+        self.dataT = self.bolt.model.createData()
         self.dt = dt
         # Q includes base position, which is updated by pinocchio, and position from encoders
         self.Q = pin.neutral(self.bolt.model)
-        self.Qd = pin.utils.zero(self.bolt.model.nv)
-        self.Qdd = np.zeros(self.bolt.model.nv)
+        self.Qd = pin.utils.zero(self.nv)
+        self.Qdd = np.zeros(self.nv)
+        self.Tau = np.zeros(6)
         
         # feet id
         self.LeftFootFrameID = LeftFootFrameID
@@ -50,7 +57,7 @@ class ContactEstimator():
         self.TorqueContacts = [False, False]
         
         # coefficient for averaging contact forces
-        self.coeffs = [0.0, 0.0, 0.9] #1D, 3D, torques-based
+        self.coeffs = [0.0, 0.3, 0.7] #1D, 3D, torques-based
         if sum(self.coeffs) != 1: self.logger.LogTheLog("Coeffs sum not equal to 1", "warn")
         self.c1, self.c2, self.c3 = self.coeffs
     
@@ -75,6 +82,8 @@ class ContactEstimator():
         # boolean contact, probability of contact and trust in contact
         self.Log_Contact = np.zeros([2, self.IterNumber], dtype=bool)
         self.Log_ContactProbability = np.zeros([2, self.IterNumber])
+        self.Log_ContactProbability_F = np.zeros([2, self.IterNumber])
+        self.Log_ContactProbability_T = np.zeros([2, self.IterNumber])
         self.Log_Trust = np.zeros([2, self.IterNumber])
         return None
     
@@ -97,6 +106,8 @@ class ContactEstimator():
         # boolean contact, probability of contact and trust in contact
         self.Log_Contact[:, self.iter] = [self.LeftContact, self.RightContact]
         self.Log_ContactProbability[:, self.iter] = [self.ContactProbL, self.ContactProbR]
+        self.Log_ContactProbability_F[:, self.iter] = [self.ContactProbL_F, self.ContactProbR_F]
+        self.Log_ContactProbability_T[:, self.iter] = [self.ContactProbL_T, self.ContactProbR_T]
         self.Log_Trust[:, self.iter] = [self.TrustL, self.TrustR]
         # number of updates
         self.iter += 1
@@ -126,6 +137,10 @@ class ContactEstimator():
            return self.Log_Contact
         elif data=="contact_prob":
            return self.Log_ContactProbability
+        elif data=="contact_prob_force":
+           return self.Log_ContactProbability_F
+        elif data=="contact_prob_torque":
+           return self.Log_ContactProbability_T
                 
         
         
@@ -195,8 +210,8 @@ class ContactEstimator():
         
 
         # update data from encoders
-        self.Q[-6:] = Q[:]
-        self.Qd[-6:] = Qd[:]
+        self.Q[:] = Q[:]
+        self.Qd[:] = Qd[:]
         TauPin = np.zeros(self.bolt.model.nv)
         TauPin[-6:] = Torques[:]
         
@@ -250,24 +265,27 @@ class ContactEstimator():
         return CF
     
     
-    def ContactForces3d(self, Torques, Q, frames=[10,18]) -> tuple[np.ndarray, np.ndarray]:
+    def ContactForces3d(self, frames=[10,18]) -> tuple[np.ndarray, np.ndarray]:
         """ compute contact forces using jacobian and torques"""
         # set left foot and right foot data apart
         LF_id, RF_id = frames[0], frames[1]
         
-        # adapt dimension of Q
-        self.Q[-6:] = Q[:]
+        # adapt dimension of Torques
         TauPin = np.zeros(self.bolt.model.nv)
-        TauPin[-6:] = Torques[:]        
-        #pin.computeAllTerms(self.bolt.model, self.bolt.data, self.Q, self.Qd)
+        TauPin[-6:] = self.Tau[:]
+
+        # update data
+        pin.forwardKinematics(self.bolt.model, self.data3D, self.Q)
+        pin.updateFramePlacements(self.bolt.model, self.data3D)
+        pin.computeAllTerms(self.bolt.model, self.data3D, self.Q, self.Qd)
         
         # compute jacobian matrixes for both feet
-        JL = pin.computeFrameJacobian(self.bolt.model, self.bolt.data, self.Q, LF_id).copy()
-        JR = pin.computeFrameJacobian(self.bolt.model, self.bolt.data, self.Q, RF_id).copy()
+        JL = pin.computeFrameJacobian(self.bolt.model, self.data3D, self.Q, LF_id).copy()
+        JR = pin.computeFrameJacobian(self.bolt.model, self.data3D, self.Q, RF_id).copy()
         # mass and generalized gravity
-        M = self.bolt.data.M
-        g = pin.computeGeneralizedGravity(self.bolt.model, self.bolt.data, self.Q)
-        b = self.bolt.data.nle
+        M = self.data3D.M
+        g = pin.computeGeneralizedGravity(self.bolt.model, self.data3D, self.Q)
+        b = self.data3D.nle
       
         # compute 6d contact wrenches
         LcF = -np.linalg.pinv(JL.T) @ (TauPin - g - b)
@@ -329,28 +347,59 @@ class ContactEstimator():
         return Delta, Delta3d, DeltaVertical
     
     
-    def ContactProbability_Force(self, ContactForce1d, ContactForce3d, ContactForceT, thresold=0.3) -> float:
-        """check consistency in contact forces estimates"""
-        # warning thresold
-        thresold = self.mass*9.81*thresold
+    def ContactProbability_Force(self, ContactForce1d, ContactForce3d, ContactForceT, trigger=5, stiffness=3, coeffs=[0.3, 0.3, 0.4]) -> float:
+        """ compute probability of contact based on three force estimations """
+        c1, c2, c3 = coeffs
+        if c1+c2+c3 != 1.0 : self.logger.LogTheLog("Coeff sum != 1 in ContactProbability_Force", style="warn")
 
         # average vertical force
-        VerticalForce = self.c1*ContactForce1d[2] + self.c2*ContactForce3d[2] + self.c3*ContactForceT[2]
-        return self.__SigmoidDiscriminator(VerticalForce, thresold, 2)
+        VerticalForce = (c1*ContactForce1d[2] + c2*ContactForce3d[2] + c3*ContactForceT[2])/3
+        # return probability
+        return self.__SigmoidDiscriminator(VerticalForce, trigger, stiffness)
+
+
+    def ContactProbability_Force_3D(self, LeftContactForce3d, RightContactForce3d, iter, center=0.01, stiffness=0.1) -> float:
+        """ compute probability of contact """
+        if iter==0:
+            self.Previous3D_L = []
+            self.Previous3D_R = []
+        
+        LeftVerticalForce = LeftContactForce3d[2]
+        RightVerticalForce = RightContactForce3d[2]
+        self.Previous3D_L.append(LeftVerticalForce)
+        self.Previous3D_R.append(RightVerticalForce)
+
+        # check if force is increasing (contact) or decreasing (not in contact)
+        deltaL = center
+        deltaR = center
+        if iter>=1 and iter < 20 :
+            deltaL = self.Previous3D_L[-1] - self.Previous3D_L[-2]
+            deltaR = self.Previous3D_R[-1] - self.Previous3D_R[-2]
+        
+        
+        elif iter >= 20 :
+            PreviousAverageL = sum(self.Previous3D_L[-20:-10])/10
+            CurrentAverageL = sum(self.Previous3D_L[-10:])/10
+            deltaL = CurrentAverageL - PreviousAverageL
+
+            PreviousAverageR = sum(self.Previous3D_R[-20:-10])/10
+            CurrentAverageR = sum(self.Previous3D_R[-10:])/10
+            deltaR = CurrentAverageR - PreviousAverageR
+
+        return self.__SigmoidDiscriminator(deltaL, center, stiffness), self.__SigmoidDiscriminator(deltaR, center, stiffness)
+
        
         
-    def ContactProbability_Torque(self, Vertical, KneeTorque, Q, KneeID = 8, FootID=10, Center=4, Stiffness=5)-> tuple[np.ndarray, float]:
+    def ContactProbability_Torque(self, Vertical, KneeTorque, KneeID = 8, FootID=10, Center=4, Stiffness=5)-> tuple[np.ndarray, float]:
         """ compute force based on knee torques, and return the estimated force and contact probability"""
-        QPin = np.zeros(self.bolt.model.nv +1)
-        QPin[-6:] = Q[:]
         
-        pin.forwardKinematics(self.bolt.model, self.bolt.data, QPin)
-        pin.updateFramePlacements(self.bolt.model, self.bolt.data)
+        pin.forwardKinematics(self.bolt.model, self.dataT, self.Q)
+        pin.updateFramePlacements(self.bolt.model, self.dataT)
         # normalized vertical vector
         Vertical = Vertical / np.linalg.norm(Vertical)
         
         # knee to foot vector (both expressed in world frame)
-        delta = self.bolt.data.oMf[KneeID].translation - self.bolt.data.oMf[FootID].translation
+        delta = self.dataT.oMf[KneeID].translation - self.dataT.oMf[FootID].translation
         # norm of horizontal components
         hdist = np.linalg.norm(delta -  utils.scalar(delta, Vertical)*Vertical)
         if hdist < 0.05 or hdist > 0.25 : 
@@ -380,8 +429,8 @@ class ContactEstimator():
         Slip1 = self.__SigmoidDiscriminator(HorizontalAcc, AccTrigger, 5)
         # 0 : feet stable , 0.8 : feet potentially slipping
         SlipProb = mingler * Slip0 + (1-mingler) * Slip1
-        print(Slip0, Slip1)
-        print(SlipProb)
+        #print(Slip0, Slip1)
+        #print(SlipProb)
   
         return SlipProb 
         
@@ -421,17 +470,19 @@ class ContactEstimator():
         Args = 
         Return = 
         """
-        # TODO : input Qd
+        # updates encoders and torques
+        self.Q = Q.copy()
+        self.Qd = Qd.copy()
+        self.Tau = Torques.copy()
+
         # compute probability of contact based on knee's torque
         self.LcF_T, self.ContactProbL_T = self.ContactProbability_Torque(Vertical=Vertical, 
-                                                                         KneeTorque=Torques[self.LeftKneeTorqueID], 
-                                                                         Q=Q,
+                                                                         KneeTorque=self.Tau[self.LeftKneeTorqueID], 
                                                                          KneeID=self.LeftKneeFrameID, 
                                                                          FootID=self.LeftFootFrameID, 
                                                                          Center=4, Stiffness=2)
         self.RcF_T, self.ContactProbR_T = self.ContactProbability_Torque(Vertical=Vertical, 
-                                                                         KneeTorque=Torques[self.RightKneeTorqueID], 
-                                                                         Q=Q,
+                                                                         KneeTorque=self.Tau[self.RightKneeTorqueID], 
                                                                          KneeID=self.RightKneeFrameID, 
                                                                          FootID=self.RightFootFrameID, 
                                                                          Center=4, Stiffness=2)
@@ -439,7 +490,7 @@ class ContactEstimator():
         # get the contact forces # TODO : debug 1D
         self.LcF_1d, self.RcF_1d = np.zeros(3), np.zeros(3) #self.ContactForces1d(Torques=Torques, Q=Q, Qd=Qd, BaseAccelerationIMU=Acc , Dynamic=0.4, Resolution=7)
         # print("1D done", self.Q)
-        self.LcF_3d, self.RcF_3d = self.ContactForces3d(Torques=Torques, Q=Q, frames=[self.LeftFootFrameID, self.RightFootFrameID])
+        self.LcF_3d, self.RcF_3d = self.ContactForces3d(frames=[self.LeftFootFrameID, self.RightFootFrameID])
         # print("3D done", self.Q)
         # get deltas
         self.DeltaL, self.DeltaL3d, self.DeltaLV = self.ConsistencyChecker(self.LcF_1d, self.LcF_3d, self.LcF_T, coeffs=self.coeffs)
@@ -451,11 +502,13 @@ class ContactEstimator():
         self.SlipProbL = self.Slips(self.LcF_3d, self.LeftFootFrameID, MuTrigger=0.2, FootAcc=LFootAcc, AccTrigger=2., mingler=0.99)
         self.SlipProbR = self.Slips(self.RcF_3d, self.RightFootFrameID, MuTrigger=0.2, FootAcc=RFootAcc, AccTrigger=2., mingler=0.99)
 
-        # compute probability of contact based on god's sacred will and some meth
-        self.ContactProbL_F = self.ContactProbability_Force(self.LcF_1d, self.LcF_3d, self.LcF_T, thresold=0.3)
-        self.ContactProbR_F = self.ContactProbability_Force(self.RcF_1d, self.RcF_3d, self.RcF_T, thresold=0.3)
+        # compute probability of contact based on vertical contact forces from 3 DIFFERENT ESTIMATIONS
         
-
+        #self.ContactProbL_F = self.ContactProbability_Force(self.LcF_1d, self.LcF_3d, self.LcF_T, trigger=4, stiffness=3, coeffs=[0., 1.0, 0.])
+        #self.ContactProbR_F = self.ContactProbability_Force(self.RcF_1d, self.RcF_3d, self.RcF_T, trigger=4, stiffness=3, coeffs=[0., 1.0, 0.])
+        
+        self.ContactProbL_F, self.ContactProbR_F = self.ContactProbability_Force_3D(self.LcF_3d, self.RcF_3d, iter=self.iter, center=0.01, stiffness=0.03)
+        
         # merge probability of contact from force and torque
         self.ContactProbL = self.ContactProbL_T * TorqueForceMingler + self.ContactProbL_F * (1-TorqueForceMingler)
         self.ContactProbR = self.ContactProbR_T * TorqueForceMingler + self.ContactProbR_F * (1-TorqueForceMingler)

@@ -124,8 +124,8 @@ class DeviceEmulator():
         self.Speed_true = Reader.Get("v")[:, base_id, :].copy()
         
         # encoders
-        self.Q_true = Reader.Get("q")[:, 2:].copy()
-        self.Qd_true = Reader.Get("qd")[:, 2:].copy()
+        self.Q_true = Reader.Get("q")[:, :].copy()
+        self.Qd_true = Reader.Get("qd")[:, :].copy()
         # torques
         self.Tau_true = Reader.Get("tau").copy()
         # position
@@ -171,8 +171,8 @@ class DeviceEmulator():
 
         self.baseAngularVelocity = self.Omega[self.iter, :]
         self.baseOrientation = self.Theta[self.iter, :]
-        self.q_mes = self.Q_true[self.iter, -6:]
-        self.v_mes = self.Qd_true[self.iter, -6:]
+        self.q_mes = self.Q_true[self.iter, :]
+        self.v_mes = self.Qd_true[self.iter, :]
 
         self.offset_yaw_IMU = np.zeros(3)
         self.offset_speed_IMU = np.zeros(3)

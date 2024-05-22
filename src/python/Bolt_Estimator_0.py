@@ -67,6 +67,8 @@ class Estimator():
 
             self.robot = pin.RobotWrapper.BuildFromURDF(UrdfPath, ModelPath)
             self.logger.LogTheLog("URDF built", ToPrint=Talkative)
+        self.nq = self.robot.model.nq
+        self.nv = self.robot.model.nv
         self.FeetIndexes = [self.robot.model.getFrameId("FL_FOOT"), self.robot.model.getFrameId("FR_FOOT")] # Left, Right
         
 
@@ -163,8 +165,8 @@ class Estimator():
         self.v_kin = np.zeros((3,))
         self.z_kin = np.zeros((1,))
         # motors positions & velocities & torques
-        self.q = np.zeros((6, ))
-        self.qdot = np.zeros((6, ))
+        self.q = np.zeros((self.nq, ))
+        self.qdot = np.zeros((self.nv, ))
         self.tau = np.zeros((6, ))
         # attitude from Kin
         self.w_kin = R.from_euler('xyz', np.zeros(3))
@@ -193,8 +195,8 @@ class Estimator():
         # forward kinematics data log
         self.log_v_kin = np.zeros([3, self.IterNumber])
         self.log_z_kin = np.zeros([1, self.IterNumber])
-        self.log_q = np.zeros([6, self.IterNumber])
-        self.log_qdot = np.zeros([6, self.IterNumber])
+        self.log_q = np.zeros([self.nq, self.IterNumber])
+        self.log_qdot = np.zeros([self.nv, self.IterNumber])
         self.log_theta_kin = np.zeros([4, self.IterNumber])
         self.log_w_kin = np.zeros([4, self.IterNumber])
         # other logs
@@ -259,7 +261,9 @@ class Estimator():
             return self.q, 
         elif data=="qdot":
             return self.qdot
-        
+        elif data=="tau":
+            return self.tau
+
         # logs data getter
 
         elif data=="acceleration_logs" or data=="a_logs":
@@ -321,7 +325,7 @@ class Estimator():
         self.v_kin[:] = np.zeros(3)[:]
         self.z_kin[:] = np.zeros(1)[:]
         # torques from motors
-        self.tau[:] = self.device.tau_mes[:] #np.zeros(6)[:]
+        self.tau[:] = self.device.tau_mes[:]
 
         #self.ExternalDataCaster("acceleration", self.a)
 
@@ -337,7 +341,7 @@ class Estimator():
                                                                                      self.a_imu, 
                                                                                      self.tau,
                                                                                      self.a_imu - self.ag_imu + np.array([0, 0, 10]),
-                                                                                     TorqueForceMingler=0.6, 
+                                                                                     TorqueForceMingler=0.75, 
                                                                                      ProbThresold=0.5, 
                                                                                      TrustThresold=0.5
                                                                                      )

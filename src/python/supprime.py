@@ -101,15 +101,15 @@ def g(x, a, b):
     return (M/b - x)*a
 
 n= 100
-X = np.linspace(-1, 7, n)
-Y = f(X, 3, 5)
-Z = f(X, 3, 10)
+X = np.linspace(-1, 1, n)
+Y = f(X, 0.01, 0.1)
+Z = f(X, 0.1, 10)
 #Z = X + np.linspace(np.zeros(3), n*np.ones(3), n).T
 
 
 plt.figure(dpi=200)
-plt.plot(X, Y, label="Ps with center=3, b0=5")
-plt.plot(X, Z, label="Ps with center=3, b0=10")
+plt.plot(X, Y, label="Ps with center=0, b0=5")
+plt.plot(X, Z, label="Ps with center=0, b0=10")
 plt.grid()
 plt.legend()
 plt.title("Sigmoid discriminator")

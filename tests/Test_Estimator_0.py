@@ -16,10 +16,10 @@ from DataReader import DataReader
 
 
 def main():
-    N = 100
-    T = 10
-    dt = 1e-2
-    kf=6
+    N = 1000 - 1
+    T = 1
+    dt = 5e-3
+    kf=4
 
     # create objects
     testlogger = Log("test", PrintOnFlight=True)
@@ -49,13 +49,14 @@ def main():
     theta, omega, omegadot = device.GetRotation()
     Inputs_rotations = [theta.T, omega.T]
 
+    True_LCF = reader.Get("lcf")
+    """
     grapher.SetLegend(["traj", "speed", "acc"], 3)
     grapher.CompareNDdatas(Inputs_translations, "", "Trajectory, speed and acceleration as inputed", StyleAdapter=False, width=1.)
 
     grapher.SetLegend(["theta", "omega"], 3)
     grapher.CompareNDdatas(Inputs_rotations, "", "rotation and rotation speed as inputed", StyleAdapter=False, width=1.)
-
-    
+    """
     
     # run the estimator as if
     # device will iterate over generated data each time estimator calls it
@@ -78,6 +79,8 @@ def main():
     Slip = estimator.ContactEstimator.Get("slip_prob")
     Contact = estimator.ContactEstimator.Get("contact_bool")
     ContactProb = estimator.ContactEstimator.Get("contact_prob")
+    ContactProb_F = estimator.ContactEstimator.Get("contact_prob_force")
+    ContactProb_T = estimator.ContactEstimator.Get("contact_prob_torque")
     
     
     # convert and plot
@@ -104,34 +107,64 @@ def main():
     """
     
     # plot true base trajectory
-    reader.PlotBaseTrajectory()
+    #reader.PlotBaseTrajectory()
     
     # plot true base torques
-    reader.PlotLeftFootCorrelation()
+    #reader.PlotLeftFootCorrelation()
     
     # plot contact forces
+    """
     grapher.SetLegend(["Left force from 1D",], ndim=3)
     grapher.CompareNDdatas([LCF_1D], datatype='force', title='1D left contact force')
+    
     grapher.SetLegend(["Left force from 3D",], ndim=3)
     grapher.CompareNDdatas([LCF_3D], datatype='force', title='3D left contact force')
     grapher.SetLegend(["Left force from torques",], ndim=3)
     grapher.CompareNDdatas([LCF_T], datatype='force', title='torque left contact force')
-
+    
     grapher.SetLegend(["Right force from 1D",], ndim=3)
     grapher.CompareNDdatas([RCF_1D], datatype='force', title='1D right contact force')
+    
     grapher.SetLegend(["Right force from 3D",], ndim=3)
     grapher.CompareNDdatas([RCF_3D], datatype='force', title='3D right contact force')
     grapher.SetLegend(["Right force from torques",], ndim=3)
     grapher.CompareNDdatas([RCF_T], datatype='force', title='torque right contact force')
+
+    grapher.SetLegend(["Left force from 3D", "Left force from torques", "Right force from 3D", "Right force from torques",], ndim=1)
+    grapher.CompareNDdatas([LCF_3D[2:, :], LCF_T[2:, :], RCF_3D[2:, :], RCF_T[2:, :]], datatype='force', title='comparing contact force')
+    """
+    print(True_LCF)
+    grapher.SetLegend(["Left Z force from 3D", "Left X force from 3D", "Left force from torques", "True left Force"], ndim=1)
+    grapher.CompareNDdatas([LCF_3D[2:, :], LCF_3D[:1, :], LCF_T[2:, :], [True_LCF[:N, 2]]], datatype='force', title='comparing contact force', mitigate=[1])
+    """
+    
+    L3DNorm = np.linalg.norm(LCF_3D, axis=0)
+    R3DNorm = np.linalg.norm(RCF_3D, axis=0)
+
+    grapher.SetLegend(["Left force from 3D", "Left force from torques", "Right force from 3D", "Right force from torques",], ndim=1)
+    grapher.CompareNDdatas([[L3DNorm], LCF_T[2:, :], [R3DNorm], RCF_T[2:, :]], datatype='force', title='comparing contact force TOTAL')
+    
+    toto = np.array(toto)
+    grapher.SetLegend(["Torques"], ndim=6)
+    grapher.CompareNDdatas([toto.transpose()], datatype='torque', title='Torques', StyleAdapter=True)
     
     # plot trust, slips and contact
     grapher.SetLegend(["Slip","Trust"], ndim=2)
     grapher.CompareNDdatas([Slip, Trust], datatype='real value', title='probability of slip and trust value')
-    
+    """
+
     grapher.SetLegend(["Contact boolean"], ndim=2)
     grapher.CompareNDdatas([Contact], datatype='proba', title='contact')
-    grapher.SetLegend(["Contact probability"], ndim=2)
-    grapher.CompareNDdatas([ContactProb], datatype='proba', title='probability of contact')
+    
+
+    grapher.SetLegend(["Contact probability", "Contact probability Force", "Contact probability Torque", ], ndim=1)
+    grapher.CompareNDdatas([ContactProb[:1, :], ContactProb_F[:1, :], ContactProb_T[:1, :]], datatype='proba', title='probability of left contact')
+    
+    """
+    grapher.SetLegend(["Contact probability force 3d", "Z Force"], ndim=1)
+    grapher.CompareNDdatas([5*ContactProb_F[:1, :], LCF_3D[2:, :]], datatype='proba', title='probability of left contact')
+    """
+    
     grapher.end()
     return None
 

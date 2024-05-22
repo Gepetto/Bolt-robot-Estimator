@@ -378,13 +378,13 @@ def main(k=6):
     
     # in case data is straight out of a simulation, improve sampling and add acceleration
     # load without acceleration
-    
+    """
     Reader.AutoLoad(k, acc='not included', q_angular="not included")
     
     Reader.AddAcceleration(k)
     
     Reader.AdaptDimQQd(k)
-    """
+    
     # improve resolution of .npy files (to execute only once per set of files)
     Reader.AutoLoad(k, acc="included", q_angular="not included")
     Reader.AutoImproveData(k, 5000)
