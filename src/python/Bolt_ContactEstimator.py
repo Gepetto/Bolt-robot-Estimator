@@ -114,8 +114,20 @@ class ContactEstimator():
         return None
     
     def Get(self, data="cf_1d"):
+        # current contact forces
+        if data=='current_cf_1d':
+            return self.LcF_1d.copy(), self.RcF_1d.copy()
+        elif data=='current_cf_3d':
+            return self.LcF_3d.copy(), self.RcF_3d.copy()
+        elif data=='current_cf_torques':
+            return self.LcF_T.copy(), self.RcF_T.copy()
+        elif data=='current_cf_averaged':
+            LcF = self.c1 * self.LcF_1d + self.c2 * self.LcF_3d + self.c3 * self.LcF_T
+            RcF = self.c1 * self.RcF_1d + self.c2 * self.RcF_3d + self.c3 * self.RcF_T
+            return LcF, RcF
+        
         # contact forces log
-        if data=='cf_1d':
+        elif data=='cf_1d':
             return self.Log_LcF_1d, self.Log_RcF_1d
         elif data=='cf_3d':
             return self.Log_LcF_3d, self.Log_RcF_3d
@@ -133,6 +145,8 @@ class ContactEstimator():
             return self.Log_SlipProb
         elif data=="trust":
             return self.Log_Trust
+        
+        # bool log
         elif data=="contact_bool":
            return self.Log_Contact
         elif data=="contact_prob":

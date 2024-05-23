@@ -4,7 +4,7 @@ save_data_on_exit = True
 save_history = True
 save_non_project_files = False
 project_type = 'empty-project-type'
-recent_files = ['../../../bipedal-control/bipedal-control/mpc_main.py', '../../data/DataReader.py', '../../tests/Test_Estimator_0.py', 'Bolt_Estimator_0.py', 'Bolt_ContactEstimator.py', '../../tests/DeviceEmulator.py']
+recent_files = ['../../../bipedal-control/bipedal-control/mpc_main.py', '../../tests/Test_Estimator_0.py', 'Bolt_Estimator_0.py', 'Bolt_ContactEstimator.py', '../../tests/DeviceEmulator.py', 'Bolt_TiltEstimator.py', '../../pin/PinTest_6.py']
 
 [main]
 version = 0.2.0

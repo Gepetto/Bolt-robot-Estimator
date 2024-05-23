@@ -7,6 +7,7 @@ from scipy.spatial.transform import Rotation as R
 from Bolt_Utils import Log
 from Graphics import Graphics
 from Bolt_Estimator_0 import Estimator
+
 from DeviceEmulator import DeviceEmulator
 from TrajectoryGenerator import TrajectoryGenerator
 from Bolt_Filter_Complementary import ComplementaryFilter
@@ -16,7 +17,7 @@ from DataReader import DataReader
 
 
 def main():
-    N = 1000 - 1
+    N = 100 - 1
     T = 1
     dt = 5e-3
     kf=4
@@ -50,6 +51,7 @@ def main():
     Inputs_rotations = [theta.T, omega.T]
 
     True_LCF = reader.Get("lcf")
+    True_v = reader.Get("v")
     """
     grapher.SetLegend(["traj", "speed", "acc"], 3)
     grapher.CompareNDdatas(Inputs_translations, "", "Trajectory, speed and acceleration as inputed", StyleAdapter=False, width=1.)
@@ -62,12 +64,16 @@ def main():
     # device will iterate over generated data each time estimator calls it
     for j in range(N-1):
         estimator.Estimate()
+        
         #print(f'iter : {j}')
     
     # get logs from estimator
         # rotations
     Qtheta_estimator = estimator.Get("theta_logs")
     Qtheta_imu = estimator.Get("theta_logs_imu")
+        # tilt data
+    g_tilt = estimator.Get("g_tilt_logs")
+    v_tilt = estimator.Get("v_tilt_logs")
     
     # get logs from contact estimator
         # contact forces
@@ -81,6 +87,8 @@ def main():
     ContactProb = estimator.ContactEstimator.Get("contact_prob")
     ContactProb_F = estimator.ContactEstimator.Get("contact_prob_force")
     ContactProb_T = estimator.ContactEstimator.Get("contact_prob_torque")
+
+    
     
     
     # convert and plot
@@ -133,9 +141,12 @@ def main():
     grapher.SetLegend(["Left force from 3D", "Left force from torques", "Right force from 3D", "Right force from torques",], ndim=1)
     grapher.CompareNDdatas([LCF_3D[2:, :], LCF_T[2:, :], RCF_3D[2:, :], RCF_T[2:, :]], datatype='force', title='comparing contact force')
     """
-    print(True_LCF)
     grapher.SetLegend(["Left Z force from 3D", "Left X force from 3D", "Left force from torques", "True left Force"], ndim=1)
     grapher.CompareNDdatas([LCF_3D[2:, :], LCF_3D[:1, :], LCF_T[2:, :], [True_LCF[:N, 2]]], datatype='force', title='comparing contact force', mitigate=[1])
+    
+    grapher.SetLegend(["v from tilt estimator", "True v"], ndim=3)
+    grapher.CompareNDdatas([v_tilt, True_v[:, 1, :].T], datatype='speed', title='Tilt estimator output', mitigate=[1])
+    
     """
     
     L3DNorm = np.linalg.norm(LCF_3D, axis=0)

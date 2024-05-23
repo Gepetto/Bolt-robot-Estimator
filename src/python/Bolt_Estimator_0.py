@@ -9,6 +9,8 @@ from Bolt_Utils import utils
 from Bolt_Utils import Log
 
 from Bolt_ContactEstimator import ContactEstimator
+from Bolt_TiltEstimator import TiltEstimator
+
 from Bolt_Filter import Filter
 from Bolt_Filter_Complementary import ComplementaryFilter
 
@@ -118,6 +120,14 @@ class Estimator():
                                                  dt=self.TimeStep,
                                                  logger=self.logger)
         self.logger.LogTheLog("Contact Estimator added.", ToPrint=Talkative)
+        
+        # returns info on Slips, Contact Forces, Contact with the ground
+        self.TiltandSpeedEstimator = TiltEstimator(robot=self.robot,
+                                                   Q0=self.q,
+                                                   Qd0=self.qdot,
+                                                   Niter=self.IterNumber)
+        
+        self.logger.LogTheLog("Contact Estimator added.", ToPrint=Talkative)
 
         
         #self.AllTimeAcceleration, self.AllTimeq = np.zeros((3, self.MemorySize)), np.zeros((3, self.MemorySize))
@@ -171,6 +181,9 @@ class Estimator():
         # attitude from Kin
         self.w_kin = R.from_euler('xyz', np.zeros(3))
         self.theta_kin = R.from_euler('xyz', np.zeros(3))
+        # tilt
+        self.v_tilt = np.zeros(3)
+        self.g_tilt = np.zeros(3)
         return None
 
     def InitContactData(self) -> None:
@@ -199,10 +212,16 @@ class Estimator():
         self.log_qdot = np.zeros([self.nv, self.IterNumber])
         self.log_theta_kin = np.zeros([4, self.IterNumber])
         self.log_w_kin = np.zeros([4, self.IterNumber])
+        
+        # tilt log 
+        self.log_v_tilt = np.zeros([3, self.IterNumber])
+        self.log_g_tilt = np.zeros([3, self.IterNumber])
+        
         # other logs
         self.log_c_out = np.zeros([3, self.IterNumber])
         self.log_cdot_out = np.zeros([3, self.IterNumber])
         self.log_contactforces = np.zeros([6, self.IterNumber])
+        
         return None
 
     def UpdateLogMatrixes(self) -> None :
@@ -228,6 +247,9 @@ class Estimator():
         self.log_qdot[:, self.iter] = self.qdot[:]
         self.log_theta_kin[:, self.iter] = self.theta_kin.as_quat()[:]
         self.log_w_kin[:, self.iter] = self.w_kin.as_quat()[:]
+        # tilt log 
+        self.log_v_tilt[:, self.iter] = self.v_tilt[:]
+        self.log_g_tilt[:, self.iter] = self.g_tilt[:]
         # other
         self.log_c_out[:, self.iter] = self.c_out[:]
         self.log_cdot_out[:, self.iter] = self.cdot_out[:]
@@ -284,6 +306,10 @@ class Estimator():
             return self.log_q, 
         elif data=="qdot_logs":
             return self.log_qdot
+        elif data=="g_tilt_logs":
+            return self.log_g_tilt
+        elif data=="v_tilt_logs":
+            return self.log_v_tilt
         
         # IMU logs data getter
         elif data=="acceleration_logs_imu" or data=="a_logs_imu":
@@ -336,7 +362,8 @@ class Estimator():
     def UpdateContactInformation(self, TypeOfContactEstimator="default"):
 
         if TypeOfContactEstimator=="default":
-            self.LeftContcat, self.RightContact = self.ContactEstimator.LegsOnGround(self.q, 
+            # boolean contact
+            self.LeftContact, self.RightContact = self.ContactEstimator.LegsOnGround(self.q, 
                                                                                      self.qdot,
                                                                                      self.a_imu, 
                                                                                      self.tau,
@@ -345,9 +372,12 @@ class Estimator():
                                                                                      ProbThresold=0.5, 
                                                                                      TrustThresold=0.5
                                                                                      )
+            # contact forces
+            self.FLContact, self.RLContact = self.ContactEstimator.Get("current_cf_averaged")
+             
             
         elif TypeOfContactEstimator=="kin":
-            self.LeftContcat, self.RightContact = self.ContactEstimator.LegsOnGroundKin(self.q, self.a_imu - self.ag_imu)
+            self.LeftContact, self.RightContact = self.ContactEstimator.LegsOnGroundKin(self.q, self.a_imu - self.ag_imu)
 
     
     def KinematicAttitude(self) -> np.ndarray:
@@ -475,10 +505,26 @@ class Estimator():
     
     
     def Estimate(self):
-        # this is the main function
-        # updates all variables with latest available measurements
+        """ this is the main function"""
+        
+        # update all variables with latest available measurements
         self.ReadSensor()
+        # run contact estimator
         self.UpdateContactInformation()
+        
+        # runs speed and tilt estimator
+        if self.LeftContact :
+            ContactFootID = self.FeetIndexes[0]
+        else :
+            ContactFootID = self.FeetIndexes[1]
+        self.v_tilt, self.g_tilt = self.TiltandSpeedEstimator.Estimate(Q=self.q,
+                                            Qd=self.qdot,
+                                            BaseID=1,
+                                            ContactFootID=ContactFootID,
+                                            ya=self.a_imu, 
+                                            yg=self.w_imu, 
+                                            dt=self.TimeStep, 
+                                            alpha1=1, alpha2=1, gamma=1)
 
 
         # derive data & runs filter

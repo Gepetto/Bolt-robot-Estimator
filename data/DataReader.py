@@ -151,7 +151,7 @@ class DataReader():
         
     
     
-    def AddAcceleration(self, k):
+    def AddAcceleration(self, k, dt):
         """ create an acceleration data on every frame by deriving speed, and save it"""
         self.logger.LogTheLog("DataReader : Adding acceleration to dataset", "info")
         # get dimensions
@@ -164,20 +164,19 @@ class DataReader():
             Traj = self.X[:, FrameID, :].copy()
             Speed = self.V[:, FrameID, :].copy()        
             # load data in generator
-            generator.Generate("custom", N=1, T=1, NoiseLevel=10, Drift=20, amplitude=10, 
+            generator.Generate("custom", N=N, T=1, NoiseLevel=10, Drift=20, amplitude=10, 
                                avgfreq=0.5, relative=True, traj=Traj, speed=Speed, smooth=False)
             
-            # compute speed to check consistency
-            s = generator.MakeSpeedFromTrajectory(Traj, 1e-3)
+
             # computing acceleration
-            a = generator.MakeAccelerationFromSpeed(Speed, 1e-3)
+            D, N= np.shape(Speed)
+            a = np.zeros((D,N))
+            a[1:, :] = (Speed[1:, :] - Speed[0:-1, :])/dt
+            
             # saving acceleration to X and V shape    
             Acc[:, FrameID, :] = a
         np.save(self.prefix + "A_array_" + str(k), Acc)
-        self.grapher.SetLegend(["True", "computed"], ndim=3)
-        self.grapher.CompareNDdatas([Speed.transpose(), [s]], datatype="speed of bolt's base", mitigate=[0])
-
-    
+ 
     def AddAngularQ(self, k):
         """ the old Q from simulation was a rotation matrix. We need the encoder angle."""
         self.logger.LogTheLog("DataReader : Adding angular q to dataset as Qang", "info")
@@ -369,7 +368,7 @@ class DataReader():
 
 
 
-def main(k=6):
+def main(k=6, dt=10e-3):
     # getting ready
     logger = Log(PrintOnFlight=True)
     Reader = DataReader(logger=logger)
@@ -378,11 +377,11 @@ def main(k=6):
     
     # in case data is straight out of a simulation, improve sampling and add acceleration
     # load without acceleration
-    """
+    
     Reader.AutoLoad(k, acc='not included', q_angular="not included")
     
-    Reader.AddAcceleration(k)
-    
+    Reader.AddAcceleration(k, dt)
+    """
     Reader.AdaptDimQQd(k)
     
     # improve resolution of .npy files (to execute only once per set of files)
@@ -401,9 +400,9 @@ def main(k=6):
     
     # plot base position and speed
     # Reader.PlotBaseTrajectory()
-    # Reader.PlotSpeed(1, "base")
+    Reader.PlotSpeed(1, "base")
     # Reader.PlotFeetTrajectory()
-    # Reader.PlotAcceleration(1, "base")
+    Reader.PlotAcceleration(1, "base")
     # Reader.PlotAcceleration(4, "leg")
     
     # plotting torques and forces
