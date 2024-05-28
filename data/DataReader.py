@@ -41,7 +41,7 @@ class DataReader():
         self.logger.LogTheLog(file[-25:] + '  of shape  '+str(Z.shape), "subinfo")
         
 
-    def Load(self,   t_file=None, q_file=None, qang_file=None, qd_file=None, x_file=None, theta_file=None, 
+    def Load(self,   t_file=None, q_file=None, qd_file=None, x_file=None, theta_file=None, theta_euler_file=None, 
              v_file=None, a_file=None, w_file=None, tau_file=None, lcf_file=None, rcf_file=None, contact_file=None):
         self.logger.LogTheLog("DataReader : loading...")
         if t_file is not None :
@@ -53,9 +53,7 @@ class DataReader():
         if q_file is not None :
             self.Q = np.load(q_file)
             self.Printer(q_file, self.Q)
-        if qang_file is not None :
-            self.Qang = np.load(qang_file)
-            self.Printer(qang_file, self.Qang)
+
         if qd_file is not None :
             self.Qd = np.load(qd_file)
             self.Printer(qd_file, self.Qd)
@@ -67,6 +65,9 @@ class DataReader():
         if theta_file is not None :
             self.Theta = np.load(theta_file)
             self.Printer(theta_file, self.Theta)
+        if theta_euler_file is not None :
+            self.ThetaEuler = np.load(theta_euler_file)
+            self.Printer(theta_euler_file, self.ThetaEuler)
         if v_file is not None :
             self.V = np.load(v_file)
             self.Printer(v_file, self.V)
@@ -96,7 +97,7 @@ class DataReader():
         
 
     
-    def AutoLoad(self, k, acc='included', q_angular="not included"):
+    def AutoLoad(self, k, acc='included', theta_euler="included"):
         self.logger.LogTheLog("DataReader : Auto loading")
         kfile = str(k)
         #prefix = "/home/nalbrecht/Bolt-Estimator/bipedal-control/bipedal-control/"
@@ -114,25 +115,25 @@ class DataReader():
             self.a_file = None
         else :
             self.a_file = prefix + "A_array_" + kfile + ".npy"
-        if q_angular != 'included':
-            self.qang_file = None
+        if theta_euler != 'included':
+            self.theta_euler_file = None
         else :
-            self.qang_file = prefix + "Qang_array_" + kfile + ".npy"
+            self.theta_euler_file = prefix + "ThetaEuler_array_" + kfile + ".npy"
         self.w_file = prefix + "W_array_" + kfile + ".npy"
         self.tau_file = prefix + "Tau_array_" + kfile + ".npy"
         self.rcf_file = prefix + "RCF_array_" + kfile + ".npy"
         self.lcf_file = prefix + "LCF_array_" + kfile + ".npy"
         self.leftcontact_file = prefix + "C_array_" + kfile + ".npy"
 
-        self.Load(t_file=self.t_file,  q_file=self.q_file,  qang_file=self.qang_file, qd_file=self.qd_file,  
-                  x_file=self.x_file, theta_file=self.theta_file,
-                  v_file=self.v_file,  a_file=self.a_file,    w_file=self.w_file,    tau_file=self.tau_file,
-                  lcf_file=self.lcf_file,  rcf_file=self.rcf_file,  contact_file=self.leftcontact_file)
+        self.Load(t_file=self.t_file,    q_file=self.q_file,         qd_file=self.qd_file,  
+                  x_file=self.x_file,    theta_file=self.theta_file, theta_euler_file=self.theta_euler_file,
+                  v_file=self.v_file,    a_file=self.a_file,         w_file=self.w_file, tau_file=self.tau_file,
+                  lcf_file=self.lcf_file,  rcf_file=self.rcf_file,   contact_file=self.leftcontact_file)
         
-        self.filenames = [self.t_file,    self.q_file,   self.qang_file, self.qd_file,   self.x_file, 
-                          self.theta_file,self.v_file,    self.a_file,   
-                          self.w_file,    self.tau_file,
-                          self.lcf_file,  self.rcf_file]
+        self.filenames = [self.t_file,     self.q_file,           self.qd_file,   self.x_file, 
+                          self.theta_file, self.theta_euler_file, self.v_file,    self.a_file,   
+                          self.w_file,     self.tau_file,
+                          self.lcf_file,   self.rcf_file]
         
     
     def AutoImproveData(self, k, N=1000):
@@ -147,7 +148,7 @@ class DataReader():
             else :
                 self.logger.LogTheLog("DataReader : nonexistent filename in AutoImproveData, skipped it", "warn")
 
-        self.AutoLoad(k, acc="included", q_angular="not included")
+        self.AutoLoad(k, acc="included", theta_euler="included")
         
     
     
@@ -177,29 +178,24 @@ class DataReader():
             Acc[:, FrameID, :] = a
         np.save(self.prefix + "A_array_" + str(k), Acc)
  
-    def AddAngularQ(self, k):
-        """ the old Q from simulation was a rotation matrix. We need the encoder angle."""
-        self.logger.LogTheLog("DataReader : Adding angular q to dataset as Qang", "info")
-        # get dimensions
-        N, nq, _, _ = self.Q.shape
-        Qang = np.zeros((N, nq))
-        generator = TrajectoryGenerator(logger=self.logger)
-        
-        for Qid in range(nq):
-            # prepare data
-            RotMatrixes = self.Q[:, Qid, :, :].copy()
-            Rotation = R.from_matrix(RotMatrixes)
-            # rotation to an angle (quaternion is in scalar-last format)
-            angle = np.arccos(Rotation.as_quat()[:, -1]) * 2
-            #print(RotMatrixes)
-            #print(angle)
-            Qang[:, Qid] = angle
-            
-        np.save(self.prefix + "Qang_array_" + str(k), Qang)
-        self.grapher.SetLegend(["left hip", "left knee"], ndim=1)
-        self.grapher.CompareNDdatas([[Qang[:, 3]], [Qang[:, 4]]], title="angle from bolt articulation")
 
-    
+
+    def AddEulerTheta(self, k):
+         """ transform matrix theta to euler theta"""
+         self.logger.LogTheLog("DataReader : Adding euler theta to dataset as ThetaEuler", "info")
+         # get dimensions
+         N, nq, _, _ = self.Theta.shape
+         ThetaE = np.zeros((N, nq, 3))
+         
+         for Fid in range(nq):
+             # prepare data
+             RotMatrixes = self.Theta[:, Fid, :, :].copy()
+             Rotation = R.from_matrix(RotMatrixes)
+             
+             ThetaE[:, Fid, :] = Rotation.as_euler("xyz")
+             
+         np.save(self.prefix + "ThetaEuler_array_" + str(k), ThetaE)
+
     
     def __AdaptDimQlike(self, Q_like):
         SampleLength, _, n = Q_like.shape 
@@ -230,6 +226,8 @@ class DataReader():
             return self.Qd
         elif data=="theta":
             return self.Theta
+        elif data=="theta_euler":
+            return self.ThetaEuler
         elif data=="omega":
             return self.W
         elif data=="tau":
@@ -292,8 +290,13 @@ class DataReader():
         self.grapher.SetLegend(["left joints", "right joints"], ndim=3)
         self.grapher.CompareNDdatas([self.Q[:, -6:-3].transpose(), self.Q[:, -3:].transpose()], datatype='radian', title= 'joints angle')
   
-        
-        
+    def PlotTilt(self, frameID=1, frameName="base"):
+        self.grapher.SetLegend(["tilt of bolt's " + frameName], ndim=3)
+        self.grapher.CompareNDdatas([self.ThetaEuler[:, frameID, :].transpose()], datatype='radian', title= frameName + ' Tilt')
+
+    def PlotRotSpeed(self, frameID=1, frameName="base"):
+        self.grapher.SetLegend(["angular speed of bolt's " + frameName], ndim=3)
+        self.grapher.CompareNDdatas([self.W[:, frameID, :].transpose()], datatype='rotation speed', title=frameName + ' rotation speed') 
         
         
     def PlotTorqueJoint(self, jointID=3):
@@ -368,51 +371,52 @@ class DataReader():
 
 
 
-def main(k=6, dt=10e-3):
+def main(k=1, dt=1e-3):
     # getting ready
     logger = Log(PrintOnFlight=True)
     Reader = DataReader(logger=logger)
 
     
-    
+    """
     # in case data is straight out of a simulation, improve sampling and add acceleration
-    # load without acceleration
+    # load without acceleration nor theta as euler angles (to execute only once per set of files)
     
-    Reader.AutoLoad(k, acc='not included', q_angular="not included")
+    Reader.AutoLoad(k, acc='not included', theta_euler="not included")
     
     Reader.AddAcceleration(k, dt)
-    """
-    Reader.AdaptDimQQd(k)
+    Reader.AddEulerTheta(k)
+    
+    #Reader.AdaptDimQQd(k)
     
     # improve resolution of .npy files (to execute only once per set of files)
-    Reader.AutoLoad(k, acc="included", q_angular="not included")
-    Reader.AutoImproveData(k, 5000)
+    Reader.AutoLoad(k, acc="included", theta_euler="included")
+    Reader.AutoImproveData(k, 100)
     """
-    
 
     # loading .npy files in DataReader
-    Reader.AutoLoad(k, acc='included', q_angular="not included")
-    
-    
+    Reader.AutoLoad(k, acc="included", theta_euler="included")
     # check for contact indexes
     Reader.Contact()
     # Reader.PlotContact()
     
     # plot base position and speed
-    # Reader.PlotBaseTrajectory()
+    Reader.PlotBaseTrajectory()
     Reader.PlotSpeed(1, "base")
+    # plot base attitude and rotation speed
+    Reader.PlotTilt(1, "base")
+    Reader.PlotRotSpeed(1, "base")
     # Reader.PlotFeetTrajectory()
     Reader.PlotAcceleration(1, "base")
     # Reader.PlotAcceleration(4, "leg")
     
     # plotting torques and forces
-    Reader.PlotTorques('left')
+    # Reader.PlotTorques('left')
     # Reader.PlotTorqueJoint(0)
     # Reader.PlotTorquesAndFeet()
     # Reader.PlotForces()
-    # Reader.PlotTorqueForce()
+    Reader.PlotTorqueForce()
     # Reader.SuperPlotLeftFootCorrelation()
-    Reader.PlotQ()
+    # Reader.PlotQ()
     
     
     Reader.EndPlot()

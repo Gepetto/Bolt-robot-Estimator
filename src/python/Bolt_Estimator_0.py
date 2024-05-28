@@ -13,6 +13,7 @@ from Bolt_TiltEstimator import TiltEstimator
 
 from Bolt_Filter import Filter
 from Bolt_Filter_Complementary import ComplementaryFilter
+from Bolt_Filter_Benallegue import BenallegueEstimator
 
 
 """
@@ -44,10 +45,11 @@ class Estimator():
                 parametersAF        : list = [2],
                 SpeedFilterType     : str = "complementary",
                 parametersSF        : list = [2],
+                parametersTI        : list = [1, 1, 1],
                 TimeStep            : float = 0.01,
                 IterNumber          : int = 1000) -> None:
 
-        self.MsgName = "Bolt Estimator v0.5"
+        self.MsgName = "Bolt Estimator v0.6"
         self.Talkative=Talkative
         if logger is not None :
             self.logger = logger
@@ -72,7 +74,7 @@ class Estimator():
         self.nq = self.robot.model.nq
         self.nv = self.robot.model.nv
         self.FeetIndexes = [self.robot.model.getFrameId("FL_FOOT"), self.robot.model.getFrameId("FR_FOOT")] # Left, Right
-        
+        self.BaseID = 1
 
         # interfacing with masterboard (?)
         self.device = device
@@ -90,6 +92,14 @@ class Estimator():
         # check that sensors can be read 
         self.ReadSensor()
         self.logger.LogTheLog("Sensors read, initial data acquired", ToPrint=Talkative)
+
+        # update height of CoM value
+        pin.forwardKinematics(self.robot.model, self.robot.data, self.q)
+        pin.updateFramePlacements(self.robot.model, self.robot.data)
+        c = np.array((self.robot.data.oMf[self.FeetIndexes[0]].inverse()*self.robot.data.oMf[self.BaseID]).translation).copy()
+        self.c_out[2] = c[2]
+
+
         self.UpdateLogMatrixes()
         self.iter += 1
         self.logger.LogTheLog("Initial data stored in logs", ToPrint=Talkative)
@@ -101,11 +111,21 @@ class Estimator():
         # set desired filters types for attitude and speed
         # for the time being, complementary only
         if AttitudeFilterType=="complementary":
-            self.AttitudeFilter = ComplementaryFilter(parameters=parametersAF, name="attitude complementary filter", talkative=Talkative, logger=self.logger, ndim=3)
+            self.AttitudeFilter = ComplementaryFilter(parameters=parametersAF, 
+                                                    name="attitude complementary filter", 
+                                                    talkative=Talkative, 
+                                                    logger=self.logger, 
+                                                    ndim=3)
         self.logger.LogTheLog("Attitude Filter of type '" + AttitudeFilterType + "' added.", ToPrint=Talkative)
         
         if SpeedFilterType=="complementary":
-            self.SpeedFilter = ComplementaryFilter(parameters=parametersSF, name="speed complementary filter", talkative=Talkative, logger=self.logger, ndim=3)
+            self.SpeedFilter = ComplementaryFilter(parameters=parametersSF, 
+                                                    name="speed complementary filter", 
+                                                    talkative=Talkative, 
+                                                    logger=self.logger, 
+                                                    ndim=3,
+                                                    MemorySize=80,
+                                                    OffsetGain=1.)
         self.logger.LogTheLog("Speed Filter of type '" + SpeedFilterType + "' added.", ToPrint=Talkative)
 
         # returns info on Slips, Contact Forces, Contact with the ground
@@ -125,12 +145,20 @@ class Estimator():
         self.TiltandSpeedEstimator = TiltEstimator(robot=self.robot,
                                                    Q0=self.q,
                                                    Qd0=self.qdot,
-                                                   Niter=self.IterNumber)
+                                                   Niter=self.IterNumber,
+                                                   params=parametersTI)
         
-        self.logger.LogTheLog("Contact Estimator added.", ToPrint=Talkative)
+        self.logger.LogTheLog("Tilt Estimator added with parameters " + str(parametersTI), ToPrint=Talkative)
+        
+        # returns info on foot attitude
+        self.FootAttitudeEstimator = BenallegueEstimator(parameters=[0.001, 2],
+                                                         dt=self.TimeStep,
+                                                         name="Foot Attitude Estimator",
+                                                         talkative=Talkative,
+                                                         logger=self.logger)
+        self.logger.LogTheLog("Foot Attitude Estimator added with parameters " + str(0), ToPrint=Talkative)
+        
 
-        
-        #self.AllTimeAcceleration, self.AllTimeq = np.zeros((3, self.MemorySize)), np.zeros((3, self.MemorySize))
         self.logger.LogTheLog(self.MsgName +" initialized successfully.", ToPrint=Talkative)
         return None
 
@@ -146,7 +174,7 @@ class Estimator():
     def InitImuData(self) -> None :
         # initialize data to the right format
         self.a_imu = np.zeros((3,))   
-        self.ag_imu = np.array([0, 0, 10])            
+        self.ag_imu = np.array([0, 0, -10])            
         self.w_imu = np.zeros((3,)) #R.from_euler('xyz', np.zeros(3))
         self.theta_imu = R.from_euler('xyz', np.zeros(3))
         # angles ? quaternion ?
@@ -165,7 +193,7 @@ class Estimator():
         self.theta_out = R.from_euler('xyz', np.zeros(3)) 
         self.w_out = np.zeros((3,)) #R.from_euler('xyz', np.zeros(3))
 
-        self.c_out = np.zeros((3,)) 
+        self.c_out = np.zeros((3,))
         self.cdot_out = np.zeros((3,)) 
         return None
 
@@ -179,8 +207,8 @@ class Estimator():
         self.qdot = np.zeros((self.nv, ))
         self.tau = np.zeros((6, ))
         # attitude from Kin
-        self.w_kin = R.from_euler('xyz', np.zeros(3))
-        self.theta_kin = R.from_euler('xyz', np.zeros(3))
+        self.w_kin = np.zeros((3,))
+        self.theta_kin = np.zeros(3)#R.from_euler('xyz', np.zeros(3))
         # tilt
         self.v_tilt = np.zeros(3)
         self.g_tilt = np.zeros(3)
@@ -210,8 +238,8 @@ class Estimator():
         self.log_z_kin = np.zeros([1, self.IterNumber])
         self.log_q = np.zeros([self.nq, self.IterNumber])
         self.log_qdot = np.zeros([self.nv, self.IterNumber])
-        self.log_theta_kin = np.zeros([4, self.IterNumber])
-        self.log_w_kin = np.zeros([4, self.IterNumber])
+        self.log_theta_kin = np.zeros([3, self.IterNumber])
+        self.log_w_kin = np.zeros([3, self.IterNumber])
         
         # tilt log 
         self.log_v_tilt = np.zeros([3, self.IterNumber])
@@ -245,8 +273,8 @@ class Estimator():
         self.log_z_kin[:, self.iter] = self.z_kin[:]
         self.log_q[:, self.iter] = self.q[:]
         self.log_qdot[:, self.iter] = self.qdot[:]
-        self.log_theta_kin[:, self.iter] = self.theta_kin.as_quat()[:]
-        self.log_w_kin[:, self.iter] = self.w_kin.as_quat()[:]
+        self.log_theta_kin[:, self.iter] = self.theta_kin[:] #.as_quat()[:]
+        self.log_w_kin[:, self.iter] = self.w_kin[:]
         # tilt log 
         self.log_v_tilt[:, self.iter] = self.v_tilt[:]
         self.log_g_tilt[:, self.iter] = self.g_tilt[:]
@@ -327,6 +355,8 @@ class Estimator():
             return self.log_theta_kin
         elif data=="base_speed_logs_kin" or data=="v_logs_kin":
             return self.log_v_kin
+        elif data=="v_out_logs" or data=="base_speed_logs_out":
+            return self.log_v_out
         # ...
         else :
             self.logger.LogTheLog("Could not get data '" + data + "'. Unrecognised data getter.", style="warn", ToPrint=self.Talkative)
@@ -339,7 +369,7 @@ class Estimator():
         self.device.Read() # FOR TESTING ONLY #PPP
         # base acceleration, acceleration with gravity and rotation speed from IMU
         self.a_imu[:] = self.device.baseLinearAcceleration[:] # COPIED FROM SOLO CODE, CHECK CONSISTENCY WITH BOLT MASTERBOARD
-        self.ag_imu[:] = self.device.baseLinearAccelerationGravity[:] # bs
+        self.ag_imu[:] = self.device.baseLinearAccelerationGravity[:] # uncertain
         self.w_imu[:] = self.device.baseAngularVelocity[:]
         # integrated data from IMU
         self.DeltaTheta = R.from_euler('xyz', self.device.baseOrientation - self.device.offset_yaw_IMU) # bs, to be found
@@ -358,35 +388,31 @@ class Estimator():
         return None
     
 
+    def UpdateContactInformation(self):
+        """ get contact information from Contact Estimator"""
+        # boolean contact
+        self.LeftContact, self.RightContact = self.ContactEstimator.LegsOnGround(self.q, 
+                                                                                 self.qdot,
+                                                                                 self.a_imu, 
+                                                                                 self.tau,
+                                                                                 self.a_imu - self.ag_imu + np.array([0, 0, 10]),
+                                                                                 TorqueForceMingler=0.85, 
+                                                                                 ProbThresold=0.45, 
+                                                                                 TrustThresold=0.5
+                                                                                 )
+        # contact forces
+        self.FLContact, self.RLContact = self.ContactEstimator.Get("current_cf_averaged")
 
-    def UpdateContactInformation(self, TypeOfContactEstimator="default"):
-
-        if TypeOfContactEstimator=="default":
-            # boolean contact
-            self.LeftContact, self.RightContact = self.ContactEstimator.LegsOnGround(self.q, 
-                                                                                     self.qdot,
-                                                                                     self.a_imu, 
-                                                                                     self.tau,
-                                                                                     self.a_imu - self.ag_imu + np.array([0, 0, 10]),
-                                                                                     TorqueForceMingler=0.75, 
-                                                                                     ProbThresold=0.5, 
-                                                                                     TrustThresold=0.5
-                                                                                     )
-            # contact forces
-            self.FLContact, self.RLContact = self.ContactEstimator.Get("current_cf_averaged")
-             
-            
-        elif TypeOfContactEstimator=="kin":
-            self.LeftContact, self.RightContact = self.ContactEstimator.LegsOnGroundKin(self.q, self.a_imu - self.ag_imu)
 
     
+    # TODO : update with benallegue
     def KinematicAttitude(self) -> np.ndarray:
         # uses robot model and rotation speed to provide attitude estimate based on encoder data
         
         # consider the right contact frames, depending on which foot is in contact with the ground
         if self.LeftContact and self.RightContact :
             self.logger.LogTheLog("Both feet are touching the ground", style="warn", ToPrint=self.Talkative)
-            ContactFrames = [0,1]
+            ContactFrames = [0, 1]
         elif self.LeftContact :
             self.logger.LogTheLog("left foot touching the ground", ToPrint=self.Talkative)
             ContactFrames = [0]
@@ -399,23 +425,35 @@ class Estimator():
 
         # Compute the base's attitude for each foot in contact
         FrameAttitude = []
+        
+        pin.forwardKinematics(self.robot.model, self.robot.data, self.q)
+        pin.updateFramePlacements(self.robot.model, self.robot.data)
+        pin.computeAllTerms(self.robot.model, self.robot.data, self.q, self.qdot)
+        
+        if self.LeftContact :
+            ContactFootID = self.FeetIndexes[0]
+        else :
+            ContactFootID = self.FeetIndexes[1]
+        BaseID = 1
+        
         for foot in ContactFrames:
-            # attitude f the foot
             
             # attitude from foot to base
-            pin.forwardKinematics(self.q, [self.v,[self.a]])
-            FrameAttitude.append( - pin.updateFramePlacement(self.model, self.data, self.FeetIndexes[foot]).rotation)
+            FootBasePose = self.robot.data.oMf[ContactFootID].inverse()*self.robot.data.oMf[BaseID]
+            FootBaseAttitude = np.array(FootBasePose.rotation).copy()
+            FootBasePosition = np.array(FootBasePose.translation).copy()
+            
+            # attitude of the foot
+            WorldFootAttitude = self.FootAttitudeEstimator.RunFilter(IMUKinPos=FootBasePosition, IMUKinRot=FootBaseAttitude, ya=self.ag_imu, yg=self.w_imu)
+            
             
             # combined attitude
+            WorldBaseAttitude = WorldFootAttitude + FootBaseAttitude
         
-        if self.LeftContact or self.RightContact :
-            # averages results
-            self.theta_kin = np.mean(np.array(FrameAttitude))
-        else :
-            # no foot touching the ground, keeping old attitude data
-            self.theta_kin = self.theta_kin
+        self.theta_kin = R.from_euler(WorldBaseAttitude)
 
-        return self.theta_kin.as_euler('xyz') 
+        #return self.theta_kin.as_euler('xyz')
+        return WorldBaseAttitude
 
 
 
@@ -438,17 +476,18 @@ class Estimator():
         return self.DeltaTheta.as_euler('xyz')
 
     
-    
+    # TODO : mod 
     def AttitudeFusion(self, alpha=1) -> None :
         # uses AttitudeFusion_AG and AttitudeFusion_KG to provide attitude estimate
         
         # uses attitude from direction of gravity estimate and gyro data to provide attitude estimate
         AttitudeFromIMU = self.IMUAttitude()
-        self.theta_out_ag = R.from_euler('xyz', self.AttitudeFilter.RunFilter(AttitudeFromIMU, self.w_imu))
+        self.theta_tilt = 0
+        self.theta_out = R.from_euler('xyz', self.AttitudeFilter.RunFilter(AttitudeFromIMU, self.w_imu.copy()))
             
         # uses attitude Kinematic estimate and gyro data to provide attitude estimate
-        AttitudeFromKin = self.KinematicAttitude()
-        self.theta_out_kg = R.from_euler('xyz', self.AttitudeFilter.RunFilter(AttitudeFromKin, self.w_imu))
+        #AttitudeFromKin = self.KinematicAttitude()
+        self.theta_out_kg = self.theta_out_ag#R.from_euler('xyz', self.AttitudeFilter.RunFilter(AttitudeFromKin, self.w_imu))
         
         # average both
         self.theta_out = R.from_euler('xyz', alpha*self.theta_out_ag.as_euler('xyz') + (1-alpha)*self.theta_out_kg.as_euler('xyz'))
@@ -466,52 +505,62 @@ class Estimator():
 
         # consider the right contact frames, depending on which foot is in contact with the ground
         if self.LeftContact and self.RightContact :
-            self.logger.LogTheLog("Both feet are touching the ground", style="warn", ToPrint=self.Talkative)
+            self.logger.LogTheLog("Both feet are touching the ground on iter " + str(self.iter), style="warn", ToPrint=self.Talkative)
             ContactFrames = [0,1]
         elif self.LeftContact :
-            self.logger.LogTheLog("left foot touching the ground", ToPrint=self.Talkative)
+            self.logger.LogTheLog("left foot touching the ground", ToPrint=False)
             ContactFrames = [0]
         elif self.RightContact :
-            self.logger.LogTheLog("right foot touching the ground", ToPrint=self.Talkative)
+            self.logger.LogTheLog("right foot touching the ground", ToPrint=False)
             ContactFrames = [1]
         else :
-            self.logger.LogTheLog("No feet are touching the ground", style="warn", ToPrint=self.Talkative)
+            self.logger.LogTheLog("No feet are touching the ground on iter " + str(self.iter), style="warn", ToPrint=self.Talkative)
             ContactFrames = []
 
         # Compute the base's speed for each foot in contact
         FrameSpeed = []
         FrameRotSpeed = []
-        for foot in ContactFrames:
-            pin.forwardKinematics(self.q, [self.v,[self.a]])
-            # rotation and translation speed of Base wrt its immobile foot
-            FrameSpeed.append(pin.getFrameVelocity(self.model, self.data, self.BaseIndex, self.FeetIndexes[foot]).translation)
-            FrameRotSpeed.append(pin.getFrameVelocity(self.model, self.data, self.BaseIndex, self.FeetIndexes[foot]).rotation)
+
+        pin.forwardKinematics(self.robot.model, self.robot.data, self.q)
+        pin.updateFramePlacements(self.robot.model, self.robot.data)
+        pin.computeAllTerms(self.robot.model, self.robot.data, self.q, self.qdot)
+
+        for ContactFootID in ContactFrames:
+            # speed of Base wrt its immobile foot
+            oMf = self.robot.data.oMf[ContactFootID]
+            c_speed_l = oMf.inverse().action @ pin.getFrameVelocity(self.robot.model, self.robot.data, self.BaseID, pin.WORLD)
+            speed = np.array(c_speed_l[:3]).copy()
+            # rotation speed of base frame in contact foot frame
+            omega = np.array(c_speed_l[3:]).copy()
+
+            FrameSpeed.append(speed)
+            FrameRotSpeed.append(omega)
         
-        if self.LeftContact or self.RightContact :
+        if self.LeftContact and self.RightContact :
             # averages results
-            self.v_kin = np.mean(np.array(FrameSpeed))
-            self.w_kin = np.mean(np.array(FrameRotSpeed))
+            self.v_kin = np.mean(np.array(FrameSpeed), axis=0)
+            self.w_kin = np.mean(np.array(FrameRotSpeed), axis=0)
+        elif self.LeftContact or self.RightContact :
+            # one foot in contact
+            self.v_kin = np.array(FrameSpeed)
+            self.w_kin = np.array(FrameRotSpeed)
         else :
             # no foot touching the ground, keeping old speed data
-            self.w_kin = self.w_kin
-            self.v_kin = self.v_kin
+            v_avg = np.mean(self.log_v_kin[:, max(0, self.iter-10):self.iter-1], axis=1)
+            w_avg = np.mean(self.log_w_kin[:, max(0, self.iter-10):self.iter-1], axis=1)
+            self.w_kin = w_avg
+            self.v_kin = v_avg
+        
+        # filter speed
+        #self.v_kin = self.SpeedFilter.RunFilter(self.v_kin, self.a_imu)
 
         return self.v_kin, self.w_kin
 
 
-    def SpeedFusion(self) -> None:
-        # uses Kinematic-derived speed estimate and gyro (?) to estimate speed
-        return None
-    
-    
-    def Estimate(self):
-        """ this is the main function"""
-        
-        # update all variables with latest available measurements
-        self.ReadSensor()
-        # run contact estimator
-        self.UpdateContactInformation()
-        
+    def SpeedFusion(self, mitigate=[0.1, 0.2, 0.7]) -> None:
+        # uses Kinematic-derived speed estimate and IMU to estimate speed
+        self.KinematicSpeed()
+
         # runs speed and tilt estimator
         if self.LeftContact :
             ContactFootID = self.FeetIndexes[0]
@@ -521,21 +570,41 @@ class Estimator():
                                             Qd=self.qdot,
                                             BaseID=1,
                                             ContactFootID=ContactFootID,
-                                            ya=self.a_imu, 
+                                            ya=self.ag_imu,
                                             yg=self.w_imu, 
-                                            dt=self.TimeStep, 
-                                            alpha1=1, alpha2=1, gamma=1)
+                                            dt=self.TimeStep)
 
+        v_out = mitigate[0]*self.v_imu + mitigate[1]*self.v_kin + mitigate[2]*self.v_tilt
+        self.v_out  = self.SpeedFilter.RunFilter(v_out, self.a_imu)
+        return None
+    
+    
+    def Estimate(self, dt=None):
+        """ this is the main function"""
+        if dt is not None :
+            self.TimeStep = dt
+        
+        # update all variables with latest available measurements
+        self.ReadSensor()
+        # run contact estimator
+        self.UpdateContactInformation()
+        # estimate speed
+        self.SpeedFusion(mitigate=[0., 0., 1.])
+        
+        # integrate speed to get position
+        self.c_out += self.v_out[0]*self.TimeStep
 
         # derive data & runs filter
-        #PPP self.SpeedFusion()
 
-        #self.AttitudeFusion()
+        #self.theta_kin = self.KinematicAttitude()
 
         # update all logs & past variables
         self.UpdateLogMatrixes()
         # count iteration
+        if iter==1 :
+            self.logger.LogTheLog("executed Estimator for the first time", "subinfo")
         self.iter += 1
+        
 
         return None
 

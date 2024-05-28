@@ -303,6 +303,20 @@ class Metal:
             #self.logger.LogTheLog(str(np.max(data)), style="warn")
         return data + np.random.normal(loc=0.0, scale=amplitude, size=(self.D,self.N))
     
+    def makeNoiseAdaptativeAmplitude(self, data, division=10):
+        data = data.copy()
+        self.D, self.N = np.shape(data)
+        # tune the noise level on every division
+        amplitude = self.NoiseLevel/100
+        increment = round(self.D//division, 0)
+        print(increment)
+        for j in range(division):
+            minidata = data[j*increment:(j+1)*increment, :]
+            amplitude = np.max(abs(minidata)) * self.NoiseLevel / 100
+            noise = np.random.normal(loc=0.0, scale=amplitude, size=minidata.shape)
+            data[j*increment:(j+1)*increment, :] = minidata + noise
+        return data
+    
     def makeDrift(self, data, AutoAdjustAmplitude=True):
         self.D, self.N = np.shape(data)
         drift = self.DriftingCoeff/100

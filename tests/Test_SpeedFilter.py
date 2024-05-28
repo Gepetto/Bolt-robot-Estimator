@@ -60,11 +60,17 @@ def main(N=500, NoiseLevel=20, Drift=40):
 
     dataset = [NoisySpeed, DriftNoisySpeed, TrueSpeed, DriftSpeed]
     grapher.SetLegend(["Noisy speed (" + str(NoiseLevel) + "%)", "Drifting noisy speed", "True speed", "Drifting Speed"], 1)
-    grapher.CompareNDdatas(dataset, "speed", "Test CF, speed, sinusoidal", StyleAdapter=False, AutoLeg=False, width=0.8)
+    grapher.CompareNDdatas(dataset, "speed", "Test CF, speed, sinusoidal", StyleAdapter=False, width=0.8)
 
     dataset = [TrueSpeed, TrueAcc, DriftAcc, FilterDriftSpeed]
     grapher.SetLegend(["Theta ", "Omega", "Drifting Omega",  "Filter acting on\nnoisy Theta & Drifting noisy Omega"], 1)
-    grapher.CompareNDdatas(dataset, "speed", "Test CF, theta, sinusoidal", StyleAdapter=True, AutoLeg=False, width=1.5)
+    grapher.CompareNDdatas(dataset, "speed", "Test CF, theta, sinusoidal", StyleAdapter=True,  width=1.5)
+
+    dataset = [TrueSpeed, TrueAcc, NoisyAcc, FilterSpeed]
+    grapher.SetLegend(["Theta ", "Omega", "Noisy Omega",  "Filter acting on\nnoisy Theta &  Omega"], 1)
+    grapher.CompareNDdatas(dataset, "speed", "Test CF, theta, sinusoidal", StyleAdapter=True,  width=1.5)
+
+
     grapher.end()
 
     return dataset

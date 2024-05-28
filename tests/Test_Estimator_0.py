@@ -17,9 +17,9 @@ from DataReader import DataReader
 
 
 def main():
-    N = 100 - 1
-    T = 1
+    N = 300 - 1
     dt = 5e-3
+    T = N*dt
     kf=4
 
     # create objects
@@ -40,41 +40,54 @@ def main():
                     AttitudeFilterType = "complementary",
                     parametersAF = [2],
                     SpeedFilterType = "complementary",
-                    parametersSF = [2],
+                    parametersSF = [1.1],       # réglé
+                    parametersTI = [10, 60, 2],
                     TimeStep = dt,
                     IterNumber = N)
     
-    # plot the pseudo-measured (eg noisy and drifting) generated trajectories
-    traj, speed, acc = device.GetTranslation()
-    Inputs_translations = [traj.T, speed.T, acc.T]
-    theta, omega, omegadot = device.GetRotation()
-    Inputs_rotations = [theta.T, omega.T]
+    # plot the pseudo-measured (ie noisy and drifting) generated trajectories
+    Input_Acc = device.Acc
+    Input_AccG = device.AccG
+    Input_Speed = device.Speed
+    Input_Omega = device.Omega
+    Input_Theta = device.Theta
+    Input_Q = device.Q
+    Input_Qd = device.Qd
+    Input_Tau = device.Tau
 
+    # get some data from simulation to compare to
     True_LCF = reader.Get("lcf")
     True_v = reader.Get("v")
-    """
-    grapher.SetLegend(["traj", "speed", "acc"], 3)
-    grapher.CompareNDdatas(Inputs_translations, "", "Trajectory, speed and acceleration as inputed", StyleAdapter=False, width=1.)
-
-    grapher.SetLegend(["theta", "omega"], 3)
-    grapher.CompareNDdatas(Inputs_rotations, "", "rotation and rotation speed as inputed", StyleAdapter=False, width=1.)
-    """
+    True_a = reader.Get("a")[:, 1, :]
+    True_g = device.AccG_true - device.Acc_true
+    True_Q = reader.Get("q")
+    True_Qd = reader.Get("qd")
+    True_Tau = reader.Get("tau")
+    True_Theta = reader.Get("theta_euler")[:, 1, :]
+    True_g_bis = np.zeros((N, 3))
+    True_x = reader.Get("x")[:, 1, :]
     
     # run the estimator as if
     # device will iterate over generated data each time estimator calls it
     for j in range(N-1):
         estimator.Estimate()
+        #rotbase = R.from_euler('zyx', True_Theta[j, :]) #zyx #yzx
+        #True_g_bis[j, :] = rotbase.as_matrix() @ np.array([0, 0, -9.81])
         
-        #print(f'iter : {j}')
     
     # get logs from estimator
         # rotations
-    Qtheta_estimator = estimator.Get("theta_logs")
-    Qtheta_imu = estimator.Get("theta_logs_imu")
+    theta_estimator = estimator.Get("theta_logs")
+    theta_imu = estimator.Get("theta_logs_imu")
         # tilt data
     g_tilt = estimator.Get("g_tilt_logs")
     v_tilt = estimator.Get("v_tilt_logs")
-    
+    v_kin = estimator.Get("v_logs_kin")
+    v_out = estimator.Get("v_out_logs")
+    c_out = estimator.Get("c_logs")
+        # out acceleration
+
+
     # get logs from contact estimator
         # contact forces
     LCF_1D, RCF_1D = estimator.ContactEstimator.Get("cf_1d")
@@ -87,9 +100,22 @@ def main():
     ContactProb = estimator.ContactEstimator.Get("contact_prob")
     ContactProb_F = estimator.ContactEstimator.Get("contact_prob_force")
     ContactProb_T = estimator.ContactEstimator.Get("contact_prob_torque")
+    
+    # plot input data
+    """
+    grapher.SetLegend(["Q in", "Q true "], 2)
+    grapher.CompareNDdatas([Input_Q[:, 6:8].T, True_Q[:, 6:8].T], "theta", "Inputed and true Q, left leg", StyleAdapter=True)
 
+    grapher.SetLegend(["Qd in ", "Qd true"], 2)
+    grapher.CompareNDdatas([Input_Qd[:, 5:7].T, True_Qd[:, 5:7].T], "omega", "Inputed and true Qd, left leg", StyleAdapter=True)
     
+    grapher.SetLegend(["Tau in", "Tau true"], 3)
+    grapher.CompareNDdatas([Input_Tau[:, :3].T, True_Tau[:, :3].T], "Nm", "Inputed and true Tau, left leg", StyleAdapter=True)
     
+    grapher.SetLegend(["a in", "a true"], 3)
+    grapher.CompareNDdatas([Input_Acc.T, True_a.T], "m/s2", "Inputed acceleration", StyleAdapter=True)
+
+
     
     # convert and plot
         # rotation to euler angles
@@ -98,21 +124,33 @@ def main():
     for j in range(N-1):
         theta_estimator[:, j] = R.from_quat(Qtheta_estimator[:, j]).as_euler('xyz')
         theta_imu[:, j] = R.from_quat(Qtheta_imu[:, j]).as_euler('xyz')
-        
+    """    
+
 
     
     """
     # plot rotation
+    theta, omega = device.GetRotation()
+    Inputs_rotations = [theta.T, omega.T]
     InOut_rotations = [theta.T[:2, :], theta_imu[:2, :], theta_estimator[:2, :]]
+    
     grapher.SetLegend(["theta in", "theta imu","theta out"], 2)
-    grapher.CompareNDdatas(InOut_rotations, "theta", "Noisy rot and out rot", StyleAdapter=True, width=1.)
+    grapher.CompareNDdatas(InOut_rotations, "theta", "Noisy rot and out rot", StyleAdapter=True)
+
+    grapher.SetLegend(["theta", "omega"], 3)
+    grapher.CompareNDdatas(Inputs_rotations, "", "rotation and rotation speed as inputed", StyleAdapter=False, mitigate=[1])
+    
+    grapher.SetLegend(["g from tilt estimator", "theta"], 3)
+    grapher.CompareNDdatas([-9.81*g_tilt, theta.T], "", "g and theta", StyleAdapter=False, mitigate=[1])
+
+
     
     # plot base acceleration with and without gravity
-    ag = device.AccG
-    a = device.Acc
+    ag = device.AccG_true
+    a = device.Acc_true
     grapher.SetLegend(["ag", "a"], 3)
     grapher.CompareNDdatas([ag.T, a.T], "acceleration", "g", StyleAdapter=True, width=1.)
-    """
+    
     
     # plot true base trajectory
     #reader.PlotBaseTrajectory()
@@ -121,15 +159,16 @@ def main():
     #reader.PlotLeftFootCorrelation()
     
     # plot contact forces
-    """
+    
     grapher.SetLegend(["Left force from 1D",], ndim=3)
     grapher.CompareNDdatas([LCF_1D], datatype='force', title='1D left contact force')
     
     grapher.SetLegend(["Left force from 3D",], ndim=3)
     grapher.CompareNDdatas([LCF_3D], datatype='force', title='3D left contact force')
+    """
     grapher.SetLegend(["Left force from torques",], ndim=3)
     grapher.CompareNDdatas([LCF_T], datatype='force', title='torque left contact force')
-    
+    """
     grapher.SetLegend(["Right force from 1D",], ndim=3)
     grapher.CompareNDdatas([RCF_1D], datatype='force', title='1D right contact force')
     
@@ -140,14 +179,43 @@ def main():
 
     grapher.SetLegend(["Left force from 3D", "Left force from torques", "Right force from 3D", "Right force from torques",], ndim=1)
     grapher.CompareNDdatas([LCF_3D[2:, :], LCF_T[2:, :], RCF_3D[2:, :], RCF_T[2:, :]], datatype='force', title='comparing contact force')
-    """
-    grapher.SetLegend(["Left Z force from 3D", "Left X force from 3D", "Left force from torques", "True left Force"], ndim=1)
-    grapher.CompareNDdatas([LCF_3D[2:, :], LCF_3D[:1, :], LCF_T[2:, :], [True_LCF[:N, 2]]], datatype='force', title='comparing contact force', mitigate=[1])
+    
+    grapher.SetLegend(["Left Z force from 3D", "Left force from torques", "True left Force"], ndim=1)
+    grapher.CompareNDdatas([LCF_3D[2:, :],  LCF_T[2:, :], [True_LCF[:N, 2]]], datatype='force', title='comparing contact force')
+    
     
     grapher.SetLegend(["v from tilt estimator", "True v"], ndim=3)
-    grapher.CompareNDdatas([v_tilt, True_v[:, 1, :].T], datatype='speed', title='Tilt estimator output', mitigate=[1])
+    grapher.CompareNDdatas([v_tilt, True_v[:N, 1, :].T], datatype='speed', title='Tilt estimator output', mitigate=[1])
     
+
+    grapher.SetLegend(["v from tilt estimator", "Kin v", "True v"], ndim=3)
+    grapher.CompareNDdatas([v_tilt, v_kin, True_v[:N, 1, :].T], datatype='speed', title='speed estimation comparison', mitigate=[2])
+    
+    
+    grapher.SetLegend(["vx out", "True vx", "Error"], ndim=1)
+    grapher.CompareNDdatas([v_out[:1],  True_v[:N, 1, :1].T, True_v[:N, 1, :1].T-v_out[:1]], datatype='speed', title='X speed estimation comparison', mitigate=[1])
+    grapher.SetLegend(["vy out", "True vy", "Error"], ndim=1)
+    grapher.CompareNDdatas([v_out[1:2], True_v[:N, 1, 1:2].T, True_v[:N, 1, 1:2].T-v_out[1:2]], datatype='speed', title='Y speed estimation comparison', mitigate=[1])
     """
+
+    grapher.SetLegend(["v out", "True v"], ndim=3)
+    grapher.CompareNDdatas([v_out, True_v[:N, 1, :].T], datatype='speed', title='Estimator output', mitigate=[1])
+
+    grapher.SetLegend(["v out", "v tilt", "True v"], ndim=3)
+    grapher.CompareNDdatas([v_out, v_tilt, True_v[:N, 1, :].T], datatype='speed', title='Etimator output', mitigate=[2])
+
+    grapher.SetLegend(["base pos out", "True base pos"], ndim=3)
+    grapher.CompareNDdatas([c_out,  True_x[:N, :].T], datatype='position', title='Estimator output', mitigate=[1])
+    """
+    grapher.SetLegend(["g from tilt estimator", "True g",], ndim=3)
+    grapher.CompareNDdatas([-9.81*g_tilt, True_g[:N, :].T], datatype='vertical', title='Tilt estimator output', mitigate=[1])
+
+    g_supertilt = g_tilt
+    g_supertilt[2] *= -9.81
+    g_supertilt[0] *= 9.81
+    grapher.SetLegend(["g from tilt estimator", "True g",], ndim=2)
+    grapher.CompareNDdatas([g_supertilt[[0, 2], :], True_g[:N, [0,2]].T], datatype='vertical', title='Tilt estimator output', mitigate=[1])
+    
     
     L3DNorm = np.linalg.norm(LCF_3D, axis=0)
     R3DNorm = np.linalg.norm(RCF_3D, axis=0)
@@ -155,23 +223,20 @@ def main():
     grapher.SetLegend(["Left force from 3D", "Left force from torques", "Right force from 3D", "Right force from torques",], ndim=1)
     grapher.CompareNDdatas([[L3DNorm], LCF_T[2:, :], [R3DNorm], RCF_T[2:, :]], datatype='force', title='comparing contact force TOTAL')
     
-    toto = np.array(toto)
-    grapher.SetLegend(["Torques"], ndim=6)
-    grapher.CompareNDdatas([toto.transpose()], datatype='torque', title='Torques', StyleAdapter=True)
     
     # plot trust, slips and contact
     grapher.SetLegend(["Slip","Trust"], ndim=2)
     grapher.CompareNDdatas([Slip, Trust], datatype='real value', title='probability of slip and trust value')
-    """
-
+    
+    
     grapher.SetLegend(["Contact boolean"], ndim=2)
-    grapher.CompareNDdatas([Contact], datatype='proba', title='contact')
+    grapher.CompareNDdatas([Contact], datatype='proba', title='contact', mitigate=[1])
     
-
+    
     grapher.SetLegend(["Contact probability", "Contact probability Force", "Contact probability Torque", ], ndim=1)
-    grapher.CompareNDdatas([ContactProb[:1, :], ContactProb_F[:1, :], ContactProb_T[:1, :]], datatype='proba', title='probability of left contact')
+    grapher.CompareNDdatas([ContactProb[:1, :], ContactProb_F[:1, :], ContactProb_T[:1, :]], datatype='proba', title='probability of left contact', mitigate=[1])
     
-    """
+    
     grapher.SetLegend(["Contact probability force 3d", "Z Force"], ndim=1)
     grapher.CompareNDdatas([5*ContactProb_F[:1, :], LCF_3D[2:, :]], datatype='proba', title='probability of left contact')
     """

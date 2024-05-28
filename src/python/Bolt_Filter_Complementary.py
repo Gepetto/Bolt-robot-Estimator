@@ -34,11 +34,12 @@ class ComplementaryFilter():
 
 
 
-    # standard filter, deprecated
-    def RunFilterDeprecated(self, x, xdot) -> np.ndarray:
+    # standard filter
+    def RunFilter(self, x, xdot) -> np.ndarray:
         # complementary filter x and its temporal derivative xdot. Updates previous estimates and returns current estimate.
         # check data
-        if not isinstance(x, np.ndarray) or not isinstance(xdot, np.ndarray) and (x.size!=self.ndim or xdot.size!=self.ndim):  self.logger.LogTheLog("giving unadapted argument to filter " + self.name + " : expected np.array of dim " + str(self.ndim), style="warn")   
+        if (not isinstance(x, np.ndarray) or not isinstance(xdot, np.ndarray)) or (x.size!=self.ndim or xdot.size!=self.ndim):  
+            self.logger.LogTheLog(f"giving unadapted argument to filter {self.name} : expected np.array of dim ({self.ndim},), got {x.shape}" , style="warn")           
         if self.k==0:
             # filter runs for the first time
             self.Estimate = x
@@ -49,7 +50,7 @@ class ComplementaryFilter():
     
 
     # standard filter with offset compensation
-    def RunFilterOffset(self, x, xdot) -> np.ndarray:
+    def RunFilterOffset_deprecated(self, x, xdot) -> np.ndarray:
         # complementary filter x and its temporal derivative xdot. Updates previous estimates and returns current estimate.
         # check data
         if not isinstance(x, np.ndarray) or not isinstance(xdot, np.ndarray) and (x.size!=self.ndim or xdot.size!=self.ndim):  self.logger.LogTheLog("giving unadapted argument to filter " + self.name + " : expected np.array of dim " + str(self.ndim), style="warn")
@@ -69,7 +70,7 @@ class ComplementaryFilter():
         return self.Estimate
     
     # standard filter with non-idiotic offset compensation
-    def RunFilter(self, x, xdot) -> np.ndarray:
+    def RunFilterOffset(self, x, xdot) -> np.ndarray:
         # better averaging technique
         # complementary filter x and its temporal derivative xdot. Updates previous estimates and returns current estimate.
         # check data

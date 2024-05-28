@@ -56,6 +56,8 @@ def main(N=500, NoiseLevel=20, Drift=40):
     return dataset
 
 
+
+
 def improve_constant_data():
     '''add acceleration to data'''
     

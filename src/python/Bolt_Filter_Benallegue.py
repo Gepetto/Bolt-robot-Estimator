@@ -17,14 +17,12 @@ class BenallegueEstimator():
                 parameters=[0.001, 2],
                 dt=0.01,
                 name="[Benallegue]",
-                ndim=1,
                 talkative=False,
                 logger=None,
                 ) -> None:
         self.name=name
         self.parameters = parameters
         self.Talkative = talkative
-        self.ndim = ndim
         # number of filter run
         self.k = 0
         # timestep
@@ -57,10 +55,11 @@ class BenallegueEstimator():
     def X1(self, y1):
         return self.S(self.cPs)@y1 - self.cPsdot
     def S(self, x):
+        print("S in Ben", x.shape)
         x1, x2, x3 = x[0,0], x[0,1], x[0,2]
-        return np.array([0, -x3, x2],
+        return np.array([[0, -x3, x2],
                         [x3, 0, -x1],
-                        [-x2, x1, 0])
+                        [-x2, x1, 0]])
     
     def RefreshKin(self, IMUKinPos, IMUKinRot) :
         self.cPsdot = (IMUKinPos - self.cPs)/self.dt
@@ -88,8 +87,8 @@ class BenallegueEstimator():
         self.y1 = self.Y1(yg)
         
         # compute derivatives        
-        self.x1dot = -self.S(self.y1)@self.x1 + 9.81*self.x2 - self.cRs@ya + self.alpha * (self.X1() - self.x1)
-        self.x2dot = -self.S(self.y1 - self.beta*self.S(self.x2)*(self.X1()-self.x1)) @ self.x2
+        self.x1dot = -self.S(self.y1)@self.x1 + 9.81*self.x2 - self.cRs@ya + self.alpha * (self.X1(self.y1) - self.x1)
+        self.x2dot = -self.S(self.y1 - self.beta*self.S(self.x2)*(self.X1(self.y1)-self.x1)) @ self.x2
         # updates x1 and x2 estimates
         self.x1 = self.x1 + self.dt * self.x1dot
         self.x2 = self.x2 + self.dt * self.x2dot

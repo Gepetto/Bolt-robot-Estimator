@@ -104,7 +104,7 @@ class DeviceEmulator():
 
     def LoadSimulatedData(self, Reader, kfile) -> None:
         # fetch .npy files
-        Reader.AutoLoad(kfile, acc='included', q_angular="not included")
+        Reader.AutoLoad(kfile, acc='included', theta_euler='included')
         # base frame id
         base_id = 1
         
@@ -112,13 +112,17 @@ class DeviceEmulator():
         # base acceleration
         self.Acc_true = Reader.Get("a")[:, base_id, :].copy()
         self.AccG_true = Reader.Get("a")[:, base_id, :].copy()
+        euler = Reader.Get("theta_euler")[:, base_id, :].copy()
         n, _ = self.Acc_true.shape
         for j in range(n):
-            glocal = np.array([0, 0, 10])
+            a = np.cos(euler[j, 0])*np.sin(euler[j, 1])*np.cos(euler[j, 2]) + np.sin(euler[j, 0])*np.sin(euler[j, 2])
+            b = np.sin(euler[j, 0])*np.sin(euler[j, 1])*np.cos(euler[j, 2]) - np.cos(euler[j, 0])*np.sin(euler[j, 2])
+            c = np.cos(euler[j, 1])*np.cos(euler[j, 2])
+            glocal = -9.81 * np.array([a, b, c])
             self.AccG_true[j, :] += glocal
 
         # base attitude and rotation speed
-        self.Theta_true = Reader.Get("theta")[:, base_id, :].copy()
+        self.Theta_true = Reader.Get("theta_euler")[:, base_id, :].copy()
         self.Omega_true = Reader.Get("omega")[:, base_id, :].copy()
         # base speed (IMU has an integrator)
         self.Speed_true = Reader.Get("v")[:, base_id, :].copy()
@@ -140,22 +144,23 @@ class DeviceEmulator():
 
         # DATA THAT ESTIMATOR WILL ACCESS
         # base acceleration
-        noise.SetNoise(NoiseLevel=0., DriftingCoeff=0.)
-        self.Acc = noise.makeNoise(self.Acc_true)
-        self.AccG = noise.makeNoise(self.Acc_true)
+        noise.SetNoise(NoiseLevel=10, DriftingCoeff=0.)
+        self.Acc = noise.makeNoiseAdaptativeAmplitude(self.Acc_true)
+        self.AccG = noise.makeNoiseAdaptativeAmplitude(self.Acc_true)
         # base rotation speed
-        noise.SetNoise(NoiseLevel=0., DriftingCoeff=0.)
+        noise.SetNoise(NoiseLevel=5., DriftingCoeff=0.)
         self.Omega = noise.makeNoise(self.Omega_true)
         # base speed and attitude (IMU has an integrator)
-        noise.SetNoise(NoiseLevel=0., DriftingCoeff=0.)
-        self.Speed = noise.makeNoise(self.Speed_true)
-        self.Theta = noise.makeNoise(self.Theta_true)
+        noise.SetNoise(NoiseLevel=5., DriftingCoeff=0.)
+        self.Speed = noise.makeNoiseAdaptativeAmplitude(self.Speed_true)
+        self.Theta = noise.makeNoiseAdaptativeAmplitude(self.Theta_true)
         # encoders
-        noise.SetNoise(NoiseLevel=0., DriftingCoeff=0.)
-        self.Q = noise.makeNoise(self.Q_true)
+        noise.SetNoise(NoiseLevel=10, DriftingCoeff=0.)
+        self.Q = noise.makeNoiseAdaptativeAmplitude(self.Q_true)
+        self.Qd = noise.makeNoiseAdaptativeAmplitude(self.Qd_true)
         # torques
-        noise.SetNoise(NoiseLevel=0., DriftingCoeff=0.)
-        self.Tau = noise.makeNoise(self.Tau_true)
+        noise.SetNoise(NoiseLevel=10, DriftingCoeff=0.)
+        self.Tau = noise.makeNoiseAdaptativeAmplitude(self.Tau_true)
         
 
         return None
@@ -171,8 +176,8 @@ class DeviceEmulator():
 
         self.baseAngularVelocity = self.Omega[self.iter, :]
         self.baseOrientation = self.Theta[self.iter, :]
-        self.q_mes = self.Q_true[self.iter, :]
-        self.v_mes = self.Qd_true[self.iter, :]
+        self.q_mes = self.Q[self.iter, :]
+        self.v_mes = self.Qd[self.iter, :]
 
         self.offset_yaw_IMU = np.zeros(3)
         self.offset_speed_IMU = np.zeros(3)
@@ -183,11 +188,11 @@ class DeviceEmulator():
     
     def GetTranslation(self):
         # outputs data
-        return self.Traj_true, self.Speed_true, self.Acc_true
+        return self.Traj, self.Speed, self.Acc
     
     def GetRotation(self):
         # outputs data
-        return self.Theta_true, self.Omega_true, self.OmegaDot_true
+        return self.Theta, self.Omega
 
 
 

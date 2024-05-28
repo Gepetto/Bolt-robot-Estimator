@@ -7,6 +7,8 @@ from Bolt_Utils import utils, Log
 from TrajectoryGenerator import TrajectoryGenerator, Metal
 from Graphics import Graphics
 from Bolt_Filter_Complementary import ComplementaryFilter
+sys.path.append('/home/nalbrecht/Bolt-Estimator/Bolt-robot---Estimator/data')
+from DataReader import DataReader
 
 
 '''
@@ -16,25 +18,27 @@ Outputs all data as graphs
 
 '''
 
-# the number of samples on which to test the filter
-N = 1000
-# the desired level of noise in the signal to be filtered
-NoiseLevel=40
-# the filter to test
-filtertype =  "complementary"
-parameters=(1/N, 2)
-optparameters = (100, 0.005)
-name="Standard complementary"
+
 
 class Test_Filter():
     def __init__(self, FilterType="complementary",
-                        parameters=(1/N, 2),
+                        parameters=(1/1000, 2),
                         optparameters = (100, 0.005),
                         name="Standard complementary"):
             self.FilterType=FilterType
             self.parameters=parameters
             self.optparameters = optparameters
             self.name = name
+
+    def TestDim(self, WishedDim, InputedDim):
+        testlogger = Log("testing dimension input ", PrintOnFlight=True)
+        print("# ", self.optparameters)
+        memsize, integratorgain = self.optparameters
+        Filter = ComplementaryFilter(self.parameters, ndim=WishedDim, talkative=True, name=self.name, logger=testlogger, MemorySize=memsize, OffsetGain=integratorgain)
+        x = np.ones(InputedDim)
+        xdot = np.ones(InputedDim)
+        Filter.RunFilter(x, xdot)
+
 
 
     def RunTest(self, N, NoiseLevel, datatype):
@@ -46,6 +50,7 @@ class Test_Filter():
         if datatype=="custom":
             pcom = np.load("/home/nalbrecht/Bolt-Estimator/Bolt-robot---Estimator/tests/com_pos_superplus.npy")
             vcom = np.load("/home/nalbrecht/Bolt-Estimator/Bolt-robot---Estimator/tests/vcom_pos_superplus.npy")
+            
             trajX = pcom[0, :, 0]
             trajY = pcom[0, :, 1]
             trajZ = pcom[0, :, 2]
@@ -54,6 +59,7 @@ class Test_Filter():
             speedY = vcom[0, :, 1]
             speedZ = vcom[0, :, 2]
             AdaptedSpeed = np.array([speedX, speedY, speedZ])
+            print(" # shape ", AdaptedSpeed.shape)
 
             # number of samples
             N=max(pcom.shape)
@@ -63,14 +69,55 @@ class Test_Filter():
             generator = TrajectoryGenerator(logger=testlogger)
             generator.Generate(datatype, NoiseLevel=NoiseLevel, N=N, traj=AdaptedTraj)
 
+
+        elif datatype=="simulated":
+            datatype="custom"
+            reader = DataReader(testlogger)
+            reader.AutoLoad(4)
+            a = reader.Get("a")[:, 1, :].copy()
+            v = reader.Get("v")[:, 1, :].copy()
+            
+            AdaptedTraj = np.array([v[:, 0], v[:, 1], v[:, 2]])
+            AdaptedSpeed = np.array([a[:, 0], a[:, 1], a[:, 2]])
+            print(" # shape ", AdaptedSpeed.shape)
+
+            # number of samples
+            N=max(v.shape)
+            ndim=3
+
+            # start generator
+            generator = TrajectoryGenerator(logger=testlogger)
+            generator.Generate(datatype, NoiseLevel=NoiseLevel, N=N, traj=AdaptedTraj)
+        
+        elif datatype=="simulated 1D":
+            datatype="custom"
+            reader = DataReader(testlogger)
+            reader.AutoLoad(4)
+            a = reader.Get("a")[:, 1, 2].copy()
+            v = reader.Get("v")[:, 1, 2].copy()
+            
+            AdaptedTraj = np.array([v])
+            AdaptedSpeed = np.array([a])
+            print(" # shape ", AdaptedSpeed.shape)
+
+            # number of samples
+            N=max(v.shape)
+            ndim=1
+
+            # start generator
+            generator = TrajectoryGenerator(logger=testlogger)
+            generator.Generate(datatype, NoiseLevel=NoiseLevel, N=N, traj=AdaptedTraj)
+
+
         else : 
             # start generator
             generator = TrajectoryGenerator(logger=testlogger)
-            generator.Generate(datatype, NoiseLevel=NoiseLevel, N=N, amplitude=1)
+            generator.Generate(datatype, NoiseLevel=NoiseLevel, N=N, amplitude=0.1)
             ndim=1
         
         if self.FilterType == "complementary":
-            print("# ", self.optparameters)
+            print(" # optparams ", self.optparameters)
+            print(" # ndim ", ndim)
             memsize, integratorgain = self.optparameters
             self.filter = ComplementaryFilter(self.parameters, ndim=ndim, talkative=True, name=self.name, logger=testlogger, MemorySize=memsize, OffsetGain=integratorgain)
             
@@ -88,22 +135,41 @@ class Test_Filter():
         # plotting
         dataset = [NoisyTraj, TrueTraj, FilterTraj]
         grapher.SetLegend(["Noisy position (" + str(NoiseLevel) + "%)", "True pos", "Filter out pos"], ndim)
-        grapher.CompareNDdatas(dataset, "position", "Output on " + datatype + " traj. with noise level " + str(NoiseLevel) + "\n to filter " + self.filter.name, StyleAdapter=False, AutoLeg=False, width=1.3)
+        grapher.CompareNDdatas(dataset, "position", "Output on " + datatype + " traj. with noise level " + str(NoiseLevel) + "\n to filter " + self.filter.name, StyleAdapter=False)
 
         # plotting error
         scaler = abs(np.max(TrueTraj) / np.min(TrueTraj))
-        dataset = [abs(TrueTraj-FilterTraj)/scaler]
+        scaled_error = abs(TrueTraj-FilterTraj)/scaler
+        dataset = [scaled_error]
+        print(" error coeff : ", np.sum(scaled_error))
         grapher.SetLegend(["error of the filter " + self.filter.name], ndim)
-        grapher.CompareNDdatas(dataset, "position", "Error on " + datatype + " traj. with noise level " + str(NoiseLevel) + "\n to filter " + self.filter.name, StyleAdapter=False, AutoLeg=False, width=1.5)
+        grapher.CompareNDdatas(dataset, "position", "Error on " + datatype + " traj. with noise level " + str(NoiseLevel) + "\n to filter " + self.filter.name, StyleAdapter=False, width=0.5)
         grapher.end()
 
 
 
+
+# the number of samples on which to test the filter
+N = 1000
+# the desired level of noise in the signal to be filtered
+NoiseLevel=40
+# the filter to test
+filtertype =  "complementary"
+parameters=(1/N, 0.04)
+optparameters = (50, 0.02)
+name="Standard complementary"
+
+
+
+
 TF = Test_Filter(filtertype, parameters, optparameters, name=name)
-TF.RunTest(N, NoiseLevel=10, datatype="polynomial")
-TF.RunTest(N, NoiseLevel=40, datatype="sinus")
-TF.RunTest(N, NoiseLevel=80, datatype="polynomial9")
-TF.RunTest(N, NoiseLevel=40, datatype="custom")
+# TF.TestDim(3, 3)
+# TF.RunTest(N, NoiseLevel=10, datatype="polynomial")
+# TF.RunTest(N, NoiseLevel=40, datatype="sinus")
+# TF.RunTest(N, NoiseLevel=30, datatype="polynomial9")
+# TF.RunTest(N, NoiseLevel=20, datatype="custom")
+# TF.RunTest(N, NoiseLevel=20, datatype="simulated")
+TF.RunTest(N, NoiseLevel=5, datatype="simulated 1D")
 
 
 

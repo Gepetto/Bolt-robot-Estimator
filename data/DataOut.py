@@ -24,7 +24,7 @@ class DataOut():
     def store(self, t, pos, theta, vel, q, qd, qdd, w, tau, lcf, rcf, left_contact):
         self.t_vec.append(t)
         self.all_pos_l.append(pos.copy())
-        self.all_theta_l.append(pos.copy())
+        self.all_theta_l.append(theta.copy())
         self.all_vel_l.append(vel.copy())
         self.all_q_l.append(q.copy())
         self.all_qd_l.append(qd.copy())
