@@ -174,7 +174,7 @@ class Estimator():
     def InitImuData(self) -> None :
         # initialize data to the right format
         self.a_imu = np.zeros((3,))   
-        self.ag_imu = np.array([0, 0, -10])            
+        self.ag_imu = np.array([0, 0, -9.81])            
         self.w_imu = np.zeros((3,)) #R.from_euler('xyz', np.zeros(3))
         self.theta_imu = R.from_euler('xyz', np.zeros(3))
         # angles ? quaternion ?
@@ -190,7 +190,8 @@ class Estimator():
         # initialize filter out data
         self.v_out = np.zeros((3,)) 
         self.a_out = np.zeros((3,)) 
-        self.theta_out = R.from_euler('xyz', np.zeros(3)) 
+        #self.theta_out = R.from_euler('xyz', np.zeros(3))
+        self.theta_out = np.zeros((3,))
         self.w_out = np.zeros((3,)) #R.from_euler('xyz', np.zeros(3))
 
         self.c_out = np.zeros((3,))
@@ -211,7 +212,8 @@ class Estimator():
         self.theta_kin = np.zeros(3)#R.from_euler('xyz', np.zeros(3))
         # tilt
         self.v_tilt = np.zeros(3)
-        self.g_tilt = np.zeros(3)
+        self.g_tilt = np.array([0, 0, -1])
+        self.theta_tilt = np.zeros(3)
         return None
 
     def InitContactData(self) -> None:
@@ -227,7 +229,7 @@ class Estimator():
         self.log_v_out = np.zeros([3, self.IterNumber])
         self.log_w_out = np.zeros([3, self.IterNumber])
         self.log_a_out = np.zeros([3, self.IterNumber])
-        self.log_theta_out = np.zeros([4, self.IterNumber])
+        self.log_theta_out = np.zeros([3, self.IterNumber])
         # imu data log
         self.log_v_imu = np.zeros([3, self.IterNumber])
         self.log_w_imu = np.zeros([3, self.IterNumber])
@@ -244,6 +246,7 @@ class Estimator():
         # tilt log 
         self.log_v_tilt = np.zeros([3, self.IterNumber])
         self.log_g_tilt = np.zeros([3, self.IterNumber])
+        self.log_theta_tilt = np.zeros([3, self.IterNumber])
         
         # other logs
         self.log_c_out = np.zeros([3, self.IterNumber])
@@ -262,7 +265,7 @@ class Estimator():
         self.log_v_out[:, self.iter] = self.v_out[:]
         self.log_w_out[:, self.iter] = self.w_out[:]#self.w_out.as_quat()[:]
         self.log_a_out[:, self.iter] = self.a_out[:]
-        self.log_theta_out[:, self.iter] = self.theta_out.as_quat()[:]
+        self.log_theta_out[:, self.iter] = self.theta_out#.as_quat()[:]
         # imu data log
         self.log_v_imu[:, self.iter] = self.v_imu[:]
         self.log_w_imu[:, self.iter] = self.w_imu[:]#self.w_imu.as_quat()[:]
@@ -338,6 +341,8 @@ class Estimator():
             return self.log_g_tilt
         elif data=="v_tilt_logs":
             return self.log_v_tilt
+        elif data=="theta_tilt_logs":
+            return self.log_theta_tilt
         
         # IMU logs data getter
         elif data=="acceleration_logs_imu" or data=="a_logs_imu":
@@ -395,8 +400,8 @@ class Estimator():
                                                                                  self.qdot,
                                                                                  self.a_imu, 
                                                                                  self.tau,
-                                                                                 self.a_imu - self.ag_imu + np.array([0, 0, 10]),
-                                                                                 TorqueForceMingler=0.85, 
+                                                                                 self.g_tilt,
+                                                                                 TorqueForceMingler=1.0, 
                                                                                  ProbThresold=0.45, 
                                                                                  TrustThresold=0.5
                                                                                  )
@@ -482,7 +487,6 @@ class Estimator():
         
         # uses attitude from direction of gravity estimate and gyro data to provide attitude estimate
         AttitudeFromIMU = self.IMUAttitude()
-        self.theta_tilt = 0
         self.theta_out = R.from_euler('xyz', self.AttitudeFilter.RunFilter(AttitudeFromIMU, self.w_imu.copy()))
             
         # uses attitude Kinematic estimate and gyro data to provide attitude estimate
@@ -576,7 +580,29 @@ class Estimator():
 
         v_out = mitigate[0]*self.v_imu + mitigate[1]*self.v_kin + mitigate[2]*self.v_tilt
         self.v_out  = self.SpeedFilter.RunFilter(v_out, self.a_imu)
+        if np.linalg.norm(self.ag_imu - self.a_imu)<9:
+            print("où est la gravité")
+            print(self.ag_imu - self.a_imu)
         return None
+    
+
+
+    def TiltfromG(self, g0) -> np.ndarray:
+        """
+        From estimated g in base frame, get the euler angles between world frame and base frame
+        """
+        g = g0[:]#*np.array([9.81, 1, -9.81])
+        g = g/np.linalg.norm(g)
+        gworld = np.array([0, 0, -1])
+
+        v = np.cross(gworld, g)
+        s = np.linalg.norm(v)
+        c = utils.scalar(gworld, g0)
+        RotM = np.eye(3) + utils.S(v) + utils.S(v**2)*(1/(1+c))
+
+        euler = R.from_matrix(RotM).as_euler("xyz")
+
+        return euler
     
     
     def Estimate(self, dt=None):
@@ -597,6 +623,9 @@ class Estimator():
         # derive data & runs filter
 
         #self.theta_kin = self.KinematicAttitude()
+
+        self.theta_tilt = self.TiltfromG(self.g_tilt)
+        self.theta_out = self.AttitudeFilter.RunFilter(self.theta_tilt.copy(), self.w_imu.copy())
 
         # update all logs & past variables
         self.UpdateLogMatrixes()

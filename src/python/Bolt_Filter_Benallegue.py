@@ -32,7 +32,7 @@ class BenallegueEstimator():
         # rotation matrix (contact foot to sensor)
         self.cRs = np.eye(3)
         self.cRsT = np.transpose(self.cRs)
-        print(self.cRs, self.cRsT)
+        #print(self.cRs, self.cRsT)
         # rotation speed (contact foot to sensor)
         self.ws = np.zeros((3,3))
         # position of sensor in contact foot frame
@@ -55,7 +55,7 @@ class BenallegueEstimator():
     def X1(self, y1):
         return self.S(self.cPs)@y1 - self.cPsdot
     def S(self, x):
-        print("S in Ben", x.shape)
+        #print("S in Ben", x.shape)
         x1, x2, x3 = x[0,0], x[0,1], x[0,2]
         return np.array([[0, -x3, x2],
                         [x3, 0, -x1],

@@ -309,7 +309,6 @@ class Metal:
         # tune the noise level on every division
         amplitude = self.NoiseLevel/100
         increment = round(self.D//division, 0)
-        print(increment)
         for j in range(division):
             minidata = data[j*increment:(j+1)*increment, :]
             amplitude = np.max(abs(minidata)) * self.NoiseLevel / 100

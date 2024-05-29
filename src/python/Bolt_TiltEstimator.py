@@ -75,6 +75,9 @@ class TiltEstimator():
         self.x1_tilde_logs = np.zeros((self.Niter,3))
         self.x2_tilde_logs = np.zeros((self.Niter, 3))
         self.x2_tildeprime_logs = np.zeros((self.Niter, 3))
+
+        # derivatives
+        self.x2_hat_dot_logs = np.zeros((self.Niter,3))
         
         return None
     
@@ -90,6 +93,10 @@ class TiltEstimator():
         self.x1_tilde_logs[self.iter, :] = self.x1_tilde[:]
         self.x2_tilde_logs[self.iter, :] = self.x2_tilde[:]
         self.x2_tildeprime_logs[self.iter, :] = self.x2_tildeprime[:]
+
+        # derivatives
+        self.x2_hat_dot_logs[self.iter, :] = self.x2_hat_dot[:]
+
         return None
     
     
@@ -207,9 +214,10 @@ class TiltEstimator():
         self.iter += 1
 
         #x3 = ya - self.S(yg)@self.x1_hat - self.x1_hat_dot
+        x3 = np.array([-self.x2_hat[0], -self.x2_hat[1], self.x2_hat[2]])
         
         # return estimated data
-        return self.x1_hat, self.x2_hat
+        return self.x1_hat, x3 # TODO : mod
     
     
 

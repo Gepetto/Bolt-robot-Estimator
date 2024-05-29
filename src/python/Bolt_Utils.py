@@ -32,6 +32,13 @@ class utils():
     def rotation(EulerArray, ArrayToRotate) -> np.ndarray:
         R = Rotation.from_euler('xyz', EulerArray).as_matrix()
         return R@ArrayToRotate
+    
+    def S(x) -> np.ndarray:
+        """ Skew-symetric operator """
+        sx = np.array([[0,    -x[2],  x[1]],
+                       [x[2],   0,   -x[0]],
+                       [-x[1], x[0],    0 ]])
+        return sx
 
 '''
 A class to have a common log for all code
