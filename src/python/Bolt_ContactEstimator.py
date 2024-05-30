@@ -14,6 +14,9 @@ class ContactEstimator():
                 RightKneeTorqueID : int=5,
                 IterNumber       : int=1000,
                 dt               : float=1e-3,
+                MemorySize       : int=5,
+                Logging          : bool=True,
+                Talkative        : bool=True,
                 logger=None           ) -> None:
         
         # pinocchio
@@ -41,24 +44,33 @@ class ContactEstimator():
         self.LeftKneeTorqueID = LeftKneeTorqueID
         self.RightKneeTorqueID = RightKneeTorqueID
         
-        self.logger = logger
-        self.logger.LogTheLog("Contact Forces Estimator started", style="subtitle")
-        
+        # logging options
+        if logger is None :
+            self.Talkative=False
+        else :
+            self.Talkative=Talkative
+            self.logger = logger
+            self.logger.LogTheLog("Contact Forces Estimator started", style="subtitle")
+        self.Logging = Logging
+
         # compute bolt mass
         self.mass = pin.computeTotalMass(self.bolt.model)
-        self.logger.LogTheLog("Mass of robot : " + str(self.mass), style="subinfo")
+        if self.Talkative : self.logger.LogTheLog("Mass of robot : " + str(self.mass), style="subinfo")
         
         # initialize all variables
         self.IterNumber = IterNumber
         self.InitVariables()
-        self.InitLogMatrixes()
+        if self.Logging : self.InitLogMatrixes()
         self.iter = 0
 
         self.TorqueContacts = [False, False]
+
+        # average contact probability over the last k=memorysize results
+        self.MemorySize = MemorySize
         
         # coefficient for averaging contact forces
         self.coeffs = [0.0, 0.3, 0.7] #1D, 3D, torques-based
-        if sum(self.coeffs) != 1: self.logger.LogTheLog("Coeffs sum not equal to 1", "warn")
+        if sum(self.coeffs) != 1 and self.Talkative: self.logger.LogTheLog("Coeffs sum not equal to 1", "warn")
         self.c1, self.c2, self.c3 = self.coeffs
     
     
@@ -185,6 +197,10 @@ class ContactEstimator():
         # foot position
         self.RightFootPos = np.zeros(3)
         self.LeftFootPos = np.zeros(3)
+
+        # contact memory
+        self.PastProbL = 0.
+        self.PastProbR = 0.
      
         
     def __SigmoidDiscriminator(self, x, center, stiffness=5) -> np.ndarray:
@@ -364,7 +380,7 @@ class ContactEstimator():
     def ContactProbability_Force(self, ContactForce1d, ContactForce3d, ContactForceT, trigger=5, stiffness=3, coeffs=[0.3, 0.3, 0.4]) -> float:
         """ compute probability of contact based on three force estimations """
         c1, c2, c3 = coeffs
-        if c1+c2+c3 != 1.0 : self.logger.LogTheLog("Coeff sum != 1 in ContactProbability_Force", style="warn")
+        if c1+c2+c3 != 1.0 and self.Talkative: self.logger.LogTheLog("Coeff sum != 1 in ContactProbability_Force", style="warn")
 
         # average vertical force
         VerticalForce = (c1*ContactForce1d[2] + c2*ContactForce3d[2] + c3*ContactForceT[2])/3
@@ -417,7 +433,7 @@ class ContactEstimator():
         # norm of horizontal components
         hdist = np.linalg.norm(delta -  utils.scalar(delta, Vertical)*Vertical)
         if hdist < 0.05 or hdist > 0.25 : 
-            self.logger.LogTheLog(f"Computed distance from knee : {KneeID} to foot : {FootID} is anormal :: {hdist} m")
+            if self.Talkative : self.logger.LogTheLog(f"Computed distance from knee : {KneeID} to foot : {FootID} is anormal :: {hdist} m")
             hdist = 0.12
 
         # compute force
@@ -455,8 +471,25 @@ class ContactEstimator():
         return Trust
 
 
-    def ContactBool(self, Contact, ContactProb, Trust, ProbThresold, TrustThresold) -> bool:
+    def ContactBool(self, Contact, ContactProb, Trust, ProbThresold, TrustThresold, side) -> bool:
         """ Compute a contact boolean based on a contact probability"""
+        # pseudo-integrator of probability
+        memorysize = self.MemorySize
+        if self.iter < memorysize :
+            if side=="left":
+                self.PastProbL = ContactProb
+            if side=="right":
+                self.PastProbR = ContactProb
+        else :
+            if side=="left":
+                self.PastProbL = ( self.PastProbL*(memorysize-1) + ContactProb )/memorysize
+                ContactProb = self.PastProbL
+            if side=="right":
+                self.PastProbR = ( self.PastProbR*(memorysize-1) + ContactProb )/memorysize
+                ContactProb = self.PastProbR
+        
+        
+
         if ContactProb > ProbThresold :
             if ContactProb > 1.2*ProbThresold:
                 # high probability of contact
@@ -532,11 +565,11 @@ class ContactEstimator():
         self.TrustL = self.TrustContact(self.DeltaL, self.DeltaL3d, self.DeltaLV, self.MuL, coeffs=(0.1, 0.1, 0.2, 0.1))
         self.TrustR = self.TrustContact(self.DeltaR, self.DeltaR3d, self.DeltaRV, self.MuR, coeffs=(0.1, 0.1, 0.2, 0.1))
         
-        self.LeftContact = self.ContactBool(self.LeftContact, self.ContactProbL, self.TrustL, ProbThresold, TrustThresold)
-        self.RightContact = self.ContactBool(self.RightContact, self.ContactProbR, self.TrustR, ProbThresold, TrustThresold)
+        self.LeftContact = self.ContactBool(self.LeftContact, self.ContactProbL, self.TrustL, ProbThresold, TrustThresold, "left")
+        self.RightContact = self.ContactBool(self.RightContact, self.ContactProbR, self.TrustR, ProbThresold, TrustThresold, "right")
          
         # log contact forces and deltas and contact
-        self.UpdateLogMatrixes()
+        if self.Logging : self.UpdateLogMatrixes()
         
         return self.LeftContact, self.RightContact
 

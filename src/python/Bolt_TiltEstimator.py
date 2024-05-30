@@ -20,7 +20,8 @@ class TiltEstimator():
                  robot,
                  Q0,
                  Qd0,
-                 Niter, 
+                 Niter,
+                 Logging,
                  params)-> None:
         """ initialize variables """
         # iter 
@@ -56,7 +57,8 @@ class TiltEstimator():
         self.g0 = -9.81
         
         # logs
-        self.InitLogs()
+        self.Logging = Logging
+        if self.Logging : self.InitLogs()
 
         # parameters
         self.alpha1, self.alpha2, self.gamma = params
@@ -210,7 +212,7 @@ class TiltEstimator():
         self.ErrorUpdate(dt)
         
         # logging
-        self.UpdateLogs()
+        if self.Logging : self.UpdateLogs()
         self.iter += 1
 
         #x3 = ya - self.S(yg)@self.x1_hat - self.x1_hat_dot

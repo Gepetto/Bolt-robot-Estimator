@@ -145,22 +145,22 @@ class DeviceEmulator():
         
         # DATA THAT ESTIMATOR WILL ACCESS
         # base acceleration
-        noise.SetNoise(NoiseLevel=0, DriftingCoeff=0.)
+        noise.SetNoise(NoiseLevel=10, DriftingCoeff=0.)
         self.Acc = noise.makeNoiseAdaptativeAmplitude(self.Acc_true)
         self.AccG = noise.makeNoiseAdaptativeAmplitude(self.AccG_true)
         # base rotation speed
-        noise.SetNoise(NoiseLevel=0, DriftingCoeff=0.)
+        noise.SetNoise(NoiseLevel=10, DriftingCoeff=0.)
         self.Omega = noise.makeNoise(self.Omega_true)
         # base speed and attitude (IMU has an integrator)
-        noise.SetNoise(NoiseLevel=0, DriftingCoeff=0.)
+        noise.SetNoise(NoiseLevel=10, DriftingCoeff=0.)
         self.Speed = noise.makeNoiseAdaptativeAmplitude(self.Speed_true)
         self.Theta = noise.makeNoiseAdaptativeAmplitude(self.Theta_true)
         # encoders
-        noise.SetNoise(NoiseLevel=0, DriftingCoeff=0.)
+        noise.SetNoise(NoiseLevel=10, DriftingCoeff=0.)
         self.Q = noise.makeNoiseAdaptativeAmplitude(self.Q_true)
         self.Qd = noise.makeNoiseAdaptativeAmplitude(self.Qd_true)
         # torques
-        noise.SetNoise(NoiseLevel=0, DriftingCoeff=0.)
+        noise.SetNoise(NoiseLevel=10, DriftingCoeff=0.)
         self.Tau = noise.makeNoiseAdaptativeAmplitude(self.Tau_true)
         
 

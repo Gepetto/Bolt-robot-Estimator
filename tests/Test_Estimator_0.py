@@ -2,7 +2,8 @@ import sys
 sys.path.append('/home/nalbrecht/Bolt-Estimator/Bolt-robot---Estimator/src/python')
 import numpy as np
 from scipy.spatial.transform import Rotation as R
-
+import time as t
+from decimal import Decimal
 
 from Bolt_Utils import Log, utils
 from Graphics import Graphics
@@ -33,7 +34,7 @@ def TiltfromG(g0) -> np.ndarray:
     return euler
 
 def main():
-    N  = 5000 - 1
+    N  = 1000 - 1
     dt = 1e-3
     T  = N*dt
     kf = 3
@@ -54,12 +55,15 @@ def main():
                     Talkative=True,
                     logger=testlogger,
                     AttitudeFilterType = "complementary",
-                    parametersAF = [2],
+                    parametersAF = [2],         # réglé
                     SpeedFilterType = "complementary",
                     parametersSF = [1.1],       # réglé
-                    parametersTI = [10, 60, 2],
+                    parametersTI = [10, 60, 2], # réglé
                     TimeStep = dt,
-                    IterNumber = N)
+                    IterNumber = N,
+                    EstimatorLogging=True,
+                    ContactLogging=True,
+                    TiltLogging=True)
     
     # plot the pseudo-measured (ie noisy and drifting) generated trajectories
     Input_Acc = device.Acc
@@ -89,13 +93,16 @@ def main():
     
     # run the estimator as if
     # device will iterate over generated data each time estimator calls it
+    t0 = t.time()
     for j in range(N-1):
         estimator.Estimate()
         #rotbase = R.from_euler('zyx', True_Theta[j, :]) #zyx #yzx
         #True_g_bis[j, :] = rotbase.as_matrix() @ np.array([0, 0, -9.81])
-        Computed_Theta[:, j] = TiltfromG(True_g[j, :])
-    
-        
+        #Computed_Theta[:, j] = TiltfromG(True_g[j, :])
+    t1 = t.time()
+    print(" ")
+    print(f"Estimator : \n\t was executed {N-1} times\n\t within {round(t1-t0, 3)}s\n\t @ f={Decimal(str((N-1)/(t1-t0))):.3E}")
+    print(" ")
     
     # get logs from estimator
         # rotations
@@ -110,6 +117,16 @@ def main():
     v_out = estimator.Get("v_out_logs")
     c_out = estimator.Get("c_logs")
     theta_out = estimator.Get("theta_logs")
+    g_out = estimator.Get("g_out_logs")
+
+
+    g_rebuilt = np.zeros((3, N))
+    for j in range(N-1):
+        # rebuild gravity estimate (comprend rien)
+        rotmat = R.from_euler("xyz", theta_out[:, j]).as_matrix()
+        g_rebuilt[:, j] = rotmat @ np.array([0, 0, -9.81])
+        g_rebuilt[2, j] = 5
+
 
 
 
@@ -142,7 +159,7 @@ def main():
     
     grapher.SetLegend(["a in", "a true"], 3)
     grapher.CompareNDdatas([Input_Acc.T, True_a.T], "m/s2", "Inputed acceleration", StyleAdapter=True)
-
+    
 
     
     # convert and plot
@@ -214,51 +231,54 @@ def main():
     
     grapher.SetLegend(["v from tilt estimator", "True v"], ndim=3)
     grapher.CompareNDdatas([v_tilt, True_v[:N, 1, :].T], datatype='speed', title='Tilt estimator output', mitigate=[1])
-    
+
 
     grapher.SetLegend(["v from tilt estimator", "Kin v", "True v"], ndim=3)
     grapher.CompareNDdatas([v_tilt, v_kin, True_v[:N, 1, :].T], datatype='speed', title='speed estimation comparison', mitigate=[2])
-    
+        
     
     grapher.SetLegend(["vx out", "True vx", "Error"], ndim=1)
-    grapher.CompareNDdatas([v_out[:1],  True_v[:N, 1, :1].T, True_v[:N, 1, :1].T-v_out[:1]], datatype='speed', title='X speed estimation comparison', mitigate=[1])
+    grapher.CompareNDdatas([v_out[:1],  True_v[:N, 1, :1].T, np.abs(True_v[:N, 1, :1].T-v_out[:1])], datatype='speed', title='X speed estimation comparison', mitigate=[1])
     grapher.SetLegend(["vy out", "True vy", "Error"], ndim=1)
-    grapher.CompareNDdatas([v_out[1:2], True_v[:N, 1, 1:2].T, True_v[:N, 1, 1:2].T-v_out[1:2]], datatype='speed', title='Y speed estimation comparison', mitigate=[1])
-    """
+    grapher.CompareNDdatas([v_out[1:2], True_v[:N, 1, 1:2].T, np.abs(True_v[:N, 1, 1:2].T-v_out[1:2])], datatype='speed', title='Y speed estimation comparison', mitigate=[1])
+    
 
     grapher.SetLegend(["v out", "True v"], ndim=3)
     grapher.CompareNDdatas([v_out, True_v[:N, 1, :].T], datatype='speed', title='Estimator output, speed', mitigate=[1])
-
+    
     grapher.SetLegend(["v out", "v tilt", "True v"], ndim=3)
     grapher.CompareNDdatas([v_out, v_tilt, True_v[:N, 1, :].T], datatype='speed', title='Etimator output, speed', mitigate=[2])
-
+    """
     grapher.SetLegend(["base pos out", "True base pos"], ndim=3)
     grapher.CompareNDdatas([c_out,  True_x[:N, :].T], datatype='position', title='Estimator output, position', mitigate=[1])
-
+    """
     grapher.SetLegend(["theta tilt", "theta_true"], ndim=3)
-    grapher.CompareNDdatas([theta_tilt, 10*True_Theta[:N, :].T], datatype='orientation', title='Estimator output, attitude', mitigate=[1])
+    grapher.CompareNDdatas([theta_tilt, True_Theta[:N, :].T], datatype='orientation', title='Tilt estimator output, attitude', mitigate=[1])
     
     grapher.SetLegend(["theta tilt", "theta_true", "theta_computed"], ndim=3)
-    grapher.CompareNDdatas([theta_tilt, 10*True_Theta[:N, :].T, 10*Computed_Theta], datatype='orientation', title='Estimator output, attitude', mitigate=[1])
+    grapher.CompareNDdatas([theta_tilt, True_Theta[:N, :].T, Computed_Theta], datatype='orientation', title='Tilt estimator output, attitude', mitigate=[1])
 
     grapher.SetLegend(["theta_true", "theta_computed"], ndim=3)
-    grapher.CompareNDdatas([10*True_Theta[:N, :].T, 10*Computed_Theta], datatype='orientation', title='Computed output, attitude', mitigate=[1])
-
-
+    grapher.CompareNDdatas([True_Theta[:N, :].T, Computed_Theta], datatype='orientation', title='Computed output, attitude', mitigate=[1])
+    """
+    grapher.SetLegend(["theta out", "theta_true"], ndim=3)
+    grapher.CompareNDdatas([theta_out, True_Theta[:N, :].T,], datatype='orientation', title='Estimator output, attitude', mitigate=[1])
+    """
     
     grapher.SetLegend(["g from tilt estimator", "True g",], ndim=3)
     grapher.CompareNDdatas([-9.81*g_tilt, True_g[:N, :].T], datatype='vertical', title='Tilt estimator output', mitigate=[1])
+    """
+    grapher.SetLegend(["g out", "True g",], ndim=3)
+    grapher.CompareNDdatas([9.81*g_out, True_g[:N, :].T], datatype='vertical', title='Estimator output', mitigate=[1])
+    """
+    grapher.SetLegend(["g from tilt estimator", "Rebuilt g",], ndim=3)
+    grapher.CompareNDdatas([-9.81*g_tilt, g_rebuilt], datatype='vertical', title='Tilt estimator output and rebuilt', mitigate=[1])
 
-
+    """
     grapher.SetLegend(["omega tilt", "omega true"], ndim=3)
     grapher.CompareNDdatas([omega_tilt.T, True_w[:N, :].T], datatype='rad per s', title='Tilt estimator output, angular speed', mitigate=[1])
-    
-    
-    
-    
-    
+
     """
-    
     L3DNorm = np.linalg.norm(LCF_3D, axis=0)
     R3DNorm = np.linalg.norm(RCF_3D, axis=0)
 
@@ -270,14 +290,14 @@ def main():
     grapher.SetLegend(["Slip","Trust"], ndim=2)
     grapher.CompareNDdatas([Slip, Trust], datatype='real value', title='probability of slip and trust value')
     
-    
+    """
     grapher.SetLegend(["Contact boolean"], ndim=2)
     grapher.CompareNDdatas([[Contact[0, :]], [Contact[1, :]]], datatype='proba', title='contact', mitigate=[1])
     
     grapher.SetLegend(["Contact probability", "Contact probability Force", "Contact probability Torque", ], ndim=1)
     grapher.CompareNDdatas([ContactProb[:1, :], ContactProb_F[:1, :], ContactProb_T[:1, :]], datatype='proba', title='probability of left contact', mitigate=[1])
     
-    
+    """
     grapher.SetLegend(["Contact probability force 3d", "Z Force"], ndim=1)
     grapher.CompareNDdatas([5*ContactProb_F[:1, :], LCF_3D[2:, :]], datatype='proba', title='probability of left contact')
     """

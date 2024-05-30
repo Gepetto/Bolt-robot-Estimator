@@ -47,16 +47,25 @@ class Estimator():
                 parametersSF        : list = [2],
                 parametersTI        : list = [1, 1, 1],
                 TimeStep            : float = 0.01,
-                IterNumber          : int = 1000) -> None:
-
+                IterNumber          : int = 1000,
+                EstimatorLogging    : bool = True,
+                ContactLogging      : bool = True,
+                TiltLogging         : bool = True,
+                ) -> None:
+        
         self.MsgName = "Bolt Estimator v0.6"
+
+        # logging options 
         self.Talkative=Talkative
+        self.EstimatorLogging = EstimatorLogging
+        self.ContactLogging = ContactLogging
+        self.TiltLogging = TiltLogging
         if logger is not None :
             self.logger = logger
         else:
             self.logger = Log("default " + self.MsgName+ " log")
         self.logger.LogTheLog(" Starting log of" + self.MsgName, ToPrint=False)
-        self.logger.LogTheLog("Initializing " + self.MsgName + "...", style="title", ToPrint=Talkative)
+        if self.Talkative : self.logger.LogTheLog("Initializing " + self.MsgName + "...", style="title", ToPrint=Talkative)
         self.IterNumber = IterNumber
         self.iter = 0
         
@@ -91,18 +100,18 @@ class Estimator():
 
         # check that sensors can be read 
         self.ReadSensor()
-        self.logger.LogTheLog("Sensors read, initial data acquired", ToPrint=Talkative)
+        if self.Talkative : self.logger.LogTheLog("Sensors read, initial data acquired", ToPrint=Talkative)
 
-        # update height of CoM value
+        # update height of CoM value, assuming Bolt is vertical
         pin.forwardKinematics(self.robot.model, self.robot.data, self.q)
         pin.updateFramePlacements(self.robot.model, self.robot.data)
         c = np.array((self.robot.data.oMf[self.FeetIndexes[0]].inverse()*self.robot.data.oMf[self.BaseID]).translation).copy()
-        self.c_out[2] = c[2]
-
+        self.c_out[2] = np.linalg.norm(c)
+        self.c_out[2] += 0.02 # TODO : radius of bolt foot
 
         self.UpdateLogMatrixes()
         self.iter += 1
-        self.logger.LogTheLog("Initial data stored in logs", ToPrint=Talkative)
+        if self.Talkative : self.logger.LogTheLog("Initial data stored in logs", ToPrint=Talkative)
         
 
         # filter parameters
@@ -116,7 +125,7 @@ class Estimator():
                                                     talkative=Talkative, 
                                                     logger=self.logger, 
                                                     ndim=3)
-        self.logger.LogTheLog("Attitude Filter of type '" + AttitudeFilterType + "' added.", ToPrint=Talkative)
+        if self.Talkative : self.logger.LogTheLog("Attitude Filter of type '" + AttitudeFilterType + "' added.", ToPrint=Talkative)
         
         if SpeedFilterType=="complementary":
             self.SpeedFilter = ComplementaryFilter(parameters=parametersSF, 
@@ -125,8 +134,9 @@ class Estimator():
                                                     logger=self.logger, 
                                                     ndim=3,
                                                     MemorySize=80,
-                                                    OffsetGain=1.)
-        self.logger.LogTheLog("Speed Filter of type '" + SpeedFilterType + "' added.", ToPrint=Talkative)
+                                                    OffsetGain=0.02)
+        if self.Talkative : self.logger.LogTheLog("Speed Filter of type '" + SpeedFilterType + "' added.", ToPrint=Talkative)
+
 
         # returns info on Slips, Contact Forces, Contact with the ground
         self.ContactEstimator = ContactEstimator(robot=self.robot, 
@@ -138,17 +148,21 @@ class Estimator():
                                                  RightKneeTorqueID=5,
                                                  IterNumber=self.IterNumber,
                                                  dt=self.TimeStep,
+                                                 MemorySize=5,
+                                                 Logging=self.ContactLogging,
+                                                 Talkative=self.Talkative,
                                                  logger=self.logger)
-        self.logger.LogTheLog("Contact Estimator added.", ToPrint=Talkative)
+        if self.Talkative : self.logger.LogTheLog("Contact Estimator added.", ToPrint=Talkative)
         
         # returns info on Slips, Contact Forces, Contact with the ground
         self.TiltandSpeedEstimator = TiltEstimator(robot=self.robot,
                                                    Q0=self.q,
                                                    Qd0=self.qdot,
                                                    Niter=self.IterNumber,
+                                                   Logging=self.TiltLogging,
                                                    params=parametersTI)
         
-        self.logger.LogTheLog("Tilt Estimator added with parameters " + str(parametersTI), ToPrint=Talkative)
+        if self.Talkative : self.logger.LogTheLog("Tilt Estimator added with parameters " + str(parametersTI), ToPrint=Talkative)
         
         # returns info on foot attitude
         self.FootAttitudeEstimator = BenallegueEstimator(parameters=[0.001, 2],
@@ -156,7 +170,7 @@ class Estimator():
                                                          name="Foot Attitude Estimator",
                                                          talkative=Talkative,
                                                          logger=self.logger)
-        self.logger.LogTheLog("Foot Attitude Estimator added with parameters " + str(0), ToPrint=Talkative)
+        if self.Talkative : self.logger.LogTheLog("Foot Attitude Estimator added with parameters " + str(0), ToPrint=Talkative)
         
 
         self.logger.LogTheLog(self.MsgName +" initialized successfully.", ToPrint=Talkative)
@@ -187,12 +201,13 @@ class Estimator():
         return None
 
     def InitOutData(self) -> None:
-        # initialize filter out data
+        # initialize estimator out data
         self.v_out = np.zeros((3,)) 
         self.a_out = np.zeros((3,)) 
         #self.theta_out = R.from_euler('xyz', np.zeros(3))
         self.theta_out = np.zeros((3,))
         self.w_out = np.zeros((3,)) #R.from_euler('xyz', np.zeros(3))
+        self.g_out = np.array([0, 0, -1])
 
         self.c_out = np.zeros((3,))
         self.cdot_out = np.zeros((3,)) 
@@ -230,6 +245,7 @@ class Estimator():
         self.log_w_out = np.zeros([3, self.IterNumber])
         self.log_a_out = np.zeros([3, self.IterNumber])
         self.log_theta_out = np.zeros([3, self.IterNumber])
+        self.log_g_out = np.zeros([3, self.IterNumber])
         # imu data log
         self.log_v_imu = np.zeros([3, self.IterNumber])
         self.log_w_imu = np.zeros([3, self.IterNumber])
@@ -266,6 +282,7 @@ class Estimator():
         self.log_w_out[:, self.iter] = self.w_out[:]#self.w_out.as_quat()[:]
         self.log_a_out[:, self.iter] = self.a_out[:]
         self.log_theta_out[:, self.iter] = self.theta_out#.as_quat()[:]
+        self.log_g_out[:, self.iter] = self.g_out[:]
         # imu data log
         self.log_v_imu[:, self.iter] = self.v_imu[:]
         self.log_w_imu[:, self.iter] = self.w_imu[:]#self.w_imu.as_quat()[:]
@@ -316,6 +333,7 @@ class Estimator():
             return self.qdot
         elif data=="tau":
             return self.tau
+        
 
         # logs data getter
 
@@ -337,6 +355,9 @@ class Estimator():
             return self.log_q, 
         elif data=="qdot_logs":
             return self.log_qdot
+        elif data=="g_out_logs"or data=="g_logs":
+            return self.log_g_out
+
         elif data=="g_tilt_logs":
             return self.log_g_tilt
         elif data=="v_tilt_logs":
@@ -416,13 +437,13 @@ class Estimator():
         
         # consider the right contact frames, depending on which foot is in contact with the ground
         if self.LeftContact and self.RightContact :
-            self.logger.LogTheLog("Both feet are touching the ground", style="warn", ToPrint=self.Talkative)
+            if self.Talkative : self.logger.LogTheLog("Both feet are touching the ground", style="warn", ToPrint=self.Talkative)
             ContactFrames = [0, 1]
         elif self.LeftContact :
-            self.logger.LogTheLog("left foot touching the ground", ToPrint=self.Talkative)
+            if self.Talkative : self.logger.LogTheLog("left foot touching the ground", ToPrint=self.Talkative)
             ContactFrames = [0]
         elif self.RightContact :
-            self.logger.LogTheLog("right foot touching the ground", ToPrint=self.Talkative)
+            if self.Talkative : self.logger.LogTheLog("right foot touching the ground", ToPrint=self.Talkative)
             ContactFrames = [1]
         else :
             self.logger.LogTheLog("No feet are touching the ground", style="warn", ToPrint=self.Talkative)
@@ -509,13 +530,13 @@ class Estimator():
 
         # consider the right contact frames, depending on which foot is in contact with the ground
         if self.LeftContact and self.RightContact :
-            self.logger.LogTheLog("Both feet are touching the ground on iter " + str(self.iter), style="warn", ToPrint=self.Talkative)
+            if self.Talkative : self.logger.LogTheLog("Both feet are touching the ground on iter " + str(self.iter), style="warn", ToPrint=self.Talkative)
             ContactFrames = [0,1]
         elif self.LeftContact :
-            self.logger.LogTheLog("left foot touching the ground", ToPrint=False)
+            if self.Talkative : self.logger.LogTheLog("left foot touching the ground", ToPrint=False)
             ContactFrames = [0]
         elif self.RightContact :
-            self.logger.LogTheLog("right foot touching the ground", ToPrint=False)
+            if self.Talkative : self.logger.LogTheLog("right foot touching the ground", ToPrint=False)
             ContactFrames = [1]
         else :
             self.logger.LogTheLog("No feet are touching the ground on iter " + str(self.iter), style="warn", ToPrint=self.Talkative)
@@ -581,8 +602,8 @@ class Estimator():
         v_out = mitigate[0]*self.v_imu + mitigate[1]*self.v_kin + mitigate[2]*self.v_tilt
         self.v_out  = self.SpeedFilter.RunFilter(v_out, self.a_imu)
         if np.linalg.norm(self.ag_imu - self.a_imu)<9:
-            print("où est la gravité")
-            print(self.ag_imu - self.a_imu)
+            if self.Talkative : self.logger.LogTheLog(f"anormal gravity input : {self.ag_imu - self.a_imu} on iter {self.iter}", "warn")
+
         return None
     
 
@@ -593,12 +614,16 @@ class Estimator():
         """
         g = g0[:]#*np.array([9.81, 1, -9.81])
         g = g/np.linalg.norm(g)
-        gworld = np.array([0, 0, -1])
+        gworld = np.array([0, 0, 1])
 
         v = np.cross(gworld, g)
         s = np.linalg.norm(v)
         c = utils.scalar(gworld, g0)
-        RotM = np.eye(3) + utils.S(v) + utils.S(v**2)*(1/(1+c))
+        if c != -1 :
+            RotM = np.eye(3) + utils.S(v) + utils.S(v**2)*(1/(1+c))
+        else :
+            RotM = -np.eye(3) # TODO : check
+            if self.Talkative : self.logger.LogTheLog("Could not compute g rot matrix on iter "+self.iter, "warn")
 
         euler = R.from_matrix(RotM).as_euler("xyz")
 
@@ -618,7 +643,7 @@ class Estimator():
         self.SpeedFusion(mitigate=[0., 0., 1.])
         
         # integrate speed to get position
-        self.c_out += self.v_out[0]*self.TimeStep
+        self.c_out += self.v_out[0, :]*self.TimeStep
 
         # derive data & runs filter
 
@@ -626,11 +651,13 @@ class Estimator():
 
         self.theta_tilt = self.TiltfromG(self.g_tilt)
         self.theta_out = self.AttitudeFilter.RunFilter(self.theta_tilt.copy(), self.w_imu.copy())
+        rotmat = R.from_euler("xyz", self.theta_out.copy()).as_matrix()
+        self.g_out = rotmat @ np.array([0, 0, -1])
 
         # update all logs & past variables
         self.UpdateLogMatrixes()
         # count iteration
-        if iter==1 :
+        if self.iter==1 :
             self.logger.LogTheLog("executed Estimator for the first time", "subinfo")
         self.iter += 1
         
