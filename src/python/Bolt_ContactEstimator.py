@@ -77,6 +77,7 @@ class ContactEstimator():
     
     
     def InitLogMatrixes(self) -> None:
+        
         # contact forces logs
         self.Log_LcF_3d = np.zeros([3, self.IterNumber])
         self.Log_LcF_1d = np.zeros([3, self.IterNumber])
@@ -101,26 +102,32 @@ class ContactEstimator():
     
 
     def UpdateLogMatrixes(self) -> None:
+        LogIter = self.iter
+        if self.iter >= self.IterNumber:
+            # Logs matrices' size will not be sufficient
+            if self.Talkative : self.logger.LogTheLog("Excedind planned number of executions for ContactEstimator, IterNumber = " + str(self.IterNumber), style="warn", ToPrint=self.Talkative)
+            LogIter = self.IterNumber-1
+
         # contact forces logs
-        self.Log_LcF_3d[:, self.iter] = self.LcF_3d[:]
-        self.Log_LcF_1d[:, self.iter] = self.LcF_1d[:]
-        self.Log_RcF_3d[:, self.iter] = self.RcF_3d[:]
-        self.Log_RcF_1d[:, self.iter] = self.RcF_1d[:]
-        self.Log_LcF_T[:, self.iter] = self.LcF_T[:]
-        self.Log_RcF_T[:, self.iter] = self.RcF_T[:]
+        self.Log_LcF_3d[:, LogIter] = self.LcF_3d[:]
+        self.Log_LcF_1d[:, LogIter] = self.LcF_1d[:]
+        self.Log_RcF_3d[:, LogIter] = self.RcF_3d[:]
+        self.Log_RcF_1d[:, LogIter] = self.RcF_1d[:]
+        self.Log_LcF_T[:, LogIter] = self.LcF_T[:]
+        self.Log_RcF_T[:, LogIter] = self.RcF_T[:]
         # left and right trust in contacts logs
-        self.Log_Delta1D[:, self.iter] = [self.DeltaL, self.DeltaR]
-        self.Log_Delta3D[:, self.iter] = [self.DeltaL3d, self.DeltaR3d]
-        self.Log_DeltaVertical[:, self.iter] = [self.DeltaLV, self.DeltaRV]
+        self.Log_Delta1D[:, LogIter] = [self.DeltaL, self.DeltaR]
+        self.Log_Delta3D[:, LogIter] = [self.DeltaL3d, self.DeltaR3d]
+        self.Log_DeltaVertical[:, LogIter] = [self.DeltaLV, self.DeltaRV]
         # slipping logs
-        self.Log_Mu[:, self.iter] = [self.MuL, self.MuR]
-        self.Log_SlipProb[:, self.iter] = [self.SlipProbL, self.SlipProbR]
+        self.Log_Mu[:, LogIter] = [self.MuL, self.MuR]
+        self.Log_SlipProb[:, LogIter] = [self.SlipProbL, self.SlipProbR]
         # boolean contact, probability of contact and trust in contact
-        self.Log_Contact[:, self.iter] = [self.LeftContact, self.RightContact]
-        self.Log_ContactProbability[:, self.iter] = [self.ContactProbL, self.ContactProbR]
-        self.Log_ContactProbability_F[:, self.iter] = [self.ContactProbL_F, self.ContactProbR_F]
-        self.Log_ContactProbability_T[:, self.iter] = [self.ContactProbL_T, self.ContactProbR_T]
-        self.Log_Trust[:, self.iter] = [self.TrustL, self.TrustR]
+        self.Log_Contact[:, LogIter] = [self.LeftContact, self.RightContact]
+        self.Log_ContactProbability[:, LogIter] = [self.ContactProbL, self.ContactProbR]
+        self.Log_ContactProbability_F[:, LogIter] = [self.ContactProbL_F, self.ContactProbR_F]
+        self.Log_ContactProbability_T[:, LogIter] = [self.ContactProbL_T, self.ContactProbR_T]
+        self.Log_Trust[:, LogIter] = [self.TrustL, self.TrustR]
         # number of updates
         self.iter += 1
         return None
@@ -294,8 +301,10 @@ class ContactEstimator():
                     print("gougi")
         return CF
     
-    
     def ContactForces3d(self, frames=[10,18]) -> tuple[np.ndarray, np.ndarray]:
+        return np.zeros(3), np.zeros(3)
+
+    def ContactForces3d_(self, frames=[10,18]) -> tuple[np.ndarray, np.ndarray]:
         """ compute contact forces using jacobian and torques"""
         # set left foot and right foot data apart
         LF_id, RF_id = frames[0], frames[1]

@@ -19,11 +19,13 @@ from Bolt_Filter_Benallegue import BenallegueEstimator
 """
 An estimator for Bolt Bipedal Robot
 
-    This code uses Pinocchio and IMU data to provide an estimate of Bolt's
-    base attitude and center of mass' speed.
+    This code uses Pinocchio, encoders and IMU data to provide an estimate of Bolt's
+    base attitude, base speed and position, and center of mass' speed.
 
     The Estimator Class contains the different filters and sub-estimators 
     needed to merge the relevant data. Its main method is Estimator.Estimate() .
+
+    The estimators called by Estimator are : ContactEstimator and TiltEstimator.
     
     Documentation can be found at  $ $ $  G I T  $ $ $ 
 
@@ -52,6 +54,24 @@ class Estimator():
                 ContactLogging      : bool = True,
                 TiltLogging         : bool = True,
                 ) -> None:
+        """
+        Initialize estimator class.
+        Args :  device              (object)        the odri interface from which Estimator will get sensor's data
+                ModelPath           (string)        if none, will use example-robot-data
+                UrdfPath            (string)
+                Talkative           (boolean)       if True, Estimator will log errors and key information and print them
+                logger              (object)        the logger object to store the logs in
+                AttitudeFilterType  (string)        "complementary"
+                parametersAF        (list of float) parameters of the attitude filter. If complementary, list of one float.
+                SpeedFilterType     (string)        "complementary"
+                parametersSF        (list of float) parameters of the attitude filter. If complementary, list of one float.
+                parametersTI        (list of float) parameters of the tilt estimator, list of three float (alpha1, alpha2, gamma)
+                TimeStep            (float)         dt
+                IterNumber          (int)           the estimated number of times Estimator will run. Used to init log matrixes
+                EstimatorLogging    (boolean)       wether estimator should store data in log matrixes
+                ContactLogging      (boolean)       wether contact estimator should store data in log matrixes
+                TiltLogging         (boolean)       wether tilt estimator should store data in log matrixes
+        """
         
         self.MsgName = "Bolt Estimator v0.6"
 
@@ -60,18 +80,20 @@ class Estimator():
         self.EstimatorLogging = EstimatorLogging
         self.ContactLogging = ContactLogging
         self.TiltLogging = TiltLogging
+        # adding logger
         if logger is not None :
             self.logger = logger
         else:
             self.logger = Log("default " + self.MsgName+ " log")
         self.logger.LogTheLog(" Starting log of" + self.MsgName, ToPrint=False)
         if self.Talkative : self.logger.LogTheLog("Initializing " + self.MsgName + "...", style="title", ToPrint=Talkative)
+        # iteration number
         self.IterNumber = IterNumber
         self.iter = 0
         
         # loading data from file
         if UrdfPath=="" or ModelPath=="":
-            self.logger.LogTheLog("No URDF path or ModelPath added !", style="warn", ToPrint=True)
+            self.logger.LogTheLog("No URDF path or ModelPath addeds", style="warn", ToPrint=True)
             self.robot = example_robot_data.load("bolt")
         else :
             #model, collision_model, visual_model = pin.buildModelsFromUrdf(UrdfPath, ModelPath, pin.JointModelFreeFlyer())
@@ -80,13 +102,19 @@ class Estimator():
 
             self.robot = pin.RobotWrapper.BuildFromURDF(UrdfPath, ModelPath)
             self.logger.LogTheLog("URDF built", ToPrint=Talkative)
+        # number of frames and movement
         self.nq = self.robot.model.nq
         self.nv = self.robot.model.nv
+        # useful frame indexes
         self.FeetIndexes = [self.robot.model.getFrameId("FL_FOOT"), self.robot.model.getFrameId("FR_FOOT")] # Left, Right
         self.BaseID = 1
 
         # interfacing with masterboard (?)
-        self.device = device
+        if device is not None :
+            self.device = device
+        else :
+            self.logger.LogTheLog("No device added", style="warn", ToPrint=True)
+            self.device=None
 
         # 1 kHz by default
         self.TimeStep = TimeStep
@@ -96,11 +124,12 @@ class Estimator():
         self.InitKinematicData()
         self.InitOutData()
         self.InitContactData()
-        self.InitLogMatrixes()
+        if self.EstimatorLogging : self.InitLogMatrixes()
 
-        # check that sensors can be read 
-        self.ReadSensor()
-        if self.Talkative : self.logger.LogTheLog("Sensors read, initial data acquired", ToPrint=Talkative)
+        # check that sensors can be read
+        if self.device is not None :
+            self.ReadSensor()
+            if self.Talkative : self.logger.LogTheLog("Sensors read, initial data acquired", ToPrint=Talkative)
 
         # update height of CoM value, assuming Bolt is vertical
         pin.forwardKinematics(self.robot.model, self.robot.data, self.q)
@@ -109,7 +138,7 @@ class Estimator():
         self.c_out[2] = np.linalg.norm(c)
         self.c_out[2] += 0.02 # TODO : radius of bolt foot
 
-        self.UpdateLogMatrixes()
+        if self.EstimatorLogging : self.UpdateLogMatrixes()
         self.iter += 1
         if self.Talkative : self.logger.LogTheLog("Initial data stored in logs", ToPrint=Talkative)
         
@@ -189,7 +218,7 @@ class Estimator():
         # initialize data to the right format
         self.a_imu = np.zeros((3,))   
         self.ag_imu = np.array([0, 0, -9.81])            
-        self.w_imu = np.zeros((3,)) #R.from_euler('xyz', np.zeros(3))
+        self.w_imu = np.zeros((3,)) 
         self.theta_imu = R.from_euler('xyz', np.zeros(3))
         # angles ? quaternion ?
         self.DeltaTheta = R.from_euler('xyz', np.zeros(3))
@@ -206,7 +235,7 @@ class Estimator():
         self.a_out = np.zeros((3,)) 
         #self.theta_out = R.from_euler('xyz', np.zeros(3))
         self.theta_out = np.zeros((3,))
-        self.w_out = np.zeros((3,)) #R.from_euler('xyz', np.zeros(3))
+        self.w_out = np.zeros((3,)) 
         self.g_out = np.array([0, 0, -1])
 
         self.c_out = np.zeros((3,))
@@ -272,37 +301,39 @@ class Estimator():
         return None
 
     def UpdateLogMatrixes(self) -> None :
+        LogIter = self.iter
         if self.iter >= self.IterNumber:
             # Logs matrices' size will not be sufficient
             if self.Talkative : self.logger.LogTheLog("Excedind planned number of executions, IterNumber = " + str(self.IterNumber), style="warn", ToPrint=self.Talkative)
+            LogIter = self.IterNumber-1
 
         # update logs with latest data
         # base velocitie & co, post-filtering logs
-        self.log_v_out[:, self.iter] = self.v_out[:]
-        self.log_w_out[:, self.iter] = self.w_out[:]#self.w_out.as_quat()[:]
-        self.log_a_out[:, self.iter] = self.a_out[:]
-        self.log_theta_out[:, self.iter] = self.theta_out#.as_quat()[:]
-        self.log_g_out[:, self.iter] = self.g_out[:]
+        self.log_v_out[:, LogIter] = self.v_out[:]
+        self.log_w_out[:, LogIter] = self.w_out[:]#self.w_out.as_quat()[:]
+        self.log_a_out[:, LogIter] = self.a_out[:]
+        self.log_theta_out[:, LogIter] = self.theta_out#.as_quat()[:]
+        self.log_g_out[:, LogIter] = self.g_out[:]
         # imu data log
-        self.log_v_imu[:, self.iter] = self.v_imu[:]
-        self.log_w_imu[:, self.iter] = self.w_imu[:]#self.w_imu.as_quat()[:]
-        self.log_a_imu[:, self.iter] = self.a_imu[:]
-        self.log_theta_imu[:, self.iter] = self.theta_imu.as_quat()[:]
+        self.log_v_imu[:, LogIter] = self.v_imu[:]
+        self.log_w_imu[:, LogIter] = self.w_imu[:]#self.w_imu.as_quat()[:]
+        self.log_a_imu[:, LogIter] = self.a_imu[:]
+        self.log_theta_imu[:, LogIter] = self.theta_imu.as_quat()[:]
         # forward kinematics data log
-        self.log_v_kin[:, self.iter] = self.v_kin[:]
-        self.log_z_kin[:, self.iter] = self.z_kin[:]
-        self.log_q[:, self.iter] = self.q[:]
-        self.log_qdot[:, self.iter] = self.qdot[:]
-        self.log_theta_kin[:, self.iter] = self.theta_kin[:] #.as_quat()[:]
-        self.log_w_kin[:, self.iter] = self.w_kin[:]
+        self.log_v_kin[:, LogIter] = self.v_kin[:]
+        self.log_z_kin[:, LogIter] = self.z_kin[:]
+        self.log_q[:, LogIter] = self.q[:]
+        self.log_qdot[:, LogIter] = self.qdot[:]
+        self.log_theta_kin[:, LogIter] = self.theta_kin[:] #.as_quat()[:]
+        self.log_w_kin[:, LogIter] = self.w_kin[:]
         # tilt log 
-        self.log_v_tilt[:, self.iter] = self.v_tilt[:]
-        self.log_g_tilt[:, self.iter] = self.g_tilt[:]
+        self.log_v_tilt[:, LogIter] = self.v_tilt[:]
+        self.log_g_tilt[:, LogIter] = self.g_tilt[:]
         # other
-        self.log_c_out[:, self.iter] = self.c_out[:]
-        self.log_cdot_out[:, self.iter] = self.cdot_out[:]
-        self.log_contactforces[:3, self.iter] = self.FLContact[:]
-        self.log_contactforces[3:, self.iter] = self.FRContact[:]
+        self.log_c_out[:, LogIter] = self.c_out[:]
+        self.log_cdot_out[:, LogIter] = self.cdot_out[:]
+        self.log_contactforces[:3, LogIter] = self.FLContact[:]
+        self.log_contactforces[3:, LogIter] = self.FRContact[:]
         return None
 
 
@@ -315,7 +346,7 @@ class Estimator():
         elif data=="rotation_speed" or data=="w" or data=="omega":
             return self.w_out
         elif data=="attitude" or data=="theta":
-            return self.theta_out
+            return R.from_euler('xyz', self.theta_out).as_quat()
         elif data=="com_position" or data=="c":
             return self.c_out
         elif data=="com_speed" or data=="cdot":
@@ -403,13 +434,36 @@ class Estimator():
         # Kinematic data from encoders
         self.q[:] = self.device.q_mes[:]
         self.qdot[:] = self.device.v_mes[:]
-        # data from forward kinematics
-        self.v_kin[:] = np.zeros(3)[:]
-        self.z_kin[:] = np.zeros(1)[:]
         # torques from motors
         self.tau[:] = self.device.tau_mes[:]
 
         #self.ExternalDataCaster("acceleration", self.a)
+
+
+        return None
+    
+    def ReadExternalSensor(self, 
+                            baseLinearAcceleration,
+                            baseLinearAccelerationGravity,
+                            baseAngularVelocity,
+
+                            q_mes,
+                            v_mes,
+                            tau_mes) -> None:
+                            # acc with g is absolutely needed
+        # rotation are updated supposing the value returned by device is xyz euler angles, in radians
+        # base acceleration, acceleration with gravity and rotation speed from IMU
+        self.a_imu[:] = baseLinearAcceleration[:]# COPIED FROM SOLO CODE, CHECK CONSISTENCY WITH BOLT MASTERBOARD
+        self.ag_imu[:] = baseLinearAccelerationGravity[:] # uncertain
+        self.w_imu[:] = baseAngularVelocity[:]
+        # integrated data from IMU
+
+        # Kinematic data from encoders
+        self.q[:] = q_mes[:]
+        self.qdot[:] = v_mes[:]
+        # torques from motors
+        self.tau[:] = tau_mes[:]
+
 
         return None
     
@@ -571,8 +625,11 @@ class Estimator():
             self.w_kin = np.array(FrameRotSpeed)
         else :
             # no foot touching the ground, keeping old speed data
-            v_avg = np.mean(self.log_v_kin[:, max(0, self.iter-10):self.iter-1], axis=1)
-            w_avg = np.mean(self.log_w_kin[:, max(0, self.iter-10):self.iter-1], axis=1)
+            if self.EstimatorLogging : 
+                v_avg = np.mean(self.log_v_kin[:, max(0, self.iter-10):self.iter-1], axis=1)
+                w_avg = np.mean(self.log_w_kin[:, max(0, self.iter-10):self.iter-1], axis=1)
+            else :
+                v_avg, w_avg = self.v_kin, self.w_kin
             self.w_kin = w_avg
             self.v_kin = v_avg
         
@@ -583,6 +640,9 @@ class Estimator():
 
 
     def SpeedFusion(self, mitigate=[0.1, 0.2, 0.7]) -> None:
+        """
+        
+        """
         # uses Kinematic-derived speed estimate and IMU to estimate speed
         self.KinematicSpeed()
 
@@ -591,6 +651,7 @@ class Estimator():
             ContactFootID = self.FeetIndexes[0]
         else :
             ContactFootID = self.FeetIndexes[1]
+        # run tilt estimator
         self.v_tilt, self.g_tilt = self.TiltandSpeedEstimator.Estimate(Q=self.q,
                                             Qd=self.qdot,
                                             BaseID=1,
@@ -599,8 +660,10 @@ class Estimator():
                                             yg=self.w_imu, 
                                             dt=self.TimeStep)
 
-        v_out = mitigate[0]*self.v_imu + mitigate[1]*self.v_kin + mitigate[2]*self.v_tilt
-        self.v_out  = self.SpeedFilter.RunFilter(v_out, self.a_imu)
+        v_out = self.v_tilt
+        # filter speed with data from imu
+
+        self.v_out  = np.reshape(self.v_tilt, (1, 3)) #self.SpeedFilter.RunFilter(v_out, self.a_imu)
         if np.linalg.norm(self.ag_imu - self.a_imu)<9:
             if self.Talkative : self.logger.LogTheLog(f"anormal gravity input : {self.ag_imu - self.a_imu} on iter {self.iter}", "warn")
 
@@ -612,7 +675,7 @@ class Estimator():
         """
         From estimated g in base frame, get the euler angles between world frame and base frame
         """
-        g = g0[:]#*np.array([9.81, 1, -9.81])
+        g = g0[:]
         g = g/np.linalg.norm(g)
         gworld = np.array([0, 0, 1])
 
@@ -629,6 +692,21 @@ class Estimator():
 
         return euler
     
+    def TiltfromG_(self, g0) -> np.ndarray :
+        """
+        From estimated g in base frame, get the euler angles between world frame and base frame
+        """
+        g = g0[:]
+        g = g/np.linalg.norm(g)
+        gworld = np.array([0, 0, 1])
+        
+        # compute the quaternion to pass from gworld to g0
+        gg0 = utils.cross(g0, gworld)
+        q0 = np.array( [np.linalg.norm(g0) * np.linalg.norm(gworld) + utils.scalar(g0, gworld)] )
+        q = R.from_quat( np.concatenate((gg0, q0), axis=0) )
+        
+        return q.as_euler('xyz')
+    
     
     def Estimate(self, dt=None):
         """ this is the main function"""
@@ -636,14 +714,18 @@ class Estimator():
             self.TimeStep = dt
         
         # update all variables with latest available measurements
-        self.ReadSensor()
+        if self.device is not None :
+            self.ReadSensor()
+        
         # run contact estimator
         self.UpdateContactInformation()
         # estimate speed
         self.SpeedFusion(mitigate=[0., 0., 1.])
         
         # integrate speed to get position
-        self.c_out += self.v_out[0, :]*self.TimeStep
+        if self.v_out.shape == (3,):
+            self.v_out.shape = (1, 3)
+        self.c_out += self.v_out[0, :]*self.TimeStep # TODO bizarre les dimensions
 
         # derive data & runs filter
 
@@ -654,8 +736,10 @@ class Estimator():
         rotmat = R.from_euler("xyz", self.theta_out.copy()).as_matrix()
         self.g_out = rotmat @ np.array([0, 0, -1])
 
+        self.a_out = self.a_imu
+
         # update all logs & past variables
-        self.UpdateLogMatrixes()
+        if self.EstimatorLogging : self.UpdateLogMatrixes()
         # count iteration
         if self.iter==1 :
             self.logger.LogTheLog("executed Estimator for the first time", "subinfo")

@@ -86,18 +86,23 @@ class TiltEstimator():
     
     def UpdateLogs(self) -> None:
         """ update log matrixes"""
+        LogIter = self.iter
+        if self.iter >= self.Niter:
+            # Logs matrices' size will not be sufficient
+            LogIter = self.Niter-1
+            
         # state variables
-        self.x1_hat_logs[self.iter, :] = self.x1_hat[:]
-        self.x2_hat_logs[self.iter, :] = self.x2_hat[:]
-        self.x2_prime_logs[self.iter, :] = self.x2_prime[:]
+        self.x1_hat_logs[LogIter, :] = self.x1_hat[:]
+        self.x2_hat_logs[LogIter, :] = self.x2_hat[:]
+        self.x2_prime_logs[LogIter, :] = self.x2_prime[:]
         
         # errors
-        self.x1_tilde_logs[self.iter, :] = self.x1_tilde[:]
-        self.x2_tilde_logs[self.iter, :] = self.x2_tilde[:]
-        self.x2_tildeprime_logs[self.iter, :] = self.x2_tildeprime[:]
+        self.x1_tilde_logs[LogIter, :] = self.x1_tilde[:]
+        self.x2_tilde_logs[LogIter, :] = self.x2_tilde[:]
+        self.x2_tildeprime_logs[LogIter, :] = self.x2_tildeprime[:]
 
         # derivatives
-        self.x2_hat_dot_logs[self.iter, :] = self.x2_hat_dot[:]
+        self.x2_hat_dot_logs[LogIter, :] = self.x2_hat_dot[:]
 
         return None
     
@@ -169,7 +174,13 @@ class TiltEstimator():
         self.x2_tildeprime += x2_tildeprime_dot * dt
         
         return None
-
+    
+    def CheckDim(self, x, a, b):
+        if a==0:
+            dim = (b,)
+        else :
+            dim = (a, b)
+        return x.shape == dim
     
     
     def Estimate(self, 
@@ -191,8 +202,10 @@ class TiltEstimator():
         self.Qd = Qd.copy()
         self.PinocchioUpdate(BaseID, ContactFootID, dt)
         self.yv = self.GetYV_v1()
-    
-        
+        # check dimensions
+        if not self.CheckDim(ya, 0, 3) : print("non pour ya")
+        if not self.CheckDim(yg, 0, 3) : print("non pour yg")
+        if not self.CheckDim(self.x1_hat, 0, 3) : print("non pour x1_hat")
           
         # state variables derivatives update
         self.x1_hat_dot = - self.S(yg) @ self.x1_hat - self.g0*self.x2_prime + ya + self.alpha1*( self.yv - self.x1_hat)

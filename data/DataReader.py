@@ -39,6 +39,33 @@ class DataReader():
     
     def Printer(self, file, Z):
         self.logger.LogTheLog(file[-25:] + '  of shape  '+str(Z.shape), "subinfo")
+    
+    def LoadAndPlotLog(self, file, ndim, title, toprint=False):
+        #prefix = "/home/nalbrecht/Bolt-Estimator/Bolt-robot---Estimator/data/simu/"
+        prefix = "/home/nalbrecht/Bolt-Estimator/bipedal-control/"
+        filename = prefix + file
+        Y = np.load(filename)
+        self.logger.LogTheLog("loaded file " + filename+ " in " + prefix, "info")
+        self.logger.LogTheLog("data shape : " + str(Y.shape), "info")
+        self.grapher.SetLegend(["logs", "true"], ndim=ndim)
+        if toprint :
+            print(Y)
+        self.grapher.CompareNDdatas([Y], datatype='logs', title=title, StyleAdapter=True)
+    
+    def LoadAndPlotDualLogs(self, file1, file2, ndim, title, toprint=False):
+        #prefix = "/home/nalbrecht/Bolt-Estimator/Bolt-robot---Estimator/data/simu/"
+        prefix = "/home/nalbrecht/Bolt-Estimator/bipedal-control/"
+        filename1 = prefix + file1
+        filename2 = prefix + file2
+        Y = np.load(filename1)
+        Z = np.load(filename2)
+        self.logger.LogTheLog("2 loaded files " + filename1 + " in " + prefix, "info")
+        self.logger.LogTheLog("data shapes : " + str(Y.shape) + " and " + str(Z.shape), "info")
+        self.grapher.SetLegend(["logs"], ndim=ndim)
+        if toprint :
+            print(Y)
+        self.grapher.CompareNDdatas([Y, Z.T], datatype='logs', title=title, StyleAdapter=True)
+        
         
 
     def Load(self,   t_file=None, q_file=None, qd_file=None, x_file=None, theta_file=None, theta_euler_file=None, 
@@ -276,7 +303,7 @@ class DataReader():
     def PlotTrajectory(self, frameID=1, frameName="base"):
         self.grapher.SetLegend(["position of bolt's " + frameName], ndim=3)
         self.grapher.CompareNDdatas([self.X[:, frameID, :].transpose()], datatype='position', title= frameName + ' Position')#' with Right foot contact times highlighted', selectmarker=self.Rcontactindex)
-    
+        
     def PlotSpeed(self, frameID=1, frameName="base"):
         self.grapher.SetLegend(["speed of bolt's " + frameName], ndim=3)
         self.grapher.CompareNDdatas([self.V[:, frameID, :].transpose()], datatype='speed', title=frameName + ' speed')
@@ -368,6 +395,23 @@ class DataReader():
 
     
     
+def logloading():
+    # getting ready
+    logger = Log(PrintOnFlight=True)
+    Reader = DataReader(logger=logger)
+    Reader.LoadAndPlotLog("theta_out.npy", 3, "theta")
+    #Reader.LoadAndPlotLog("c_out.npy", 3, "c")
+    Reader.LoadAndPlotLog("g_out.npy", 3, "g")
+    Reader.LoadAndPlotDualLogs("v_out.npy", "true_speed_logs.npy", 3, "v", True)
+    Reader.LoadAndPlotDualLogs("c_out.npy", "true_pos_logs.npy", 3, "v tilt and v true")
+    Reader.LoadAndPlotDualLogs("theta_out.npy", "true_theta_logs.npy", 3, "theta")
+    Reader.LoadAndPlotLog("a.npy", 3, "a")
+    #Reader.LoadAndPlotLog("q.npy", 6, "q")
+    #Reader.LoadAndPlotLog("qdot.npy", 6, "qdot")
+    Reader.LoadAndPlotLog("Contact.npy", 2, "contact")
+    Reader.EndPlot()
+
+
 
 
 
@@ -426,5 +470,5 @@ def main(k=1, dt=1e-3):
     
     
 if __name__ == "__main__":
-    ZZ = main()
-    #A = Q[:, 3, :, :]
+    #main()
+    logloading()
