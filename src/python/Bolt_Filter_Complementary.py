@@ -48,26 +48,26 @@ class ComplementaryFilter():
         #if self.k < 5 : self.logger.LogTheLog("Running Filter " + self.name + " (on run " + str(self.k) + " out of 4 prints)")
         return self.Estimate
     
-
-    # standard filter with offset compensation
-    def RunFilterOffset_deprecated(self, x, xdot) -> np.ndarray:
-        # complementary filter x and its temporal derivative xdot. Updates previous estimates and returns current estimate.
+    
+    def RunFilterQuaternion(self, q, w) -> np.ndarray:
+        # complementary filter for q [scalar-last format] and angular speed w
         # check data
-        if not isinstance(x, np.ndarray) or not isinstance(xdot, np.ndarray) and (x.size!=self.ndim or xdot.size!=self.ndim):  self.logger.LogTheLog("giving unadapted argument to filter " + self.name + " : expected np.array of dim " + str(self.ndim), style="warn")
+        if (not isinstance(q, np.ndarray)) or (not isinstance(w, np.ndarray)) or (q.size!=4 or w.size!=3):  
+            if self.Talkative : self.logger.LogTheLog(f"giving unadapted argument to filter {self.name} : expected np.array of dim 4 and 3" , style="warn")           
         if self.k==0:
             # filter runs for the first time
-            self.Estimate = x
-        
-        self.Estimate = self.b*self.Estimate + self.T*self.b*xdot + (1-self.b)*x
-        # prepare offset correction
-        self.ErrorHistory[self.k%self.MemorySize, :] = x-self.Estimate
-        self.Offset = np.mean(self.ErrorHistory, axis=0)
-        #self.Offset = np.true_divide(self.ErrorHistory.sum(axis=0), np.count_nonzero(self.ErrorHistory, axis=0)) * self.OffsetGain
-        # offset correction
-        self.Estimate += self.Offset  * self.OffsetGain
+            self.Estimate = q
+        # quaternion derivative
+        wx, wy, wz = w
+        qdot = 0.5 * np.array([wx*q[3] + wz*q[1] - wy*q[2],
+                               wy*q[3] - wz*q[0] + wx*q[2],
+                               wz*q[3] + wy*q[0] - wx*q[1],
+                              -wx*q[0] - wy*q[1] - wz*q[2]])
+        self.Estimate = self.b*self.Estimate + self.T*self.b*qdot + (1-self.b)*q
         self.k += 1
         #if self.k < 5 : self.logger.LogTheLog("Running Filter " + self.name + " (on run " + str(self.k) + " out of 4 prints)")
         return self.Estimate
+
     
     # standard filter with non-idiotic offset compensation
     def RunFilterOffset(self, x, xdot) -> np.ndarray:

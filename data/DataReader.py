@@ -47,7 +47,7 @@ class DataReader():
         Y = np.load(filename)
         self.logger.LogTheLog("loaded file " + filename+ " in " + prefix, "info")
         self.logger.LogTheLog("data shape : " + str(Y.shape), "info")
-        self.grapher.SetLegend(["logs", "true"], ndim=ndim)
+        self.grapher.SetLegend(["logs"], ndim=ndim)
         if toprint :
             print(Y)
         self.grapher.CompareNDdatas([Y], datatype='logs', title=title, StyleAdapter=True)
@@ -61,7 +61,7 @@ class DataReader():
         Z = np.load(filename2)
         self.logger.LogTheLog("2 loaded files " + filename1 + " in " + prefix, "info")
         self.logger.LogTheLog("data shapes : " + str(Y.shape) + " and " + str(Z.shape), "info")
-        self.grapher.SetLegend(["logs"], ndim=ndim)
+        self.grapher.SetLegend(["logs", "true"], ndim=ndim)
         if toprint :
             print(Y)
         self.grapher.CompareNDdatas([Y, Z.T], datatype='logs', title=title, StyleAdapter=True)
@@ -395,7 +395,7 @@ class DataReader():
 
     
     
-def logloading():
+def LogLoading():
     # getting ready
     logger = Log(PrintOnFlight=True)
     Reader = DataReader(logger=logger)
@@ -403,7 +403,7 @@ def logloading():
     #Reader.LoadAndPlotLog("c_out.npy", 3, "c")
     Reader.LoadAndPlotLog("g_out.npy", 3, "g")
     Reader.LoadAndPlotDualLogs("v_out.npy", "true_speed_logs.npy", 3, "v", True)
-    Reader.LoadAndPlotDualLogs("c_out.npy", "true_pos_logs.npy", 3, "v tilt and v true")
+    Reader.LoadAndPlotDualLogs("c_out.npy", "true_pos_logs.npy", 3, "pos out and true")
     Reader.LoadAndPlotDualLogs("theta_out.npy", "true_theta_logs.npy", 3, "theta")
     Reader.LoadAndPlotLog("a.npy", 3, "a")
     #Reader.LoadAndPlotLog("q.npy", 6, "q")
@@ -471,4 +471,4 @@ def main(k=1, dt=1e-3):
     
 if __name__ == "__main__":
     #main()
-    logloading()
+    LogLoading()

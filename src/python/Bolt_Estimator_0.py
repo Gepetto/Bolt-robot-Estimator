@@ -31,6 +31,15 @@ An estimator for Bolt Bipedal Robot
 
 License, authors, LAAS
 
+
+NOTA BENE :
+    * quaternions are in scalar-last format [xyz w]
+    * logs and print cas be de-activated
+    * complementary filters have 1/dt as first parameters automatically
+    * g_*** are estimation of gravity in robot frame, normalized to 1 
+    * euler angles are in [xyz] format # TODO : add as parameter
+    
+
 """
 
 
@@ -46,8 +55,8 @@ class Estimator():
                 AttitudeFilterType  : str = "complementary",
                 parametersAF        : list = [2],
                 SpeedFilterType     : str = "complementary",
-                parametersSF        : list = [2],
-                parametersTI        : list = [1, 1, 1],
+                parametersSF        : list = [1.1],
+                parametersTI        : list = [10, 60, 2],
                 TimeStep            : float = 0.01,
                 IterNumber          : int = 1000,
                 EstimatorLogging    : bool = True,
@@ -67,13 +76,13 @@ class Estimator():
                 parametersSF        (list of float) parameters of the attitude filter. If complementary, list of one float.
                 parametersTI        (list of float) parameters of the tilt estimator, list of three float (alpha1, alpha2, gamma)
                 TimeStep            (float)         dt
-                IterNumber          (int)           the estimated number of times Estimator will run. Used to init log matrixes
-                EstimatorLogging    (boolean)       wether estimator should store data in log matrixes
-                ContactLogging      (boolean)       wether contact estimator should store data in log matrixes
-                TiltLogging         (boolean)       wether tilt estimator should store data in log matrixes
+                IterNumber          (int)           the estimated number of times Estimator will run. Logs will only include the n=IterNumber first data 
+                EstimatorLogging    (boolean)       whether estimator should store data in log matrixes
+                ContactLogging      (boolean)       whether contact estimator should store data in log matrixes
+                TiltLogging         (boolean)       whether tilt estimator should store data in log matrixes
         """
         
-        self.MsgName = "Bolt Estimator v0.6"
+        self.MsgName = "Bolt Estimator v0.8"
 
         # logging options 
         self.Talkative=Talkative
@@ -219,7 +228,7 @@ class Estimator():
         self.a_imu = np.zeros((3,))   
         self.ag_imu = np.array([0, 0, -9.81])            
         self.w_imu = np.zeros((3,)) 
-        self.theta_imu = R.from_euler('xyz', np.zeros(3))
+        self.theta_imu = np.array([0, 0, 0, 1])#R.from_euler('xyz', np.zeros(3))
         # angles ? quaternion ?
         self.DeltaTheta = R.from_euler('xyz', np.zeros(3))
         self.DeltaV = np.zeros((3,))
@@ -234,7 +243,7 @@ class Estimator():
         self.v_out = np.zeros((3,)) 
         self.a_out = np.zeros((3,)) 
         #self.theta_out = R.from_euler('xyz', np.zeros(3))
-        self.theta_out = np.zeros((3,))
+        self.theta_out = np.array([0, 0, 0, 1])
         self.w_out = np.zeros((3,)) 
         self.g_out = np.array([0, 0, -1])
 
@@ -253,11 +262,11 @@ class Estimator():
         self.tau = np.zeros((6, ))
         # attitude from Kin
         self.w_kin = np.zeros((3,))
-        self.theta_kin = np.zeros(3)#R.from_euler('xyz', np.zeros(3))
+        self.theta_kin = np.array([0, 0, 0, 1])
         # tilt
-        self.v_tilt = np.zeros(3)
+        self.v_tilt = np.zeros((3,))
         self.g_tilt = np.array([0, 0, -1])
-        self.theta_tilt = np.zeros(3)
+        self.theta_tilt = np.array([0, 0, 0, 1])
         return None
 
     def InitContactData(self) -> None:
@@ -273,7 +282,7 @@ class Estimator():
         self.log_v_out = np.zeros([3, self.IterNumber])
         self.log_w_out = np.zeros([3, self.IterNumber])
         self.log_a_out = np.zeros([3, self.IterNumber])
-        self.log_theta_out = np.zeros([3, self.IterNumber])
+        self.log_theta_out = np.zeros([4, self.IterNumber])
         self.log_g_out = np.zeros([3, self.IterNumber])
         # imu data log
         self.log_v_imu = np.zeros([3, self.IterNumber])
@@ -285,13 +294,13 @@ class Estimator():
         self.log_z_kin = np.zeros([1, self.IterNumber])
         self.log_q = np.zeros([self.nq, self.IterNumber])
         self.log_qdot = np.zeros([self.nv, self.IterNumber])
-        self.log_theta_kin = np.zeros([3, self.IterNumber])
+        self.log_theta_kin = np.zeros([4, self.IterNumber])
         self.log_w_kin = np.zeros([3, self.IterNumber])
         
         # tilt log 
         self.log_v_tilt = np.zeros([3, self.IterNumber])
         self.log_g_tilt = np.zeros([3, self.IterNumber])
-        self.log_theta_tilt = np.zeros([3, self.IterNumber])
+        self.log_theta_tilt = np.zeros([4, self.IterNumber])
         
         # other logs
         self.log_c_out = np.zeros([3, self.IterNumber])
@@ -312,13 +321,13 @@ class Estimator():
         self.log_v_out[:, LogIter] = self.v_out[:]
         self.log_w_out[:, LogIter] = self.w_out[:]#self.w_out.as_quat()[:]
         self.log_a_out[:, LogIter] = self.a_out[:]
-        self.log_theta_out[:, LogIter] = self.theta_out#.as_quat()[:]
+        self.log_theta_out[:, LogIter] = self.theta_out[:]#.as_quat()[:]
         self.log_g_out[:, LogIter] = self.g_out[:]
         # imu data log
         self.log_v_imu[:, LogIter] = self.v_imu[:]
         self.log_w_imu[:, LogIter] = self.w_imu[:]#self.w_imu.as_quat()[:]
         self.log_a_imu[:, LogIter] = self.a_imu[:]
-        self.log_theta_imu[:, LogIter] = self.theta_imu.as_quat()[:]
+        self.log_theta_imu[:, LogIter] = self.theta_imu[:]#.as_quat()[:]
         # forward kinematics data log
         self.log_v_kin[:, LogIter] = self.v_kin[:]
         self.log_z_kin[:, LogIter] = self.z_kin[:]
@@ -329,6 +338,7 @@ class Estimator():
         # tilt log 
         self.log_v_tilt[:, LogIter] = self.v_tilt[:]
         self.log_g_tilt[:, LogIter] = self.g_tilt[:]
+        self.log_theta_tilt[:, LogIter] = self.theta_tilt[:]
         # other
         self.log_c_out[:, LogIter] = self.c_out[:]
         self.log_cdot_out[:, LogIter] = self.cdot_out[:]
@@ -346,7 +356,9 @@ class Estimator():
         elif data=="rotation_speed" or data=="w" or data=="omega":
             return self.w_out
         elif data=="attitude" or data=="theta":
-            return R.from_euler('xyz', self.theta_out).as_quat()
+            return self.theta_out
+        elif data=="attitude_euler" or data=="theta_euler":
+            return R.from_quat(self.theta_out.T).as_euler("xyz")
         elif data=="com_position" or data=="c":
             return self.c_out
         elif data=="com_speed" or data=="cdot":
@@ -374,6 +386,8 @@ class Estimator():
             return self.log_w_out
         elif data=="attitude_logs" or data=="theta_logs":
             return self.log_theta_out
+        elif data=="attitude_logs_euler" or data=="theta_logs_euler":
+            return R.from_quat(self.log_theta_out.T).as_euler("xyz").T
         elif data=="com_position_logs" or data=="c_logs":
             return self.log_c_out
         elif data=="com_speed_logs" or data=="cdot_logs":
@@ -395,6 +409,8 @@ class Estimator():
             return self.log_v_tilt
         elif data=="theta_tilt_logs":
             return self.log_theta_tilt
+        elif data=="theta_tilt_logs_euler":
+            return R.from_quat(self.log_theta_tilt.T).as_euler("xyz").T
         
         # IMU logs data getter
         elif data=="acceleration_logs_imu" or data=="a_logs_imu":
@@ -403,6 +419,8 @@ class Estimator():
             return self.log_w_imu
         elif data=="theta_logs_imu" or data=="attitude_logs_imu":
             return self.log_theta_imu
+        elif data=="theta_logs_imu_euler" or data=="attitude_logs_imu_euler":
+            return R.from_quat(self.log_theta_imu.T).as_euler("xyz")
         elif data=="base_speed_logs_imu" or data=="v_logs_imu":
             return self.log_v_imu
         # kin logs data getter
@@ -410,6 +428,8 @@ class Estimator():
             return self.log_w_kin
         elif data=="theta_logs_kin" or data=="attitude_logs_kin":
             return self.log_theta_kin
+        elif data=="theta_logs_kin_euler" or data=="attitude_logs_kin_euler":
+            return R.from_quat(self.log_theta_kin.T).as_euler("xyz").T
         elif data=="base_speed_logs_kin" or data=="v_logs_kin":
             return self.log_v_kin
         elif data=="v_out_logs" or data=="base_speed_logs_out":
@@ -446,7 +466,6 @@ class Estimator():
                             baseLinearAcceleration,
                             baseLinearAccelerationGravity,
                             baseAngularVelocity,
-
                             q_mes,
                             v_mes,
                             tau_mes) -> None:
@@ -545,9 +564,9 @@ class Estimator():
         # compute the quaternion to pass from g0 to g
         gg0 = utils.cross(g, g0)
         q0 = np.array( [np.linalg.norm(g) * np.linalg.norm(g0) + utils.scalar(g, g0)] )
-        q = R.from_quat( np.concatenate((gg0, q0), axis=0) )
-        self.theta_imu = q
-        return self.theta_imu.as_euler('xyz')
+        #q = R.from_quat( np.concatenate((gg0, q0), axis=0) )
+        self.theta_imu = np.concatenate((gg0, q0), axis=0)
+        return self.theta_imu #.as_euler('xyz')
 
     
     def GyroAttitude(self) -> np.ndarray:
@@ -556,21 +575,6 @@ class Estimator():
         return self.DeltaTheta.as_euler('xyz')
 
     
-    # TODO : mod 
-    def AttitudeFusion(self, alpha=1) -> None :
-        # uses AttitudeFusion_AG and AttitudeFusion_KG to provide attitude estimate
-        
-        # uses attitude from direction of gravity estimate and gyro data to provide attitude estimate
-        AttitudeFromIMU = self.IMUAttitude()
-        self.theta_out = R.from_euler('xyz', self.AttitudeFilter.RunFilter(AttitudeFromIMU, self.w_imu.copy()))
-            
-        # uses attitude Kinematic estimate and gyro data to provide attitude estimate
-        #AttitudeFromKin = self.KinematicAttitude()
-        self.theta_out_kg = self.theta_out_ag#R.from_euler('xyz', self.AttitudeFilter.RunFilter(AttitudeFromKin, self.w_imu))
-        
-        # average both
-        self.theta_out = R.from_euler('xyz', alpha*self.theta_out_ag.as_euler('xyz') + (1-alpha)*self.theta_out_kg.as_euler('xyz'))
-        return None
 
 
     def IMUSpeed(self) -> np.ndarray:
@@ -671,7 +675,7 @@ class Estimator():
     
 
 
-    def TiltfromG(self, g0) -> np.ndarray:
+    def TiltfromG_(self, g0) -> np.ndarray:
         """
         From estimated g in base frame, get the euler angles between world frame and base frame
         """
@@ -681,7 +685,7 @@ class Estimator():
 
         v = np.cross(gworld, g)
         s = np.linalg.norm(v)
-        c = utils.scalar(gworld, g0)
+        c = utils.scalar(gworld, g)
         if c != -1 :
             RotM = np.eye(3) + utils.S(v) + utils.S(v**2)*(1/(1+c))
         else :
@@ -692,20 +696,42 @@ class Estimator():
 
         return euler
     
-    def TiltfromG_(self, g0) -> np.ndarray :
+    def TiltfromG(self, g0) -> np.ndarray :
         """
-        From estimated g in base frame, get the euler angles between world frame and base frame
+        From estimated g in base frame, get the quaternion between world frame and base frame
         """
         g = g0[:]
         g = g/np.linalg.norm(g)
-        gworld = np.array([0, 0, 1])
+        gworld = np.array([0, 0, -1])
         
         # compute the quaternion to pass from gworld to g0
-        gg0 = utils.cross(g0, gworld)
-        q0 = np.array( [np.linalg.norm(g0) * np.linalg.norm(gworld) + utils.scalar(g0, gworld)] )
-        q = R.from_quat( np.concatenate((gg0, q0), axis=0) )
+        gg0 = utils.cross(g, gworld)
+        q0 = np.array( [np.linalg.norm(g) * np.linalg.norm(gworld) + utils.scalar(g, gworld)] )
         
-        return q.as_euler('xyz')
+        if q0==0 or np.linalg.norm(gg0) == 0:
+            print("norme nulle à iter " + str(self.iter))
+            print(g)
+            print(gg0)
+            print(gworld)
+            print(q0)
+        q = np.concatenate((gg0, q0), axis=0)        
+        return q / np.linalg.norm(q)
+
+        
+    
+    def CheckQuat(self, q, name=""):
+        """
+        Check if a quat is not of norm 1
+
+        """
+        if np.sum(q) == 0:
+            self.logger.LogTheLog(f"Norm of quaternion {name} is NULL : {q} on iter {self.iter}", "warn")
+            return False
+        if np.linalg.norm(q)< 0.99 or  np.linalg.norm(q)> 1.01:
+            self.logger.LogTheLog(f"Norm of quaternion {name} is NOT ONE : {q} on iter {self.iter}", "warn")
+            return False
+        return True
+        
     
     
     def Estimate(self, dt=None):
@@ -730,23 +756,45 @@ class Estimator():
         # derive data & runs filter
 
         #self.theta_kin = self.KinematicAttitude()
-
         self.theta_tilt = self.TiltfromG(self.g_tilt)
-        self.theta_out = self.AttitudeFilter.RunFilter(self.theta_tilt.copy(), self.w_imu.copy())
-        rotmat = R.from_euler("xyz", self.theta_out.copy()).as_matrix()
-        self.g_out = rotmat @ np.array([0, 0, -1])
+        #theta_tilt = R.from_quat(self.theta_tilt).as_euler("xyz")
+        self.theta_out = self.AttitudeFilter.RunFilterQuaternion(self.theta_tilt.copy(), self.w_imu.copy())
+        self.g_out = R.from_quat(self.theta_out).apply(np.array([0, 0, -1]))
 
         self.a_out = self.a_imu
+        
+        
+        self.CheckQuat(self.theta_out, "theta_out")
+        self.CheckQuat(self.theta_tilt, "theta_tilt")
 
         # update all logs & past variables
         if self.EstimatorLogging : self.UpdateLogMatrixes()
         # count iteration
+        if self.iter % 50 == 0 :
+            print(str(self.iter))
         if self.iter==1 :
             self.logger.LogTheLog("executed Estimator for the first time", "subinfo")
         self.iter += 1
         
 
         return None
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

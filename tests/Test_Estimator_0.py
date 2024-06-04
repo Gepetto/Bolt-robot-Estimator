@@ -34,10 +34,10 @@ def TiltfromG(g0) -> np.ndarray:
     return euler
 
 def main():
-    N  = 1500 - 1
+    N  = 500 - 1
     dt = 1e-3
     T  = N*dt
-    kf = 3
+    kf = 1
 
     # create objects
     testlogger = Log("test", PrintOnFlight=True)
@@ -107,19 +107,21 @@ def main():
     
     # get logs from estimator
         # rotations
-    theta_estimator = estimator.Get("theta_logs")
+    theta_estimator = estimator.Get("theta_logs_euler")
     theta_imu = estimator.Get("theta_logs_imu")
         # tilt data
     g_tilt = estimator.Get("g_tilt_logs")
     v_tilt = estimator.Get("v_tilt_logs")
-    theta_tilt = estimator.Get("v_tilt_logs")
+    theta_tilt = estimator.Get("theta_tilt_logs_euler")
     v_kin = estimator.Get("v_logs_kin")
         # out data
     v_out = estimator.Get("v_out_logs")
     c_out = estimator.Get("c_logs")
-    theta_out = estimator.Get("theta_logs")
+    theta_out = estimator.Get("theta_logs_euler")
     g_out = estimator.Get("g_out_logs")
-
+        # quat
+    quat_out = estimator.Get("theta_logs")
+    quat_tilt = estimator.Get("theta_tilt_logs")
 
     g_rebuilt = np.zeros((3, N))
     for j in range(N-1):
@@ -252,23 +254,27 @@ def main():
     """
     grapher.SetLegend(["base pos out", "True base pos"], ndim=3)
     grapher.CompareNDdatas([c_out,  True_x[:N, :].T], datatype='position', title='Estimator output, position', mitigate=[1])
-    """
+    
     grapher.SetLegend(["theta tilt", "theta_true"], ndim=3)
     grapher.CompareNDdatas([theta_tilt, True_Theta[:N, :].T], datatype='orientation', title='Tilt estimator output, attitude', mitigate=[1])
     
-    grapher.SetLegend(["theta tilt", "theta_true", "theta_computed"], ndim=3)
-    grapher.CompareNDdatas([theta_tilt, True_Theta[:N, :].T, Computed_Theta], datatype='orientation', title='Tilt estimator output, attitude', mitigate=[1])
-
+    grapher.SetLegend(["theta tilt", "theta_out", "theta_true"], ndim=3)
+    grapher.CompareNDdatas([theta_tilt, theta_out, True_Theta[:N, :].T], datatype='orientation', title='Tilt estimator output, attitude', mitigate=[2])
+    
+    grapher.SetLegend(["quat tilt", "quat out"], ndim=4)
+    grapher.CompareNDdatas([quat_tilt, quat_out], datatype='quaternion', title='Estimator quaternions', mitigate=[1])
+    
+    """
     grapher.SetLegend(["theta_true", "theta_computed"], ndim=3)
     grapher.CompareNDdatas([True_Theta[:N, :].T, Computed_Theta], datatype='orientation', title='Computed output, attitude', mitigate=[1])
     """
     grapher.SetLegend(["theta out", "theta_true"], ndim=3)
     grapher.CompareNDdatas([theta_out, True_Theta[:N, :].T,], datatype='orientation', title='Estimator output, attitude', mitigate=[1])
-    """
+    
     
     grapher.SetLegend(["g from tilt estimator", "True g",], ndim=3)
-    grapher.CompareNDdatas([-9.81*g_tilt, True_g[:N, :].T], datatype='vertical', title='Tilt estimator output', mitigate=[1])
-    """
+    grapher.CompareNDdatas([9.81*g_tilt, True_g[:N, :].T], datatype='vertical', title='Tilt estimator output', mitigate=[1])
+    
     grapher.SetLegend(["g out", "True g",], ndim=3)
     grapher.CompareNDdatas([9.81*g_out, True_g[:N, :].T], datatype='vertical', title='Estimator output', mitigate=[1])
     """

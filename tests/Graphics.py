@@ -28,8 +28,11 @@ class Graphics:
         
         if autodir :
             direction  = [" - x", " - y", " - z"]
+        if ndim==4 :
+            direction  = [" - x", " - y", " - z", " - w"]
         if not autodir or ndim==1 :
             direction = [""]
+            
 
         for l in legend:
             for dir in direction[:self.ndim]:
