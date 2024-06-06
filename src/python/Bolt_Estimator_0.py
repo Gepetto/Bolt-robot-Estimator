@@ -146,7 +146,8 @@ class Estimator():
         c = np.array((self.robot.data.oMf[self.FeetIndexes[0]].inverse()*self.robot.data.oMf[self.BaseID]).translation).copy()
         self.c_out[2] = np.linalg.norm(c)
         self.c_out[2] += 0.02 # TODO : radius of bolt foot
-
+        self.c_out[2] = 0.34 # TODO stop doing this
+        
         if self.EstimatorLogging : self.UpdateLogMatrixes()
         self.iter += 1
         if self.Talkative : self.logger.LogTheLog("Initial data stored in logs", ToPrint=Talkative)
@@ -664,10 +665,9 @@ class Estimator():
                                             yg=self.w_imu, 
                                             dt=self.TimeStep)
 
-        v_out = self.v_tilt
         # filter speed with data from imu
 
-        self.v_out  = np.reshape(self.v_tilt, (1, 3)) #self.SpeedFilter.RunFilter(v_out, self.a_imu)
+        self.v_out  = np.reshape(self.v_tilt, (1, 3))
         if np.linalg.norm(self.ag_imu - self.a_imu)<9:
             if self.Talkative : self.logger.LogTheLog(f"anormal gravity input : {self.ag_imu - self.a_imu} on iter {self.iter}", "warn")
 
@@ -682,7 +682,6 @@ class Estimator():
         g = g0[:]
         g = g/np.linalg.norm(g)
         gworld = np.array([0, 0, 1])
-
         v = np.cross(gworld, g)
         s = np.linalg.norm(v)
         c = utils.scalar(gworld, g)
@@ -691,53 +690,52 @@ class Estimator():
         else :
             RotM = -np.eye(3) # TODO : check
             if self.Talkative : self.logger.LogTheLog("Could not compute g rot matrix on iter "+self.iter, "warn")
-
         euler = R.from_matrix(RotM).as_euler("xyz")
-
         return euler
+    
+    
     
     def TiltfromG(self, g0) -> np.ndarray :
         """
         From estimated g in base frame, get the quaternion between world frame and base frame
         """
         g = g0[:]
+        if self.Talkative and np.linalg.norm(g0) > 10:
+            self.logger.LogTheLog(f"gravity computed on iter {self.iter} is anormal : {g0}", "warn")
         g = g/np.linalg.norm(g)
         gworld = np.array([0, 0, -1])
         
         # compute the quaternion to pass from gworld to g0
         gg0 = utils.cross(g, gworld)
         q0 = np.array( [np.linalg.norm(g) * np.linalg.norm(gworld) + utils.scalar(g, gworld)] )
-        
-        if q0==0 or np.linalg.norm(gg0) == 0:
-            print("norme nulle à iter " + str(self.iter))
-            print(g)
-            print(gg0)
-            print(gworld)
-            print(q0)
-        q = np.concatenate((gg0, q0), axis=0)        
+
+        q = np.concatenate((gg0, q0), axis=0)
+        if np.linalg.norm(q) == 0 and self.Talkative :
+            self.logger.LogTheLog(f"Null norm quaternion computed for gworld -> grobot at iter {self.iter} with gworld {gworld} and g measured {g0}", "warn")
+            return np.array([0, 0, 0, 1])    
         return q / np.linalg.norm(q)
 
         
     
-    def CheckQuat(self, q, name=""):
+    def CheckQuat(self, q, name="") -> np.ndarray:
         """
         Check if a quat is not of norm 1
 
         """
-        if np.sum(q) == 0:
+        if np.linalg.norm(q) < 1e-6:
             self.logger.LogTheLog(f"Norm of quaternion {name} is NULL : {q} on iter {self.iter}", "warn")
-            return False
+            return np.array([0, 0, 0, 1])
         if np.linalg.norm(q)< 0.99 or  np.linalg.norm(q)> 1.01:
             self.logger.LogTheLog(f"Norm of quaternion {name} is NOT ONE : {q} on iter {self.iter}", "warn")
-            return False
-        return True
+            return q/np.linalg.norm(q)
+        return q
         
     
     
-    def Estimate(self, dt=None):
+    def Estimate(self, TimeStep=None):
         """ this is the main function"""
-        if dt is not None :
-            self.TimeStep = dt
+        if TimeStep is not None :
+            self.TimeStep = TimeStep
         
         # update all variables with latest available measurements
         if self.device is not None :
@@ -757,21 +755,23 @@ class Estimator():
 
         #self.theta_kin = self.KinematicAttitude()
         self.theta_tilt = self.TiltfromG(self.g_tilt)
-        #theta_tilt = R.from_quat(self.theta_tilt).as_euler("xyz")
         self.theta_out = self.AttitudeFilter.RunFilterQuaternion(self.theta_tilt.copy(), self.w_imu.copy())
+        # check that quaternions are not of norm 0
+        self.theta_out  =  self.CheckQuat(self.theta_out, "theta_out")
+        self.theta_tilt =  self.CheckQuat(self.theta_tilt, "theta_tilt")
+
         self.g_out = R.from_quat(self.theta_out).apply(np.array([0, 0, -1]))
 
         self.a_out = self.a_imu
         
         
-        self.CheckQuat(self.theta_out, "theta_out")
-        self.CheckQuat(self.theta_tilt, "theta_tilt")
+        
 
         # update all logs & past variables
         if self.EstimatorLogging : self.UpdateLogMatrixes()
         # count iteration
         if self.iter % 50 == 0 :
-            print(str(self.iter))
+            print(f" iter {self.iter} \t dt {self.TimeStep}")
         if self.iter==1 :
             self.logger.LogTheLog("executed Estimator for the first time", "subinfo")
         self.iter += 1

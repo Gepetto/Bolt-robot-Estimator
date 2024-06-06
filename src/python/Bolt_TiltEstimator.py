@@ -231,6 +231,8 @@ class TiltEstimator():
         #x3 = ya - self.S(yg)@self.x1_hat - self.x1_hat_dot
         x3 = np.array([self.x2_hat[0], self.x2_hat[1], -self.x2_hat[2]])
         
+        # norm x2
+        self.x2_hat /= np.linalg.norm(self.x2_hat)
         # return estimated data
         return self.x1_hat, x3 # TODO : mod
     

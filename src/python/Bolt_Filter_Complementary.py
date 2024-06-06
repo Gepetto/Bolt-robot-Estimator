@@ -57,13 +57,15 @@ class ComplementaryFilter():
         if self.k==0:
             # filter runs for the first time
             self.Estimate = q
-        # quaternion derivative
+        # compute quaternion derivative
         wx, wy, wz = w
         qdot = 0.5 * np.array([wx*q[3] + wz*q[1] - wy*q[2],
                                wy*q[3] - wz*q[0] + wx*q[2],
                                wz*q[3] + wy*q[0] - wx*q[1],
                               -wx*q[0] - wy*q[1] - wz*q[2]])
+        # update estimate
         self.Estimate = self.b*self.Estimate + self.T*self.b*qdot + (1-self.b)*q
+        self.Estimate = self.Estimate / np.linalg.norm(self.Estimate)
         self.k += 1
         #if self.k < 5 : self.logger.LogTheLog("Running Filter " + self.name + " (on run " + str(self.k) + " out of 4 prints)")
         return self.Estimate

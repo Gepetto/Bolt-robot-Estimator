@@ -145,22 +145,22 @@ class DeviceEmulator():
         
         # DATA THAT ESTIMATOR WILL ACCESS
         # base acceleration
-        noise.SetNoise(NoiseLevel=5, DriftingCoeff=0.)
+        noise.SetNoise(NoiseLevel=0, DriftingCoeff=0.)
         self.Acc = noise.makeNoiseAdaptativeAmplitude(self.Acc_true)
         self.AccG = noise.makeNoiseAdaptativeAmplitude(self.AccG_true)
         # base rotation speed
-        noise.SetNoise(NoiseLevel=5, DriftingCoeff=0.)
+        #noise.SetNoise(NoiseLevel=5, DriftingCoeff=0.)
         self.Omega = noise.makeNoise(self.Omega_true)
         # base speed and attitude (IMU has an integrator)
-        noise.SetNoise(NoiseLevel=5, DriftingCoeff=0.)
+        #noise.SetNoise(NoiseLevel=5, DriftingCoeff=0.)
         self.Speed = noise.makeNoiseAdaptativeAmplitude(self.Speed_true)
         self.Theta = noise.makeNoiseAdaptativeAmplitude(self.Theta_true)
         # encoders
-        noise.SetNoise(NoiseLevel=5, DriftingCoeff=0.)
+        #noise.SetNoise(NoiseLevel=5, DriftingCoeff=0.)
         self.Q = noise.makeNoiseAdaptativeAmplitude(self.Q_true)
         self.Qd = noise.makeNoiseAdaptativeAmplitude(self.Qd_true)
         # torques
-        noise.SetNoise(NoiseLevel=5, DriftingCoeff=0.)
+        #noise.SetNoise(NoiseLevel=5, DriftingCoeff=0.)
         self.Tau = noise.makeNoiseAdaptativeAmplitude(self.Tau_true)
         
 
@@ -171,19 +171,21 @@ class DeviceEmulator():
         # iterate over the data as if it were real time, and get it ready to be provided to the estimator
         # estimator calls this method everytime
 
-        self.baseLinearAcceleration = self.Acc[self.iter, :]
-        self.baseLinearAccelerationGravity = self.AccG[self.iter, :]
-        self.baseSpeed = self.Speed[self.iter, :]
-
-        self.baseAngularVelocity = self.Omega[self.iter, :]
-        self.baseOrientation = self.Theta[self.iter, :]
-        self.q_mes = self.Q[self.iter, :]
-        self.v_mes = self.Qd[self.iter, :]
-
-        self.offset_yaw_IMU = np.zeros(3)
-        self.offset_speed_IMU = np.zeros(3)
+        if self.iter%1 == 0:
+            self.baseLinearAcceleration = self.Acc[self.iter, :]
+            self.baseLinearAccelerationGravity = self.AccG[self.iter, :]
+            self.baseSpeed = self.Speed[self.iter, :]
         
-        self.tau_mes = self.Tau[self.iter, :]
+
+            self.baseAngularVelocity = self.Omega[self.iter, :]
+            self.baseOrientation = self.Theta[self.iter, :]
+            self.q_mes = self.Q[self.iter, :]
+            self.v_mes = self.Qd[self.iter, :]
+
+            self.offset_yaw_IMU = np.zeros(3)
+            self.offset_speed_IMU = np.zeros(3)
+        
+            self.tau_mes = self.Tau[self.iter, :]
 
         self.iter += 1
     
