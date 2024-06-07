@@ -38,22 +38,30 @@ class ComplementaryFilter():
     def RunFilter(self, x, xdot) -> np.ndarray:
         # complementary filter x and its temporal derivative xdot. Updates previous estimates and returns current estimate.
         # check data
-        if (not isinstance(x, np.ndarray) or not isinstance(xdot, np.ndarray)) or (x.size!=self.ndim or xdot.size!=self.ndim):  
-            self.logger.LogTheLog(f"giving unadapted argument to filter {self.name} : expected np.array of dim ({self.ndim},), got {x.shape}" , style="warn")           
+        if self.ndim==1 :
+            if  not isinstance(x, float) or not isinstance(xdot, float):
+                self.logger.LogTheLog(f"giving unadapted argument to filter '{self.name}' of dim. 1 : expected float, got {type(x)}" , style="warn")
+        elif (not isinstance(x, np.ndarray) or not isinstance(xdot, np.ndarray)):
+            self.logger.LogTheLog(f"giving unadapted argument to filter '{self.name}' : expected np.array" , style="warn")
+            return None
+        elif (x.shape != (self.ndim, ) or xdot.shape != (self.ndim, ) ):  
+            self.logger.LogTheLog(f"giving unadapted argument to filter '{self.name}' : expected dim. ({self.ndim},), got {x.shape} and {xdot.shape}" , style="warn")           
+            return None
         if self.k==0:
             # filter runs for the first time
             self.Estimate = x
         self.Estimate = self.b*self.Estimate + self.T*self.b*xdot + (1-self.b)*x
         self.k += 1
-        #if self.k < 5 : self.logger.LogTheLog("Running Filter " + self.name + " (on run " + str(self.k) + " out of 4 prints)")
+        # if (self.Estimate.shape != (self.ndim, ) ):  
+        #     self.logger.LogTheLog(f"anormal output shape {self.Estimate.shape}" , style="warn")           
         return self.Estimate
     
     
     def RunFilterQuaternion(self, q, w) -> np.ndarray:
         # complementary filter for q [scalar-last format] and angular speed w
         # check data
-        if (not isinstance(q, np.ndarray)) or (not isinstance(w, np.ndarray)) or (q.size!=4 or w.size!=3):  
-            if self.Talkative : self.logger.LogTheLog(f"giving unadapted argument to filter {self.name} : expected np.array of dim 4 and 3" , style="warn")           
+        if (not isinstance(q, np.ndarray)) or (not isinstance(w, np.ndarray)) or (q.shape!=(4,) or w.shape!=(3,) ):  
+            if self.Talkative : self.logger.LogTheLog(f"giving unadapted argument to filter '{self.name}' : expected np.array of dim 4 and 3" , style="warn")           
         if self.k==0:
             # filter runs for the first time
             self.Estimate = q
@@ -76,7 +84,12 @@ class ComplementaryFilter():
         # better averaging technique
         # complementary filter x and its temporal derivative xdot. Updates previous estimates and returns current estimate.
         # check data
-        if not isinstance(x, np.ndarray) or not isinstance(xdot, np.ndarray) and (x.size!=self.ndim or xdot.size!=self.ndim):  self.logger.LogTheLog("giving unadapted argument to filter " + self.name + " : expected np.array of dim " + str(self.ndim), style="warn")
+        if (not isinstance(x, np.ndarray) or not isinstance(xdot, np.ndarray)):
+            self.logger.LogTheLog(f"giving unadapted argument to filter '{self.name}' : expected np.array" , style="warn")
+            return None
+        elif (x.shape != (self.ndim, ) or xdot.shape != (self.ndim, ) ):  
+            self.logger.LogTheLog(f"giving unadapted argument to filter '{self.name}' : expected dim. ({self.ndim},), got {x.shape}" , style="warn")           
+            return None
         if self.k==0:
             # filter runs for the first time
             self.Estimate = x
@@ -94,7 +107,12 @@ class ComplementaryFilter():
     def RunFilterOffset3(self, x, xdot) -> np.ndarray:
         # complementary filter x and its temporal derivative xdot. Updates previous estimates and returns current estimate.
         # check data
-        if not isinstance(x, np.ndarray) or not isinstance(xdot, np.ndarray) and (x.size!=self.ndim or xdot.size!=self.ndim):  self.logger.LogTheLog("giving unadapted argument to filter " + self.name + " : expected np.array of dim " + str(self.ndim), style="warn")
+        if (not isinstance(x, np.ndarray) or not isinstance(xdot, np.ndarray)):
+            self.logger.LogTheLog(f"giving unadapted argument to filter '{self.name}' : expected np.array" , style="warn")
+            return None
+        elif (x.shape != (self.ndim, ) or xdot.shape != (self.ndim, ) ):  
+            self.logger.LogTheLog(f"giving unadapted argument to filter '{self.name}' : expected dim. ({self.ndim},), got {x.shape}" , style="warn")           
+            return None
         if self.k==0:
             # filter runs for the first time
             self.Estimate = x

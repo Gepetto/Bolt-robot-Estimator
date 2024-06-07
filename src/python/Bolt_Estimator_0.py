@@ -56,6 +56,7 @@ class Estimator():
                 parametersAF        : list = [2],
                 SpeedFilterType     : str = "complementary",
                 parametersSF        : list = [1.1],
+                parametersPF        : list = [0.15],
                 parametersTI        : list = [10, 60, 2],
                 TimeStep            : float = 0.01,
                 IterNumber          : int = 1000,
@@ -74,6 +75,7 @@ class Estimator():
                 parametersAF        (list of float) parameters of the attitude filter. If complementary, list of one float.
                 SpeedFilterType     (string)        "complementary"
                 parametersSF        (list of float) parameters of the attitude filter. If complementary, list of one float.
+                parametersPF        (list of float) parameters of the height of base filter. If complementary, list of one float.
                 parametersTI        (list of float) parameters of the tilt estimator, list of three float (alpha1, alpha2, gamma)
                 TimeStep            (float)         dt
                 IterNumber          (int)           the estimated number of times Estimator will run. Logs will only include the n=IterNumber first data 
@@ -156,6 +158,7 @@ class Estimator():
         # filter parameters
         parametersAF = [self.TimeStep] + parametersAF
         parametersSF = [self.TimeStep] + parametersSF
+        parametersPF = [self.TimeStep] + parametersPF
         # set desired filters types for attitude and speed
         # for the time being, complementary only
         if AttitudeFilterType=="complementary":
@@ -175,7 +178,13 @@ class Estimator():
                                                     MemorySize=80,
                                                     OffsetGain=0.02)
         if self.Talkative : self.logger.LogTheLog("Speed Filter of type '" + SpeedFilterType + "' added.", ToPrint=Talkative)
-
+        
+        self.HeightFilter = ComplementaryFilter(parameters=parametersPF, 
+                                                name="base height complementary filter", 
+                                                talkative=Talkative, 
+                                                logger=self.logger, 
+                                                ndim=1)
+        
 
         # returns info on Slips, Contact Forces, Contact with the ground
         self.ContactEstimator = ContactEstimator(robot=self.robot, 
@@ -203,8 +212,9 @@ class Estimator():
         
         if self.Talkative : self.logger.LogTheLog("Tilt Estimator added with parameters " + str(parametersTI), ToPrint=Talkative)
         
+        
         # returns info on foot attitude
-        self.FootAttitudeEstimator = BenallegueEstimator(parameters=[0.001, 2],
+        self.FootAttitudeEstimator = BenallegueEstimator(parameters=[self.TimeStep, 2],
                                                          dt=self.TimeStep,
                                                          name="Foot Attitude Estimator",
                                                          talkative=Talkative,
@@ -250,6 +260,8 @@ class Estimator():
 
         self.c_out = np.zeros((3,))
         self.cdot_out = np.zeros((3,)) 
+        
+        self.ContactFoot = "none"
         return None
 
     def InitKinematicData(self) -> None :
@@ -377,6 +389,13 @@ class Estimator():
             return self.qdot
         elif data=="tau":
             return self.tau
+        elif data=="left_foot_pos":
+            # left foot position in base frame
+            pos, _ = self.ComputeFramePose(self.FeetIndexes[0])
+            return pos
+        elif data=="right_foot_pos":
+            pos, _ = self.ComputeFramePose(self.FeetIndexes[1])
+            return pos
         
 
         # logs data getter
@@ -502,6 +521,17 @@ class Estimator():
                                                                                  )
         # contact forces
         self.FLContact, self.RLContact = self.ContactEstimator.Get("current_cf_averaged")
+        
+        # contact foot
+        if self.LeftContact and self.RightContact :
+            self.ContactFoot = "both"
+        elif self.LeftContact :
+            self.ContactFoot = "left"
+        elif self.RightContact :
+            self.ContactFoot = "right"
+        else :
+            self.ContactFoot = "none"
+            
 
 
     
@@ -554,6 +584,27 @@ class Estimator():
 
         #return self.theta_kin.as_euler('xyz')
         return WorldBaseAttitude
+    
+    def KinematicPosition(self):
+        if self.LeftContact and self.RightContact:
+            pleft, _  = self.ComputeFramePose(self.FeetIndexes[0])
+            pright, _ = self.ComputeFramePose(self.FeetIndexes[1])
+            p = 0.5  *(pleft + pright)
+        elif self.LeftContact :
+            p, _ = self.ComputeFramePose(self.FeetIndexes[0])
+        elif self.RightContact :
+            p, _ = self.ComputeFramePose(self.FeetIndexes[1])
+        else :
+            p = None
+        
+        return p
+    
+    def ComputeFramePose(self, nframe):
+        # get frame 'nframe' pose in base frame
+        BaseFramePose = self.robot.data.oMf[self.BaseID].inverse()*self.robot.data.oMf[nframe]
+        BaseFrameAttitude = np.array(BaseFramePose.rotation).copy()
+        BaseFramePosition = np.array(BaseFramePose.translation).copy()
+        return BaseFramePosition, BaseFrameAttitude
 
 
 
@@ -664,10 +715,10 @@ class Estimator():
                                             ya=self.ag_imu,
                                             yg=self.w_imu, 
                                             dt=self.TimeStep)
-
+        
+        # filter results
+        self.v_out[:] = self.SpeedFilter.RunFilter(self.v_tilt.copy(), self.a_imu.copy())
         # filter speed with data from imu
-
-        self.v_out  = np.reshape(self.v_tilt, (1, 3))
         if np.linalg.norm(self.ag_imu - self.a_imu)<9:
             if self.Talkative : self.logger.LogTheLog(f"anormal gravity input : {self.ag_imu - self.a_imu} on iter {self.iter}", "warn")
 
@@ -747,9 +798,7 @@ class Estimator():
         self.SpeedFusion(mitigate=[0., 0., 1.])
         
         # integrate speed to get position
-        if self.v_out.shape == (3,):
-            self.v_out.shape = (1, 3)
-        self.c_out += self.v_out[0, :]*self.TimeStep # TODO bizarre les dimensions
+        self.c_out += self.v_out[:]*self.TimeStep
 
         # derive data & runs filter
 
@@ -763,6 +812,16 @@ class Estimator():
         self.g_out = R.from_quat(self.theta_out).apply(np.array([0, 0, -1]))
 
         self.a_out = self.a_imu
+        
+        # correct position using kin
+        BaseKinPos = self.KinematicPosition()
+
+        if BaseKinPos is not None :
+            # at least one foot is touching the ground
+            self.c_out[2] =  -BaseKinPos[2] + 0.01 # foot radius
+            
+        self.c_out[2] = self.HeightFilter.RunFilter(self.c_out[2], self.v_out[2])
+        
         
         
         

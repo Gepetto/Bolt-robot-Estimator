@@ -1,5 +1,5 @@
 import sys
-sys.path.append('/home/nalbrecht/Bolt-Estimator/Bolt-robot---Estimator/src/python')
+sys.path.append('/home/niels/Supaéro/Stage 2A/Gepetto/Code/Bolt-robot---Estimator/src/python')
 import numpy as np
 from scipy.spatial.transform import Rotation as R
 import time as t
@@ -12,7 +12,7 @@ from Bolt_Estimator_0 import Estimator
 from DeviceEmulator import DeviceEmulator
 from TrajectoryGenerator import TrajectoryGenerator
 from Bolt_Filter_Complementary import ComplementaryFilter
-sys.path.append('/home/nalbrecht/Bolt-Estimator/Bolt-robot---Estimator/data')
+sys.path.append('/home/niels/Supaéro/Stage 2A/Gepetto/Code/Bolt-robot---Estimator/data')
 from DataReader import DataReader
 
 
@@ -34,12 +34,12 @@ def TiltfromG(g0) -> np.ndarray:
     return euler
 
 def main():
-    N  = 500 - 1
-    dt = 5e-3
+    N  = 1500 - 1
+    dt = 1e-3
     T  = N*dt
-    kf = 4
-    #ToPlot = "inputs, position, vitesse, acc√©l√©ration, attitude, omega, tau, q, qdot, contact, trust, forces "
-    ToPlot = "position, attitude"
+    kf = 3
+    #ToPlot = "inputs, position, vitesse, accélération, attitude, omega, tau, q, qdot, contact, trust, forces "
+    ToPlot = "position"
 
     # create objects
     testlogger = Log("test", PrintOnFlight=True)
@@ -55,13 +55,14 @@ def main():
     estimator = Estimator(device=device,
                     ModelPath="",
                     UrdfPath="",
-                    Talkative=True,
+                    Talkative=False,
                     logger=testlogger,
                     AttitudeFilterType = "complementary",
-                    parametersAF = [2],         # r√©gl√©
+                    parametersAF = [2],         # réglé
                     SpeedFilterType = "complementary",
-                    parametersSF = [1.1],       # r√©gl√©
-                    parametersTI = [10, 60, 2], # r√©gl√©
+                    parametersSF = [1.1],       # réglé
+                    parametersPF = [0.15],      # réglé
+                    parametersTI = [10, 60, 2], # réglé
                     TimeStep = dt,
                     IterNumber = N,
                     EstimatorLogging=logging,
