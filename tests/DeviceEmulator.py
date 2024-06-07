@@ -162,7 +162,55 @@ class DeviceEmulator():
         # torques
         #noise.SetNoise(NoiseLevel=5, DriftingCoeff=0.)
         self.Tau = noise.makeNoiseAdaptativeAmplitude(self.Tau_true)
+
+        return None
+    
+    def LoadSimulatedDataDirect(self, Reader, style) -> None:
+        # load trajectory from new simu of constanr
+        # fetch .npy files
+        Reader.AutoLoadSimulatedData(style)
+
+        # DATA THAT ESTIMATOR WILL NOT ACCESS
+        # base acceleration
+        self.Acc_true = Reader.Get("a").copy()
+        self.AccG_true = Reader.Get("ag").copy()
+        # base attitude and rotation speed
+        self.Theta_true = Reader.Get("theta_euler").copy()
+        self.Omega_true = Reader.Get("omega").copy()
+        # base speed (IMU has an integrator)
+        self.Speed_true = Reader.Get("v").copy() 
+        # encoders
+        self.Q_true = Reader.Get("q").copy()
+        self.Qd_true = Reader.Get("qd").copy()
+        # torques
+        self.Tau_true = Reader.Get("tau").copy()
+        # position
+        self.Traj_true = Reader.Get("x").copy()
+        # rotation acceleration
+        self.OmegaDot_true = np.zeros(self.Omega_true.shape)
+
+        # start noise generator
+        noise = Metal(traj=self.Acc_true, NoiseLevel=0.5, DriftingCoeff=0.)
         
+        # DATA THAT ESTIMATOR WILL ACCESS
+        # base acceleration
+        noise.SetNoise(NoiseLevel=10, DriftingCoeff=0.)
+        self.Acc = noise.makeNoiseAdaptativeAmplitude(self.Acc_true)
+        self.AccG = noise.makeNoiseAdaptativeAmplitude(self.AccG_true)
+        # base rotation speed
+        #noise.SetNoise(NoiseLevel=5, DriftingCoeff=0.)
+        self.Omega = noise.makeNoise(self.Omega_true)
+        # base speed and attitude (IMU has an integrator)
+        #noise.SetNoise(NoiseLevel=5, DriftingCoeff=0.)
+        self.Speed = noise.makeNoiseAdaptativeAmplitude(self.Speed_true)
+        self.Theta = noise.makeNoiseAdaptativeAmplitude(self.Theta_true)
+        # encoders
+        #noise.SetNoise(NoiseLevel=5, DriftingCoeff=0.)
+        self.Q = noise.makeNoiseAdaptativeAmplitude(self.Q_true)
+        self.Qd = noise.makeNoiseAdaptativeAmplitude(self.Qd_true)
+        # torques
+        #noise.SetNoise(NoiseLevel=5, DriftingCoeff=0.)
+        self.Tau = noise.makeNoiseAdaptativeAmplitude(self.Tau_true)
 
         return None
     
@@ -178,7 +226,7 @@ class DeviceEmulator():
         
 
             self.baseAngularVelocity = self.Omega[self.iter, :]
-            self.baseOrientation = self.Theta[self.iter, :]
+            self.baseOrientation = np.zeros(3)#self.Theta[self.iter, :]
             self.q_mes = self.Q[self.iter, :]
             self.v_mes = self.Qd[self.iter, :]
 

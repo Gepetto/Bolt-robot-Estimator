@@ -69,17 +69,23 @@ class DataReader():
         
 
     def Load(self,   t_file=None, q_file=None, qd_file=None, x_file=None, theta_file=None, theta_euler_file=None, 
-             v_file=None, a_file=None, w_file=None, tau_file=None, lcf_file=None, rcf_file=None, contact_file=None):
+             v_file=None, a_file=None, ag_file=None, w_file=None, tau_file=None, lcf_file=None, rcf_file=None, 
+             contact_file=None, base_pos_file=None):
         self.logger.LogTheLog("DataReader : loading...")
+        self.dt = 1e-3
         if t_file is not None :
             self.T = np.load(t_file)
             self.Printer(t_file, self.T)
             t0 = self.T[0]
             t1 = self.T[-1]
+            self.dt = (t1-t0)/self.SampleLength
             self.logger.LogTheLog(f"time ranging from {t0} to {t1} ", "subinfo")
         if q_file is not None :
             self.Q = np.load(q_file)
             self.Printer(q_file, self.Q)
+        if base_pos_file is not None :
+            self.X = np.load(base_pos_file)
+            self.Printer(base_pos_file, self.X)
 
         if qd_file is not None :
             self.Qd = np.load(qd_file)
@@ -101,6 +107,9 @@ class DataReader():
         if a_file is not None :
             self.A = np.load(a_file)
             self.Printer(a_file, self.A)
+        if ag_file is not None :
+            self.Ag = np.load(ag_file)
+            self.Printer(ag_file, self.Ag)
         if w_file is not None :
             self.W = np.load(w_file)
             self.Printer(w_file, self.W)
@@ -119,10 +128,10 @@ class DataReader():
             #print(self.LeftContact)
       
         self.SampleLength = len(self.T)
-        self.dt = (t1-t0)/self.SampleLength
+        
         self.logger.LogTheLog("DataReader : loaded data, number of samples = " + str(self.SampleLength) + ", dt = " + str(self.dt))
         
-
+    
     
     def AutoLoad(self, k, acc='included', theta_euler="included"):
         self.logger.LogTheLog("DataReader : Auto loading")
@@ -162,6 +171,36 @@ class DataReader():
                           self.theta_file, self.theta_euler_file, self.v_file,    self.a_file,   
                           self.w_file,     self.tau_file,
                           self.lcf_file,   self.rcf_file]
+    
+    
+    def AutoLoadSimulatedData(self, style="standing"):
+        self.logger.LogTheLog("DataReader : Auto loading simulated data")
+        #prefix = "/home/nalbrecht/Bolt-Estimator/Bolt-robot---Estimator/data/" + kfile + "/"
+        prefix = "/home/niels/Supaéro/Stage 2A/Gepetto/Code/Bolt-robot---Estimator/data/Data_" + style + "/true_"
+        self.prefix=prefix
+        
+        self.q_file = prefix + "q_logs.npy"
+        self.qd_file = prefix + "qdot_logs.npy"
+        self.x_file = prefix + "pos_logs.npy"
+        self.theta_euler_file = prefix + "theta_logs.npy"
+        self.v_file = prefix + "speed_logs.npy"
+        self.a_file = prefix + "a_logs.npy"
+        self.ag_file = prefix + "ag_logs.npy"
+
+        self.w_file = prefix + "omega_logs.npy"
+        self.tau_file = prefix + "tau_logs.npy"
+
+
+        self.Load(t_file=None,           q_file=self.q_file,         qd_file=self.qd_file,  
+                  x_file=None,    theta_file=None,           theta_euler_file=self.theta_euler_file,
+                  v_file=self.v_file,    a_file=self.a_file,  ag_file=self.ag_file,       w_file=self.w_file, tau_file=self.tau_file,
+                  lcf_file=None,  rcf_file=None,   contact_file=None, base_pos_file=self.x_file)
+        
+        self.filenames = [self.q_file,           self.qd_file,   self.x_file, 
+                          self.theta_euler_file, self.v_file,    self.a_file,  self.ag_file, 
+                          self.w_file,     self.tau_file
+                          ]
+        
         
     
     def AutoImproveData(self, k, N=1000):
@@ -248,6 +287,8 @@ class DataReader():
             return self.V
         elif data=="a":
             return self.A
+        elif data=="ag":
+            return self.Ag
         elif data=="q":
             return self.Q
         elif data=="qd":
@@ -417,6 +458,14 @@ def LogLoading():
     Reader.EndPlot()
 
 
+def main_simu(style="walking"):
+    # getting ready
+    logger = Log(PrintOnFlight=True)
+    Reader = DataReader(logger=logger)
+    
+    # loading
+    Reader.AutoLoadSimulatedData(style)
+
 
 
 
@@ -424,7 +473,6 @@ def main(k=1, dt=1e-3):
     # getting ready
     logger = Log(PrintOnFlight=True)
     Reader = DataReader(logger=logger)
-
     
     """
     # in case data is straight out of a simulation, improve sampling and add acceleration
@@ -476,4 +524,5 @@ def main(k=1, dt=1e-3):
     
 if __name__ == "__main__":
     #main()
-    LogLoading()
+    main_simu()
+    #LogLoading()
