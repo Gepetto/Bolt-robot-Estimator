@@ -4,9 +4,11 @@ from scipy.spatial.transform import Rotation as R
 
 
 import sys
-sys.path.append('/home/niels/Supaéro/Stage 2A/Gepetto/Code/Bolt-robot---Estimator/tests')
+#sys.path.append('/home/niels/Supaéro/Stage 2A/Gepetto/Code/Bolt-robot---Estimator/tests')
+sys.path.append('/home/nalbrecht//Bolt-Estimator/Bolt-robot---Estimator/tests')
 from Graphics import Graphics
-sys.path.append('/home/niels/Supaéro/Stage 2A/Gepetto/Code/Bolt-robot---Estimator/src/python')
+sys.path.append('/home/nalbrecht//Bolt-Estimator/Bolt-robot---Estimator/src/python')
+#sys.path.append('/home/niels/Supaéro/Stage 2A/Gepetto/Code/Bolt-robot---Estimator/src/python')
 from Bolt_Utils import Log
 
 from DataImprover import improve
@@ -36,6 +38,9 @@ class DataReader():
 
         self.LeftFootID = 10
         self.RightFootID = 18
+
+        # data get useless after fall
+        self.fall = -1
     
     def Printer(self, file, Z):
         self.logger.LogTheLog(file[-25:] + '  of shape  '+str(Z.shape), "subinfo")
@@ -55,17 +60,25 @@ class DataReader():
     def LoadAndPlotDualLogs(self, file1, file2, ndim, title, toprint=False):
         #prefix = "/home/nalbrecht/Bolt-Estimator/Bolt-robot---Estimator/data/simu/"
         prefix = "/home/nalbrecht/Bolt-Estimator/bipedal-control/"
+        self.prefix = prefix
         filename1 = prefix + file1
         filename2 = prefix + file2
         Y = np.load(filename1)
-        Z = np.load(filename2)
+        Z = np.load(filename2).T
+        _, n1 = Y.shape
+        _, n2 = Z.shape
+        n = min(n1, n2)
+        n = min(n, self.fall)
+        print(n)
+        print(self.fall)
         self.logger.LogTheLog("2 loaded files " + filename1 + " in " + prefix, "info")
         self.logger.LogTheLog("data shapes : " + str(Y.shape) + " and " + str(Z.shape), "info")
         self.grapher.SetLegend(["logs", "true"], ndim=ndim)
         if toprint :
             print(Y)
-        self.grapher.CompareNDdatas([Y, Z.T], datatype='logs', title=title, StyleAdapter=True)
-        
+        self.grapher.CompareNDdatas([Y[:, :n], Z[:, :n]], datatype='logs', title=title, StyleAdapter=True)
+        self.grapher.SetLegend(["error"], ndim=ndim)
+        self.grapher.CompareNDdatas([Y[:, :n]-Z[:, :n]], datatype='error', title=title + ' (error)', StyleAdapter=True)
         
 
     def Load(self,   t_file=None, q_file=None, qd_file=None, x_file=None, theta_file=None, theta_euler_file=None, 
@@ -442,19 +455,31 @@ def LogLoading():
     logger = Log(PrintOnFlight=True)
     Reader = DataReader(logger=logger)
     #Reader.LoadAndPlotLog("theta_out.npy", 4, "theta")
-    Reader.LoadAndPlotLog("c_out.npy", 3, "c out")
+    #Reader.LoadAndPlotLog("c_out.npy", 3, "c out")
+    Reader.fall = 1400
     Reader.LoadAndPlotDualLogs("g_out.npy", "true_g_logs.npy", 3, "g out and true")
-    Reader.LoadAndPlotDualLogs("g_tilt.npy", "true_g_logs.npy", 3, "g tilt and true")
+    #Reader.LoadAndPlotDualLogs("g_tilt.npy", "true_g_logs.npy", 3, "g tilt and true")
     Reader.LoadAndPlotDualLogs("v_out.npy", "true_speed_logs.npy", 3, "v out and true", True)
-    Reader.LoadAndPlotDualLogs("v_tilt.npy", "true_speed_logs.npy", 3, "v tilt and true", True)
+    #Reader.LoadAndPlotDualLogs("v_tilt.npy", "true_speed_logs.npy", 3, "v tilt and true", True)
     Reader.LoadAndPlotDualLogs("c_out.npy", "true_pos_logs.npy", 3, "pos out and true")
     Reader.LoadAndPlotDualLogs("theta_out.npy", "true_theta_logs.npy", 4, "theta out and true")
-    Reader.LoadAndPlotDualLogs("theta_tilt.npy", "true_theta_logs.npy", 4, "theta tilt and true")
-    Reader.LoadAndPlotLog("a.npy", 3, "a")
+    #Reader.LoadAndPlotDualLogs("theta_tilt.npy", "true_theta_logs.npy", 4, "theta tilt and true")
+    #Reader.LoadAndPlotLog("a.npy", 3, "a")
     #Reader.LoadAndPlotLog("q.npy", 6, "q")
     #Reader.LoadAndPlotLog("qdot.npy", 6, "qdot")
-    Reader.LoadAndPlotLog("Contact.npy", 2, "contact out")
+    #Reader.LoadAndPlotLog("Contact.npy", 2, "contact out")
     Reader.LoadAndPlotDualLogs("w.npy", "true_omega_logs.npy", 3, "omega out and true")
+
+    # convert to euler
+    theta_true = R.from_quat(np.load(Reader.prefix + "true_theta_logs.npy")).as_euler('xyz').T
+    theta_out = R.from_quat(np.load(Reader.prefix + "theta_out.npy").T).as_euler('xyz').T
+    _, n1 = theta_true.shape
+    _, n2 = theta_out.shape
+    n = 1400
+    Reader.grapher.SetLegend(["Theta true", "Theta out"], ndim=3)
+    Reader.grapher.CompareNDdatas([theta_true[:, :n], theta_out[:, :n]], datatype='radian', title='Attitude as Euler', mitigate=[1])
+    Reader.grapher.SetLegend(["Error on theta"], ndim=3)
+    Reader.grapher.CompareNDdatas([theta_true[:, :n]-theta_out[:, :n]], datatype='radian', title='Error on Attitude as Euler', mitigate=[1])
     Reader.EndPlot()
 
 
@@ -524,5 +549,5 @@ def main(k=1, dt=1e-3):
     
 if __name__ == "__main__":
     #main()
-    main_simu()
-    #LogLoading()
+    #main_simu()
+    LogLoading()
