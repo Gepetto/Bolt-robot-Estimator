@@ -1,5 +1,6 @@
 import sys
-sys.path.append('/home/niels/SupaŽro/Stage 2A/Gepetto/Code/Bolt-robot---Estimator/src/python')
+#sys.path.append('/home/niels/SupaÃ©ro/Stage 2A/Gepetto/Code/Bolt-robot---Estimator/src/python')
+sys.path.append('/home/nalbrecht//Bolt-Estimator/Bolt-robot---Estimator/src/python')
 import numpy as np
 from scipy.spatial.transform import Rotation as R
 import time as t
@@ -12,7 +13,8 @@ from Bolt_Estimator_0 import Estimator
 from DeviceEmulator import DeviceEmulator
 from TrajectoryGenerator import TrajectoryGenerator
 from Bolt_Filter_Complementary import ComplementaryFilter
-sys.path.append('/home/niels/SupaŽro/Stage 2A/Gepetto/Code/Bolt-robot---Estimator/data')
+#sys.path.append('/home/niels/SupaÃ©ro/Stage 2A/Gepetto/Code/Bolt-robot---Estimator/data')
+sys.path.append('/home/nalbrecht//Bolt-Estimator/Bolt-robot---Estimator/data')
 from DataReader import DataReader
 
 
@@ -34,12 +36,12 @@ def TiltfromG(g0) -> np.ndarray:
     return euler
 
 def main():
-    N  = 1500 - 1
+    N  = 1000 - 1
     dt = 1e-3
     T  = N*dt
     kf = 3
-    #ToPlot = "inputs, position, vitesse, accŽlŽration, attitude, omega, tau, q, qdot, contact, trust, forces "
-    ToPlot = "position"
+    #ToPlot = "inputs, position, vitesse, accï¿½lï¿½ration, attitude, omega, tau, q, qdot, contact, trust, forces "
+    ToPlot = "position, contact"
 
     # create objects
     testlogger = Log("test", PrintOnFlight=True)
@@ -58,11 +60,11 @@ def main():
                     Talkative=False,
                     logger=testlogger,
                     AttitudeFilterType = "complementary",
-                    parametersAF = [2],         # rŽglŽ
+                    parametersAF = [2],         # rï¿½glï¿½
                     SpeedFilterType = "complementary",
-                    parametersSF = [1.1],       # rŽglŽ
-                    parametersPF = [0.15],      # rŽglŽ
-                    parametersTI = [10, 60, 2], # rŽglŽ
+                    parametersSF = [1.1],       # rï¿½glï¿½
+                    parametersPF = [0.15],      # rï¿½glï¿½
+                    parametersTI = [10, 60, 2], # rï¿½glï¿½
                     TimeStep = dt,
                     IterNumber = N,
                     EstimatorLogging=logging,
@@ -133,6 +135,7 @@ def main():
     c_out = estimator.Get("c_logs")
     theta_out = estimator.Get("theta_logs_euler")
     g_out = estimator.Get("g_out_logs")
+    c_switch = estimator.Get("c_switch_logs")
         # quat
     quat_out = estimator.Get("theta_logs")
     quat_tilt = estimator.Get("theta_tilt_logs")
@@ -159,6 +162,7 @@ def main():
     ContactProb = estimator.ContactEstimator.Get("contact_prob")
     ContactProb_F = estimator.ContactEstimator.Get("contact_prob_force")
     ContactProb_T = estimator.ContactEstimator.Get("contact_prob_torque")
+
 
     # logs from tilt estimator
     omega_tilt = estimator.TiltandSpeedEstimator.x2_hat_dot_logs.copy()
@@ -257,6 +261,11 @@ def main():
     if "position" in ToPlot :
         grapher.SetLegend(["base pos out", "True base pos"], ndim=3)
         grapher.CompareNDdatas([c_out,  True_x[:N, :].T], datatype='position', title='Estimator output, position', mitigate=[1])
+
+        grapher.SetLegend(["base pos switch", "True base pos"], ndim=3)
+        grapher.CompareNDdatas([c_switch,  True_x[:N, :].T], datatype='position', title='Estimator switch out, position', mitigate=[1])
+
+
     if "attitude" in ToPlot :
         grapher.SetLegend(["theta tilt", "theta_true"], ndim=3)
         grapher.CompareNDdatas([theta_tilt, True_Theta[:N, :].T], datatype='orientation', title='Tilt estimator output, attitude', mitigate=[1])

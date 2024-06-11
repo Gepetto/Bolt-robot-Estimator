@@ -101,6 +101,7 @@ class Estimator():
         # iteration number
         self.IterNumber = IterNumber
         self.iter = 0
+        self.TimeRunning = 0.
         
         # loading data from file
         if UrdfPath=="" or ModelPath=="":
@@ -141,6 +142,7 @@ class Estimator():
         if self.device is not None :
             self.ReadSensor()
             if self.Talkative : self.logger.LogTheLog("Sensors read, initial data acquired", ToPrint=Talkative)
+        
 
         # update height of CoM value, assuming Bolt is vertical
         pin.forwardKinematics(self.robot.model, self.robot.data, self.q)
@@ -149,6 +151,7 @@ class Estimator():
         self.c_out[2] = np.linalg.norm(c)
         self.c_out[2] += 0.02 # TODO : radius of bolt foot
         self.c_out[2] = 0.34 # TODO stop doing this
+        self.AllTimeSwitchDeltas[2] = self.c_out[2]
         
         if self.EstimatorLogging : self.UpdateLogMatrixes()
         self.iter += 1
@@ -253,7 +256,6 @@ class Estimator():
         # initialize estimator out data
         self.v_out = np.zeros((3,)) 
         self.a_out = np.zeros((3,)) 
-        #self.theta_out = R.from_euler('xyz', np.zeros(3))
         self.theta_out = np.array([0, 0, 0, 1])
         self.w_out = np.zeros((3,)) 
         self.g_out = np.array([0, 0, -1])
@@ -280,6 +282,13 @@ class Estimator():
         self.v_tilt = np.zeros((3,))
         self.g_tilt = np.array([0, 0, -1])
         self.theta_tilt = np.array([0, 0, 0, 1])
+        # contact foot switch
+        self.SwitchDelta = np.zeros((3,))
+        self.AllTimeSwitchDeltas = np.zeros((3,))
+        self.PreviousContactFoot = 0
+        self.PreviousLeftContact, self.PreviousRightContact = False, False
+        self.Switch = False
+        self.SwitchLen = 0
         return None
 
     def InitContactData(self) -> None:
@@ -320,6 +329,12 @@ class Estimator():
         self.log_cdot_out = np.zeros([3, self.IterNumber])
         self.log_contactforces = np.zeros([6, self.IterNumber])
         
+        # Contact switch log
+        self.log_switch = np.zeros([3, self.IterNumber])
+        
+        # time
+        self.TimeStamp = np.zeros((self.IterNumber, ))
+        
         return None
 
     def UpdateLogMatrixes(self) -> None :
@@ -357,6 +372,10 @@ class Estimator():
         self.log_cdot_out[:, LogIter] = self.cdot_out[:]
         self.log_contactforces[:3, LogIter] = self.FLContact[:]
         self.log_contactforces[3:, LogIter] = self.FRContact[:]
+        # switch
+        self.log_switch[:, LogIter] = self.AllTimeSwitchDeltas[:]
+        # time
+        self.TimeStamp[LogIter] = self.TimeRunning
         return None
 
 
@@ -396,6 +415,8 @@ class Estimator():
         elif data=="right_foot_pos":
             pos, _ = self.ComputeFramePose(self.FeetIndexes[1])
             return pos
+        elif data=="timestamp" or data=="t":
+            return self.TimeRunning
         
 
         # logs data getter
@@ -432,6 +453,11 @@ class Estimator():
         elif data=="theta_tilt_logs_euler":
             return R.from_quat(self.log_theta_tilt.T).as_euler("xyz").T
         
+        elif data=="c_switch_logs":
+            return self.log_switch
+        elif data=="timestamp_logs" or data=="t_logs":
+            return self.TimeStamp
+        
         # IMU logs data getter
         elif data=="acceleration_logs_imu" or data=="a_logs_imu":
             return self.log_a_imu
@@ -456,7 +482,7 @@ class Estimator():
             return self.log_v_out
         # ...
         else :
-            self.logger.LogTheLog("Could not get data '" + data + "'. Unrecognised data getter.", style="warn", ToPrint=self.Talkative)
+            self.logger.LogTheLog("Could not get data '" + data + "'. Unrecognised data getter.", style="danger", ToPrint=self.Talkative)
             return None
 
 
@@ -532,6 +558,114 @@ class Estimator():
         else :
             self.ContactFoot = "none"
             
+    
+    def FootStepLen_(self, LeftContact, RightContact):
+        """
+        Measure length of a footstep
+        Bolt switch contact foot when LeftContact = RightContact
+        ----------
+        LeftContact : Bool
+        RightContact : Bool
+        ----------
+        Returns None
+        """
+        if LeftContact == RightContact :
+            # double contact, or close from it
+            self.SwitchLen += 1
+            # compute foot to foot distance
+            BaseToBackFoot, _ = self.ComputeFramePose(self.FeetIndexes[self.PreviousContactFoot])
+            BaseToFrontFoot, _ = self.ComputeFramePose(self.FeetIndexes[1-self.PreviousContactFoot])
+            # average over the current switch
+            self.SwitchDelta = ( self.SwitchDelta*(self.SwitchLen - 1) + (BaseToFrontFoot - BaseToBackFoot) ) / self.SwitchLen
+        
+        elif (LeftContact and self.PreviousContactFoot==1) or (RightContact and self.PreviousContactFoot==0):
+            # simple contact or delay in contact detection
+            self.SwitchLen += 1
+            # update contact foot
+            if LeftContact :
+                self.PreviousContactFoot = 0
+            else :
+                self.PreviousContactFoot = 1
+            # compute foot to foot distance
+            BaseToBackFoot, _ = self.ComputeFramePose(self.FeetIndexes[self.PreviousContactFoot])
+            BaseToFrontFoot, _ = self.ComputeFramePose(self.FeetIndexes[1-self.PreviousContactFoot])
+            # average over the current switch
+            #self.SwitchDelta = ( self.SwitchDelta*(self.SwitchLen - 1) + (BaseToBackFoot - BaseToFrontFoot) ) / self.SwitchLen
+            self.SwitchDelta = BaseToBackFoot - BaseToFrontFoot
+            
+        else :
+            # robot on a swing leg : ending footstep
+            if self.SwitchLen != 0 :
+                # just ended switch phase
+                self.AllTimeSwitchDeltas[:] += self.SwitchDelta[:]
+                if self.Talkative or True : self.logger.LogTheLog(f"Switch ended on iter {self.iter}, step of length {self.SwitchDelta} lasting {self.SwitchLen} iter.", "subinfo")
+            self.SwitchLen = 0
+            self.SwitchDelta = np.zeros((3,))
+            if LeftContact :
+                self.PreviousContactFoot = 0
+            else :
+                self.PreviousContactFoot = 1
+        
+
+        
+        
+    def FootStepLen(self, LeftContact, RightContact, MaxSwitchLen=20):
+        """
+        Measure length of a footstep
+        Bolt switch contact foot when LeftContact = RightContact
+        ----------
+        LeftContact : Bool
+        RightContact : Bool
+        ----------
+        Returns None
+        """
+        EndingSwitch = False
+        
+        # entering switch phase
+        if (LeftContact != self.PreviousLeftContact or RightContact != self.PreviousRightContact) and not self.Switch :
+            #if self.Talkative : self.logger.LogTheLog(f"Switch started on iter {self.iter}", "subinfo")
+            # switch start
+            self.Switch = True
+            self.SwitchLen = 0
+            # foot in contact at the beginning of the switch
+            if self.PreviousLeftContact :
+                self.PreviousContactFoot = 0
+            else :
+                self.PreviousContactFoot = 1
+                      
+        # switching
+        if self.Switch :
+            self.SwitchLen += 1
+            # compute foot to foot distance
+            BaseToBackFoot, _ = self.ComputeFramePose(self.FeetIndexes[self.PreviousContactFoot])
+            BaseToFrontFoot, _ = self.ComputeFramePose(self.FeetIndexes[1-self.PreviousContactFoot])
+            # average distance over the current switch
+            self.SwitchDelta = ( self.SwitchDelta*(self.SwitchLen - 1) + (BaseToFrontFoot - BaseToBackFoot) ) / self.SwitchLen
+            #self.SwitchDelta = BaseToBackFoot - BaseToFrontFoot
+            
+        # switch finished
+        if (LeftContact!=self.PreviousLeftContact and RightContact!=self.PreviousRightContact):
+            # ending switch
+            EndingSwitch = True
+            
+        # did not initialize correctly, or got lost somehow
+        if self.SwitchLen > MaxSwitchLen and not (LeftContact and RightContact):
+            # ending switch
+            EndingSwitch= True
+            if self.Talkative : self.logger.LogTheLog(f"Switch stopped on iter {self.iter} : exceding max switch duration {MaxSwitchLen} iter ", "warn")
+            
+        if EndingSwitch :
+            # ending switch
+            self.Switch = False
+            self.SwitchLen = 0
+            # updating all-time distance
+            self.AllTimeSwitchDeltas[:] += self.SwitchDelta[:]
+            # updating contact info
+            self.PreviousLeftContact = LeftContact
+            self.PreviousRightContact = RightContact
+            if self.Talkative or True: self.logger.LogTheLog(f"Switch ended on iter {self.iter}, step of length {self.SwitchDelta} lasting {self.SwitchLen} iter.", "subinfo")
+
+        
 
 
     
@@ -586,6 +720,11 @@ class Estimator():
         return WorldBaseAttitude
     
     def KinematicPosition(self):
+        """
+        Compute height of base compared to foot in contact
+        -------
+        p : position of base in world frame, robot-aligned
+        """
         if self.LeftContact and self.RightContact:
             pleft, _  = self.ComputeFramePose(self.FeetIndexes[0])
             pright, _ = self.ComputeFramePose(self.FeetIndexes[1])
@@ -600,7 +739,9 @@ class Estimator():
         return p
     
     def ComputeFramePose(self, nframe):
-        # get frame 'nframe' pose in base frame
+        """ get frame 'nframe' pose in base frame 
+            ie. {baseframe -> nframe} 
+        """
         BaseFramePose = self.robot.data.oMf[self.BaseID].inverse()*self.robot.data.oMf[nframe]
         BaseFrameAttitude = np.array(BaseFramePose.rotation).copy()
         BaseFramePosition = np.array(BaseFramePose.translation).copy()
@@ -762,7 +903,7 @@ class Estimator():
 
         q = np.concatenate((gg0, q0), axis=0)
         if np.linalg.norm(q) == 0 and self.Talkative :
-            self.logger.LogTheLog(f"Null norm quaternion computed for gworld -> grobot at iter {self.iter} with gworld {gworld} and g measured {g0}", "warn")
+            self.logger.LogTheLog(f"Null norm quaternion computed for gworld -> grobot at iter {self.iter} with gworld {gworld} and g measured {g0}", "danger")
             return np.array([0, 0, 0, 1])    
         return q / np.linalg.norm(q)
 
@@ -774,10 +915,10 @@ class Estimator():
 
         """
         if np.linalg.norm(q) < 1e-6:
-            self.logger.LogTheLog(f"Norm of quaternion {name} is NULL : {q} on iter {self.iter}", "warn")
+            self.logger.LogTheLog(f"Norm of quaternion {name} is NULL : {q} on iter {self.iter}", "danger")
             return np.array([0, 0, 0, 1])
         if np.linalg.norm(q)< 0.99 or  np.linalg.norm(q)> 1.01:
-            self.logger.LogTheLog(f"Norm of quaternion {name} is NOT ONE : {q} on iter {self.iter}", "warn")
+            self.logger.LogTheLog(f"Norm of quaternion {name} is NOT ONE : {q} on iter {self.iter}", "danger")
             return q/np.linalg.norm(q)
         return q
         
@@ -794,6 +935,11 @@ class Estimator():
         
         # run contact estimator
         self.UpdateContactInformation()
+        if self.iter < 3 :
+            self.PreviousLeftContact = self.LeftContact
+            self.PreviousRightContact = self.RightContact
+            self.Switch = False
+
         # estimate speed
         self.SpeedFusion(mitigate=[0., 0., 1.])
         
@@ -822,6 +968,8 @@ class Estimator():
             
         self.c_out[2] = self.HeightFilter.RunFilter(self.c_out[2], self.v_out[2])
         
+        self.FootStepLen(self.LeftContact, self.RightContact, MaxSwitchLen=15)
+        
         
         
         
@@ -829,11 +977,12 @@ class Estimator():
         # update all logs & past variables
         if self.EstimatorLogging : self.UpdateLogMatrixes()
         # count iteration
-        if self.iter % 50 == 0 :
+        if self.iter % 100 == 0 :
             print(f" iter {self.iter} \t dt {self.TimeStep}")
         if self.iter==1 :
-            self.logger.LogTheLog("executed Estimator for the first time", "subinfo")
+            if self.Talkative : self.logger.LogTheLog("executed Estimator for the first time", "subinfo")
         self.iter += 1
+        self.TimeRunning += self.TimeStep
         
 
         return None

@@ -56,7 +56,9 @@ class Log():
         elif style=="subinfo":
             log = "    ...  " + log
         elif style=="warn":
-            log = "  *!* " + log
+            log = "  -!- " + log
+        elif style=="danger":
+            log = "** ! ** " + log
         elif style=="title":
             log = "\n\n***\n\n " + log + "\n\n***\n\n "
         elif style=="subtitle":

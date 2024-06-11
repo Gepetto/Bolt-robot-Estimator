@@ -40,12 +40,12 @@ class ComplementaryFilter():
         # check data
         if self.ndim==1 :
             if  not isinstance(x, float) or not isinstance(xdot, float):
-                self.logger.LogTheLog(f"giving unadapted argument to filter '{self.name}' of dim. 1 : expected float, got {type(x)}" , style="warn")
+                self.logger.LogTheLog(f"giving unadapted argument to filter '{self.name}' of dim. 1 : expected float, got {type(x)}" , style="danger")
         elif (not isinstance(x, np.ndarray) or not isinstance(xdot, np.ndarray)):
             self.logger.LogTheLog(f"giving unadapted argument to filter '{self.name}' : expected np.array" , style="warn")
             return None
         elif (x.shape != (self.ndim, ) or xdot.shape != (self.ndim, ) ):  
-            self.logger.LogTheLog(f"giving unadapted argument to filter '{self.name}' : expected dim. ({self.ndim},), got {x.shape} and {xdot.shape}" , style="warn")           
+            self.logger.LogTheLog(f"giving unadapted argument to filter '{self.name}' : expected dim. ({self.ndim},), got {x.shape} and {xdot.shape}" , style="danger")           
             return None
         if self.k==0:
             # filter runs for the first time
@@ -61,7 +61,7 @@ class ComplementaryFilter():
         # complementary filter for q [scalar-last format] and angular speed w
         # check data
         if (not isinstance(q, np.ndarray)) or (not isinstance(w, np.ndarray)) or (q.shape!=(4,) or w.shape!=(3,) ):  
-            if self.Talkative : self.logger.LogTheLog(f"giving unadapted argument to filter '{self.name}' : expected np.array of dim 4 and 3" , style="warn")           
+            if self.Talkative : self.logger.LogTheLog(f"giving unadapted argument to filter '{self.name}' : expected np.array of dim 4 and 3" , style="danger")           
         if self.k==0:
             # filter runs for the first time
             self.Estimate = q
@@ -85,10 +85,10 @@ class ComplementaryFilter():
         # complementary filter x and its temporal derivative xdot. Updates previous estimates and returns current estimate.
         # check data
         if (not isinstance(x, np.ndarray) or not isinstance(xdot, np.ndarray)):
-            self.logger.LogTheLog(f"giving unadapted argument to filter '{self.name}' : expected np.array" , style="warn")
+            self.logger.LogTheLog(f"giving unadapted argument to filter '{self.name}' : expected np.array" , style="danger")
             return None
         elif (x.shape != (self.ndim, ) or xdot.shape != (self.ndim, ) ):  
-            self.logger.LogTheLog(f"giving unadapted argument to filter '{self.name}' : expected dim. ({self.ndim},), got {x.shape}" , style="warn")           
+            self.logger.LogTheLog(f"giving unadapted argument to filter '{self.name}' : expected dim. ({self.ndim},), got {x.shape}" , style="danger")           
             return None
         if self.k==0:
             # filter runs for the first time
@@ -108,10 +108,10 @@ class ComplementaryFilter():
         # complementary filter x and its temporal derivative xdot. Updates previous estimates and returns current estimate.
         # check data
         if (not isinstance(x, np.ndarray) or not isinstance(xdot, np.ndarray)):
-            self.logger.LogTheLog(f"giving unadapted argument to filter '{self.name}' : expected np.array" , style="warn")
+            self.logger.LogTheLog(f"giving unadapted argument to filter '{self.name}' : expected np.array" , style="danger")
             return None
         elif (x.shape != (self.ndim, ) or xdot.shape != (self.ndim, ) ):  
-            self.logger.LogTheLog(f"giving unadapted argument to filter '{self.name}' : expected dim. ({self.ndim},), got {x.shape}" , style="warn")           
+            self.logger.LogTheLog(f"giving unadapted argument to filter '{self.name}' : expected dim. ({self.ndim},), got {x.shape}" , style="danger")           
             return None
         if self.k==0:
             # filter runs for the first time
