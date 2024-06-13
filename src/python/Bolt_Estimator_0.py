@@ -58,6 +58,7 @@ class Estimator():
                 parametersSF        : list = [1.1],
                 parametersPF        : list = [0.15],
                 parametersTI        : list = [10, 60, 2],
+                T0posDriftComp      : float = 2.5,
                 TimeStep            : float = 0.01,
                 IterNumber          : int = 1000,
                 EstimatorLogging    : bool = True,
@@ -77,6 +78,7 @@ class Estimator():
                 parametersSF        (list of float) parameters of the attitude filter. If complementary, list of one float.
                 parametersPF        (list of float) parameters of the height of base filter. If complementary, list of one float.
                 parametersTI        (list of float) parameters of the tilt estimator, list of three float (alpha1, alpha2, gamma)
+                T0posDriftComp      (float)         At time PDC, estimator will start compensating position drift using footstep integration 
                 TimeStep            (float)         dt
                 IterNumber          (int)           the estimated number of times Estimator will run. Logs will only include the n=IterNumber first data 
                 EstimatorLogging    (boolean)       whether estimator should store data in log matrixes
@@ -98,10 +100,13 @@ class Estimator():
             self.logger = Log("default " + self.MsgName+ " log")
         self.logger.LogTheLog(" Starting log of" + self.MsgName, ToPrint=False)
         if self.Talkative : self.logger.LogTheLog("Initializing " + self.MsgName + "...", style="title", ToPrint=Talkative)
-        # iteration number
+        
+        # iteration and timing
         self.IterNumber = IterNumber
         self.iter = 0
         self.TimeRunning = 0.
+        # 1 kHz by default
+        self.TimeStep = TimeStep
         
         # loading data from file
         if UrdfPath=="" or ModelPath=="":
@@ -127,9 +132,6 @@ class Estimator():
         else :
             self.logger.LogTheLog("No device added", style="warn", ToPrint=True)
             self.device=None
-
-        # 1 kHz by default
-        self.TimeStep = TimeStep
         
         # initializes data & logs with np.zeros arrays
         self.InitImuData()
@@ -157,7 +159,12 @@ class Estimator():
         self.iter += 1
         if self.Talkative : self.logger.LogTheLog("Initial data stored in logs", ToPrint=Talkative)
         
-
+        # position drift compensation using switch and step measurement
+        self.T0posDriftComp = T0posDriftComp
+        self.PosDriftCompensation = 0
+        self.StepStart = 0
+        self.StepDuration = 0
+        
         # filter parameters
         parametersAF = [self.TimeStep] + parametersAF
         parametersSF = [self.TimeStep] + parametersSF
@@ -227,6 +234,17 @@ class Estimator():
 
         self.logger.LogTheLog(self.MsgName +" initialized successfully.", ToPrint=Talkative)
         return None
+    
+    def SetInitValues(self, BaseSpeed, BaseAccG, UnitGravity, UnitGravityDerivative, ContactFootID, Q, Qd):
+        """ modify init values """
+        self.q[:] = Q
+        self.qdot[:]  = Qd
+        _, rot = self.ComputeFramePose(ContactFootID)
+        BaseWRTFootOrientationAsMatrix = rot.T
+        UnitGravity[2] *=-1
+        UnitGravityDerivative[2] *=-1
+        print("inited")
+        self.TiltandSpeedEstimator.SetInitValues(BaseSpeed, BaseAccG, UnitGravity, UnitGravityDerivative, BaseWRTFootOrientationAsMatrix)
 
 
     def ExternalDataCaster(self, DataType:str, ReceivedData) -> None:
@@ -305,24 +323,28 @@ class Estimator():
         self.log_w_out = np.zeros([3, self.IterNumber])
         self.log_a_out = np.zeros([3, self.IterNumber])
         self.log_theta_out = np.zeros([4, self.IterNumber])
+        self.log_theta_out[3, :] = np.ones((self.IterNumber, ))
         self.log_g_out = np.zeros([3, self.IterNumber])
         # imu data log
         self.log_v_imu = np.zeros([3, self.IterNumber])
         self.log_w_imu = np.zeros([3, self.IterNumber])
         self.log_a_imu = np.zeros([3, self.IterNumber])
         self.log_theta_imu = np.zeros([4, self.IterNumber])
+        self.log_theta_imu[3, :] = np.ones((self.IterNumber, ))
         # forward kinematics data log
         self.log_v_kin = np.zeros([3, self.IterNumber])
         self.log_z_kin = np.zeros([1, self.IterNumber])
         self.log_q = np.zeros([self.nq, self.IterNumber])
         self.log_qdot = np.zeros([self.nv, self.IterNumber])
         self.log_theta_kin = np.zeros([4, self.IterNumber])
+        self.log_theta_kin[3, :] = np.ones((self.IterNumber, ))
         self.log_w_kin = np.zeros([3, self.IterNumber])
         
         # tilt log 
         self.log_v_tilt = np.zeros([3, self.IterNumber])
         self.log_g_tilt = np.zeros([3, self.IterNumber])
         self.log_theta_tilt = np.zeros([4, self.IterNumber])
+        self.log_theta_tilt[3, :] = np.ones((self.IterNumber, ))
         
         # other logs
         self.log_c_out = np.zeros([3, self.IterNumber])
@@ -384,30 +406,30 @@ class Estimator():
 
         # out data getter
         if data=="acceleration" or data=="a":
-            return self.a_out
+            return np.copy(self.a_out)
         elif data=="rotation_speed" or data=="w" or data=="omega":
-            return self.w_out
+            return np.copy(self.w_out)
         elif data=="attitude" or data=="theta":
-            return self.theta_out
+            return np.copy(self.theta_out)
         elif data=="attitude_euler" or data=="theta_euler":
             return R.from_quat(self.theta_out.T).as_euler("xyz")
         elif data=="com_position" or data=="c":
-            return self.c_out
+            return np.copy(self.c_out)
         elif data=="com_speed" or data=="cdot":
-            return self.cdot_out
+            return np.copy(self.cdot_out)
         elif data=="base_speed" or data=="v":
-            return self.v_out
+            return np.copy(self.v_out)
         elif data=="contact_forces" or data=="f":
             ContactForces = np.zeros(6)
             ContactForces[:3] = self.FLContact
             ContactForces[3:] = self.FRContact
             return ContactForces
         elif data=="q":
-            return self.q, 
+            return np.copy(self.q)
         elif data=="qdot":
-            return self.qdot
+            return np.copy(self.qdot)
         elif data=="tau":
-            return self.tau
+            return np.copy(self.tau)
         elif data=="left_foot_pos":
             # left foot position in base frame
             pos, _ = self.ComputeFramePose(self.FeetIndexes[0])
@@ -417,6 +439,10 @@ class Estimator():
             return pos
         elif data=="timestamp" or data=="t":
             return self.TimeRunning
+        
+        # other instantaneous getter
+        elif data=="attitude_tilt" or data=="theta_tilt":
+            return np.copy(self.theta_tilt)
         
 
         # logs data getter
@@ -559,52 +585,6 @@ class Estimator():
             self.ContactFoot = "none"
             
     
-    def FootStepLen_(self, LeftContact, RightContact):
-        """
-        Measure length of a footstep
-        Bolt switch contact foot when LeftContact = RightContact
-        ----------
-        LeftContact : Bool
-        RightContact : Bool
-        ----------
-        Returns None
-        """
-        if LeftContact == RightContact :
-            # double contact, or close from it
-            self.SwitchLen += 1
-            # compute foot to foot distance
-            BaseToBackFoot, _ = self.ComputeFramePose(self.FeetIndexes[self.PreviousContactFoot])
-            BaseToFrontFoot, _ = self.ComputeFramePose(self.FeetIndexes[1-self.PreviousContactFoot])
-            # average over the current switch
-            self.SwitchDelta = ( self.SwitchDelta*(self.SwitchLen - 1) + (BaseToFrontFoot - BaseToBackFoot) ) / self.SwitchLen
-        
-        elif (LeftContact and self.PreviousContactFoot==1) or (RightContact and self.PreviousContactFoot==0):
-            # simple contact or delay in contact detection
-            self.SwitchLen += 1
-            # update contact foot
-            if LeftContact :
-                self.PreviousContactFoot = 0
-            else :
-                self.PreviousContactFoot = 1
-            # compute foot to foot distance
-            BaseToBackFoot, _ = self.ComputeFramePose(self.FeetIndexes[self.PreviousContactFoot])
-            BaseToFrontFoot, _ = self.ComputeFramePose(self.FeetIndexes[1-self.PreviousContactFoot])
-            # average over the current switch
-            #self.SwitchDelta = ( self.SwitchDelta*(self.SwitchLen - 1) + (BaseToBackFoot - BaseToFrontFoot) ) / self.SwitchLen
-            self.SwitchDelta = BaseToBackFoot - BaseToFrontFoot
-            
-        else :
-            # robot on a swing leg : ending footstep
-            if self.SwitchLen != 0 :
-                # just ended switch phase
-                self.AllTimeSwitchDeltas[:] += self.SwitchDelta[:]
-                if self.Talkative or True : self.logger.LogTheLog(f"Switch ended on iter {self.iter}, step of length {self.SwitchDelta} lasting {self.SwitchLen} iter.", "subinfo")
-            self.SwitchLen = 0
-            self.SwitchDelta = np.zeros((3,))
-            if LeftContact :
-                self.PreviousContactFoot = 0
-            else :
-                self.PreviousContactFoot = 1
         
 
         
@@ -619,7 +599,7 @@ class Estimator():
         ----------
         Returns None
         """
-        EndingSwitch = False
+        self.EndingSwitch = False
         
         # entering switch phase
         if (LeftContact != self.PreviousLeftContact or RightContact != self.PreviousRightContact) and not self.Switch :
@@ -646,24 +626,25 @@ class Estimator():
         # switch finished
         if (LeftContact!=self.PreviousLeftContact and RightContact!=self.PreviousRightContact):
             # ending switch
-            EndingSwitch = True
+            self.EndingSwitch = True
             
         # did not initialize correctly, or got lost somehow
-        if self.SwitchLen > MaxSwitchLen and not (LeftContact and RightContact):
+        if self.Switch and self.SwitchLen > MaxSwitchLen and not (LeftContact and RightContact):
             # ending switch
-            EndingSwitch= True
+            self.EndingSwitch= True
             if self.Talkative : self.logger.LogTheLog(f"Switch stopped on iter {self.iter} : exceding max switch duration {MaxSwitchLen} iter ", "warn")
             
-        if EndingSwitch :
+        if self.EndingSwitch :
             # ending switch
             self.Switch = False
-            self.SwitchLen = 0
+            self.StepDuration = self.iter - self.StepStart
+            self.StepStart = self.iter
             # updating all-time distance
             self.AllTimeSwitchDeltas[:] += self.SwitchDelta[:]
             # updating contact info
             self.PreviousLeftContact = LeftContact
             self.PreviousRightContact = RightContact
-            if self.Talkative or True: self.logger.LogTheLog(f"Switch ended on iter {self.iter}, step of length {self.SwitchDelta} lasting {self.SwitchLen} iter.", "subinfo")
+            if self.Talkative : self.logger.LogTheLog(f"Switch ended on iter {self.iter}, step of length {self.SwitchDelta} lasting {self.SwitchLen} iter.", "subinfo")
 
         
 
@@ -738,10 +719,14 @@ class Estimator():
         
         return p
     
-    def ComputeFramePose(self, nframe):
+    def ComputeFramePose(self, nframe) -> tuple((np.ndarray, np.ndarray)):
         """ get frame 'nframe' pose in base frame 
             ie. {baseframe -> nframe} 
         """
+        pin.forwardKinematics(self.robot.model, self.robot.data, self.q)
+        pin.updateFramePlacements(self.robot.model, self.robot.data)
+        pin.computeAllTerms(self.robot.model, self.robot.data, self.q, self.qdot)
+        
         BaseFramePose = self.robot.data.oMf[self.BaseID].inverse()*self.robot.data.oMf[nframe]
         BaseFrameAttitude = np.array(BaseFramePose.rotation).copy()
         BaseFramePosition = np.array(BaseFramePose.translation).copy()
@@ -849,12 +834,12 @@ class Estimator():
         else :
             ContactFootID = self.FeetIndexes[1]
         # run tilt estimator
-        self.v_tilt, self.g_tilt = self.TiltandSpeedEstimator.Estimate(Q=self.q,
-                                            Qd=self.qdot,
+        self.v_tilt, self.g_tilt = self.TiltandSpeedEstimator.Estimate(Q=self.q.copy(),
+                                            Qd=self.qdot.copy(),
                                             BaseID=1,
                                             ContactFootID=ContactFootID,
-                                            ya=self.ag_imu,
-                                            yg=self.w_imu, 
+                                            ya=self.ag_imu.copy(),
+                                            yg=self.w_imu.copy(), 
                                             dt=self.TimeStep)
         
         # filter results
@@ -957,18 +942,36 @@ class Estimator():
 
         self.g_out = R.from_quat(self.theta_out).apply(np.array([0, 0, -1]))
 
-        self.a_out = self.a_imu
+        self.a_out[:] = self.a_imu[:]
+        self.w_out[:] = self.w_imu[:]
         
-        # correct position using kin
+        # correct z position using kin
         BaseKinPos = self.KinematicPosition()
 
         if BaseKinPos is not None :
-            # at least one foot is touching the ground
+            # at least one foot is touching the ground, correcting base height
             self.c_out[2] =  -BaseKinPos[2] + 0.01 # foot radius
-            
         self.c_out[2] = self.HeightFilter.RunFilter(self.c_out[2], self.v_out[2])
-        
+
+        # correcting x position using kin
         self.FootStepLen(self.LeftContact, self.RightContact, MaxSwitchLen=15)
+        if self.TimeRunning > self.T0posDriftComp :
+            if self.EndingSwitch and self.StepDuration > 70 :
+                # switch just ended, position have been updated & step has dured long enough
+                # compute increment to add over next step to compensate drift
+                PosDrift = self.AllTimeSwitchDeltas[0] - self.c_out[0]
+                sat = 0.05
+                if PosDrift < -sat:
+                    PosDrift = -sat
+                elif PosDrift > sat:
+                    PosDrift = sat
+                self.PosDriftCompensation = PosDrift/self.StepDuration
+            self.c_out[0] += self.PosDriftCompensation
+                
+                
+                
+            
+        
         
         
         

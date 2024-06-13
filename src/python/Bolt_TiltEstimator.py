@@ -65,6 +65,20 @@ class TiltEstimator():
 
         return None
     
+    def SetInitValues(self, BaseSpeed, BaseAccG, UnitGravity, UnitGravityDerivative, BaseWRTFootOrientationAsMatrix):
+        """ modify init values """
+        self.x1_hat = BaseSpeed.copy()
+        self.x2_prime = UnitGravity.copy()
+        self.x2_hat = UnitGravity.copy()
+        
+        self.x1_hat_dot = BaseAccG.copy() + UnitGravity*9.81
+        self.x2_hat_dot = UnitGravityDerivative.copy()
+        self.x2_prime_dot = UnitGravityDerivative.copy()
+        self.c_R_l = BaseWRTFootOrientationAsMatrix
+        
+        print(self.x1_hat_dot)
+        print("aaaaaaaaaaaaaaa")
+    
     
     def InitLogs(self)-> None :
         """ create log matrixes"""
@@ -143,7 +157,7 @@ class TiltEstimator():
         # rotation matrix of base frame (l) in contact foot frame (c)
         self.prev_c_R_l[:, :] = self.c_R_l.copy()
         self.c_R_l = np.array(self.data.oMf[BaseID].rotation.copy()) @ np.array(self.data.oMf[ContactFootID].rotation.copy()).T
-        self.c_Rdot_l =  (self.c_R_l - self.prev_c_R_l) / dt # TODO : chk
+        #self.c_Rdot_l =  (self.c_R_l - self.prev_c_R_l) / dt # TODO : chk
 
         # position of base frame in contact foot frame
         self.c_P_l = np.array((self.data.oMf[ContactFootID].inverse()*self.data.oMf[BaseID]).translation).copy()
@@ -203,9 +217,9 @@ class TiltEstimator():
         self.PinocchioUpdate(BaseID, ContactFootID, dt)
         self.yv = self.GetYV_v1()
         # check dimensions
-        if not self.CheckDim(ya, 0, 3) : print("non pour ya")
-        if not self.CheckDim(yg, 0, 3) : print("non pour yg")
-        if not self.CheckDim(self.x1_hat, 0, 3) : print("non pour x1_hat")
+        if not self.CheckDim(ya, 0, 3) : print("dim error ya")
+        if not self.CheckDim(yg, 0, 3) : print("dim error yg")
+        if not self.CheckDim(self.x1_hat, 0, 3) : print("dim error x1_hat")
           
         # state variables derivatives update
         self.x1_hat_dot = - self.S(yg) @ self.x1_hat - self.g0*self.x2_prime + ya + self.alpha1*( self.yv - self.x1_hat)
@@ -227,12 +241,14 @@ class TiltEstimator():
         # logging
         if self.Logging : self.UpdateLogs()
         self.iter += 1
-
-        #x3 = ya - self.S(yg)@self.x1_hat - self.x1_hat_dot
-        x3 = np.array([self.x2_hat[0], self.x2_hat[1], -self.x2_hat[2]])
         
         # norm x2
         self.x2_hat /= np.linalg.norm(self.x2_hat)
+        
+        #x3 = ya - self.S(yg)@self.x1_hat - self.x1_hat_dot
+        x3 = np.array([self.x2_hat[0], self.x2_hat[1], -self.x2_hat[2]])
+        
+        
         # return estimated data
         return self.x1_hat, x3 # TODO : mod
     

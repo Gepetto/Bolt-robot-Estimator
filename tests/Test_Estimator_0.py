@@ -36,12 +36,12 @@ def TiltfromG(g0) -> np.ndarray:
     return euler
 
 def main():
-    N  = 1000 - 1
+    N  = 3000 - 1
     dt = 1e-3
     T  = N*dt
     kf = 3
-    #ToPlot = "inputs, position, vitesse, acc�l�ration, attitude, omega, tau, q, qdot, contact, trust, forces "
-    ToPlot = "position, contact"
+    #ToPlot = "inputs, position, vitesse, accélération, attitude, omega, tau, q, qdot, contact, trust, forces, g "
+    ToPlot = "vitesse  "
 
     # create objects
     testlogger = Log("test", PrintOnFlight=True)
@@ -60,11 +60,11 @@ def main():
                     Talkative=False,
                     logger=testlogger,
                     AttitudeFilterType = "complementary",
-                    parametersAF = [2],         # r�gl�
+                    parametersAF = [2],         # réglé
                     SpeedFilterType = "complementary",
-                    parametersSF = [1.1],       # r�gl�
-                    parametersPF = [0.15],      # r�gl�
-                    parametersTI = [10, 60, 2], # r�gl�
+                    parametersSF = [1.1],       # réglé
+                    parametersPF = [0.15],      # réglé
+                    parametersTI = [10, 60, 2], # réglé
                     TimeStep = dt,
                     IterNumber = N,
                     EstimatorLogging=logging,
@@ -99,8 +99,10 @@ def main():
     
     # run the estimator as if
     # device will iterate over generated data each time estimator calls it
+    start=200
+    device.iter = start
     t0 = t.time()
-    for j in range(N-1):
+    for j in range(start, N-1):
         # device.Read()
         # a = device.baseLinearAcceleration.copy()
         # ag = device.baseLinearAccelerationGravity.copy()
@@ -114,11 +116,25 @@ def main():
         #                                     q_mes=q,
         #                                     v_mes=v, 
         #                                     tau_mes=tau)
+        if  estimator.iter == 1 :
+            v = True_v[start, 1, :]
+            ag = device.AccG_true[start, :]
+            ug = utils.normalize(True_g[start, :])
+            udg = (True_g[start, :] -  True_g[start-1, :])/dt / np.linalg.norm(True_g[start, :])
+
+
+            estimator.SetInitValues(BaseSpeed=v,
+                                    BaseAccG=ag, 
+                                    UnitGravity=ug, 
+                                    UnitGravityDerivative=udg, 
+                                    ContactFootID=10,
+                                    Q = True_Q[start, :],
+                                    Qd = True_Qd[start, :])
         estimator.Estimate()
 
     t1 = t.time()
     print(" ")
-    print(f"Estimator : \n\t was executed {N-1} times\n\t within {round(t1-t0, 3)}s\n\t @ f={Decimal(str((N-1)/(t1-t0))):.3E}")
+    print(f"Estimator : \n\t was executed {N-1 - start} times\n\t within {round(t1-t0, 3)}s\n\t @ f={Decimal(str((N-1-start)/(t1-t0))):.3E}")
     print(" ")
     
     # get logs from estimator
@@ -235,16 +251,16 @@ def main():
         grapher.CompareNDdatas([LCF_3D[2:, :], LCF_T[2:, :], RCF_3D[2:, :], RCF_T[2:, :]], datatype='force', title='comparing contact force')
         
         grapher.SetLegend(["Left Z force from 3D", "Left force from torques", "True left Force"], ndim=1)
-        grapher.CompareNDdatas([LCF_3D[2:, :],  LCF_T[2:, :], [True_LCF[:N, 2]]], datatype='force', title='comparing contact force')
+        grapher.CompareNDdatas([LCF_3D[2:, :],  LCF_T[2:, :], [True_LCF[start:N, 2]]], datatype='force', title='comparing contact force')
     
     if "vitesse" in ToPlot :
         """
         grapher.SetLegend(["v from tilt estimator", "True v"], ndim=3)
-        grapher.CompareNDdatas([v_tilt, True_v[:N, 1, :].T], datatype='speed', title='Tilt estimator output', mitigate=[1])
+        grapher.CompareNDdatas([v_tilt, True_v[start:N, 1, :].T], datatype='speed', title='Tilt estimator output', mitigate=[1])
         
         
         grapher.SetLegend(["v from tilt estimator", "Kin v", "True v"], ndim=3)
-        grapher.CompareNDdatas([v_tilt, v_kin, True_v[:N, 1, :].T], datatype='speed', title='speed estimation comparison', mitigate=[2])
+        grapher.CompareNDdatas([v_tilt, v_kin, True_v[start:N, 1, :].T], datatype='speed', title='speed estimation comparison', mitigate=[2])
         """
         
         grapher.SetLegend(["vx out", "True vx", "Error"], ndim=1)
@@ -254,48 +270,48 @@ def main():
         
         
         grapher.SetLegend(["v out", "True v"], ndim=3)
-        grapher.CompareNDdatas([v_out, True_v[:N, 1, :].T], datatype='speed', title='Estimator output, speed', mitigate=[1])
+        grapher.CompareNDdatas([v_out, True_v[start:N, 1, :].T], datatype='speed', title='Estimator output, speed', mitigate=[1])
         
         grapher.SetLegend(["v out", "v tilt", "True v"], ndim=3)
-        grapher.CompareNDdatas([v_out, v_tilt, True_v[:N, 1, :].T], datatype='speed', title='Etimator output, speed', mitigate=[2])
+        grapher.CompareNDdatas([v_out, v_tilt, True_v[start:N, 1, :].T], datatype='speed', title='Etimator output, speed', mitigate=[2])
     if "position" in ToPlot :
         grapher.SetLegend(["base pos out", "True base pos"], ndim=3)
-        grapher.CompareNDdatas([c_out,  True_x[:N, :].T], datatype='position', title='Estimator output, position', mitigate=[1])
+        grapher.CompareNDdatas([c_out,  True_x[start:N, :].T], datatype='position', title='Estimator output, position', mitigate=[1])
 
         grapher.SetLegend(["base pos switch", "True base pos"], ndim=3)
-        grapher.CompareNDdatas([c_switch,  True_x[:N, :].T], datatype='position', title='Estimator switch out, position', mitigate=[1])
+        grapher.CompareNDdatas([c_switch,  True_x[start:N, :].T], datatype='position', title='Estimator switch out, position', mitigate=[1])
 
 
     if "attitude" in ToPlot :
         grapher.SetLegend(["theta tilt", "theta_true"], ndim=3)
-        grapher.CompareNDdatas([theta_tilt, True_Theta[:N, :].T], datatype='orientation', title='Tilt estimator output, attitude', mitigate=[1])
+        grapher.CompareNDdatas([theta_tilt, True_Theta[start:N, :].T], datatype='orientation', title='Tilt estimator output, attitude', mitigate=[1])
         
         grapher.SetLegend(["theta tilt", "theta_out", "theta_true"], ndim=3)
-        grapher.CompareNDdatas([theta_tilt, theta_out, True_Theta[:N, :].T], datatype='orientation', title='Tilt estimator output, attitude', mitigate=[2])
+        grapher.CompareNDdatas([theta_tilt, theta_out, True_Theta[start:N, :].T], datatype='orientation', title='Tilt estimator output, attitude', mitigate=[2])
         
         grapher.SetLegend(["quat tilt", "quat out"], ndim=4)
         grapher.CompareNDdatas([quat_tilt, quat_out], datatype='quaternion', title='Estimator quaternions', mitigate=[1])
         
         """
         grapher.SetLegend(["theta_true", "theta_computed"], ndim=3)
-        grapher.CompareNDdatas([True_Theta[:N, :].T, Computed_Theta], datatype='orientation', title='Computed output, attitude', mitigate=[1])
+        grapher.CompareNDdatas([True_Theta[start:N, :].T, Computed_Theta], datatype='orientation', title='Computed output, attitude', mitigate=[1])
         """
         grapher.SetLegend(["theta out", "theta_true"], ndim=3)
-        grapher.CompareNDdatas([theta_out, True_Theta[:N, :].T,], datatype='orientation', title='Estimator output, attitude', mitigate=[1])
+        grapher.CompareNDdatas([theta_out, True_Theta[start:N, :].T,], datatype='orientation', title='Estimator output, attitude', mitigate=[1])
     
     if "g" in ToPlot :
         grapher.SetLegend(["g from tilt estimator", "True g",], ndim=3)
-        grapher.CompareNDdatas([9.81*g_tilt, True_g[:N, :].T], datatype='vertical', title='Tilt estimator output', mitigate=[1])
+        grapher.CompareNDdatas([9.81*g_tilt, True_g[start:N, :].T], datatype='vertical', title='Tilt estimator output', mitigate=[1])
         
         grapher.SetLegend(["g out", "True g",], ndim=3)
-        grapher.CompareNDdatas([9.81*g_out, True_g[:N, :].T], datatype='vertical', title='Estimator output', mitigate=[1])
+        grapher.CompareNDdatas([9.81*g_out, True_g[start:N, :].T], datatype='vertical', title='Estimator output', mitigate=[1])
         """
         grapher.SetLegend(["g from tilt estimator", "Rebuilt g",], ndim=3)
         grapher.CompareNDdatas([-9.81*g_tilt, g_rebuilt], datatype='vertical', title='Tilt estimator output and rebuilt', mitigate=[1])
         """
     if "omega" in ToPlot :
         grapher.SetLegend(["omega tilt", "omega true"], ndim=3)
-        grapher.CompareNDdatas([omega_tilt.T, True_w[:N, :].T], datatype='rad per s', title='Tilt estimator output, angular speed', mitigate=[1])
+        grapher.CompareNDdatas([omega_tilt.T, True_w[start:N, :].T], datatype='rad per s', title='Tilt estimator output, angular speed', mitigate=[1])
 
     if "forces" in ToPlot :
         L3DNorm = np.linalg.norm(LCF_3D, axis=0)

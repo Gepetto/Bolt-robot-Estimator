@@ -214,6 +214,8 @@ class ContactEstimator():
         """Bring x data between 0 and 1, such that P(x=center)=0.5. The greater stiffness, the greater dP/dx (esp. around x=center)"""
         b0 = stiffness
         b = b0/center
+        if b*x < -100 :
+            return 1
         return 1/ (1 + np.exp(-b*x + b0))
     
     def __ApplyForce(self, ContactForces):

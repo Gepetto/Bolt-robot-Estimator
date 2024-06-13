@@ -57,13 +57,16 @@ class DataReader():
             print(Y)
         self.grapher.CompareNDdatas([Y], datatype='logs', title=title, StyleAdapter=True)
     
-    def LoadAndPlotDualLogs(self, file1, file2, ndim, title, toprint=False):
+    def LoadAndPlotDualLogs(self, file1, file2, ndim, title, toprint=False, transpose=False):
         #prefix = "/home/nalbrecht/Bolt-Estimator/Bolt-robot---Estimator/data/simu/"
         prefix = "/home/nalbrecht/Bolt-Estimator/bipedal-control/"
         self.prefix = prefix
         filename1 = prefix + file1
         filename2 = prefix + file2
-        Y = np.load(filename1)
+        if transpose : 
+            Y = np.load(filename1).T
+        else :
+            Y = np.load(filename1)
         Z = np.load(filename2).T
         _, n1 = Y.shape
         _, n2 = Z.shape
@@ -239,31 +242,51 @@ def LogLoading():
     Reader = DataReader(logger=logger)
     #Reader.LoadAndPlotLog("theta_out.npy", 4, "theta")
     #Reader.LoadAndPlotLog("c_out.npy", 3, "c out")
-    Reader.fall = 10000-1
+    Reader.fall = 6000-1
     #Reader.LoadAndPlotDualLogs("g_out.npy", "true_g_logs.npy", 3, "g out and true")
     #Reader.LoadAndPlotDualLogs("g_tilt.npy", "true_g_logs.npy", 3, "g tilt and true")
-    #Reader.LoadAndPlotDualLogs("v_out.npy", "true_speed_logs.npy", 3, "v out and true", True)
+    #Reader.LoadAndPlotDualLogs("v_out.npy", "true_speed_logs.npy", 3, "v out and true", False)
     #Reader.LoadAndPlotDualLogs("v_tilt.npy", "true_speed_logs.npy", 3, "v tilt and true", True)
-    Reader.LoadAndPlotDualLogs("c_switch.npy", "true_pos_logs.npy", 3, "pos from switch and true")
-    Reader.LoadAndPlotDualLogs("c_out.npy", "true_pos_logs.npy", 3, "pos out and true")
-    #Reader.LoadAndPlotDualLogs("theta_out.npy", "true_theta_logs.npy", 4, "theta out and true")
+    #Reader.LoadAndPlotDualLogs("c_switch.npy", "true_pos_logs.npy", 3, "pos from switch and true")
+    #Reader.LoadAndPlotDualLogs("c_out.npy", "true_pos_logs.npy", 3, "pos out and true")
+    Reader.LoadAndPlotDualLogs("theta_out.npy", "true_theta_logs.npy", 4, "theta out and true")
     #Reader.LoadAndPlotDualLogs("theta_tilt.npy", "true_theta_logs.npy", 4, "theta tilt and true")
     #Reader.LoadAndPlotLog("a.npy", 3, "a")
     #Reader.LoadAndPlotLog("q.npy", 6, "q")
     #Reader.LoadAndPlotLog("qdot.npy", 6, "qdot")
-    Reader.LoadAndPlotLog("Contact.npy", 2, "contact out")
+    #Reader.LoadAndPlotLog("Contact.npy", 2, "contact out")
     #Reader.LoadAndPlotDualLogs("w.npy", "true_omega_logs.npy", 3, "omega out and true")
 
+    
+    Reader.LoadAndPlotDualLogs("com_pos_logs.npy", "true_pos_logs.npy", 3, "pos command and true", transpose=True)
+    Reader.LoadAndPlotDualLogs("com_speed_logs.npy", "true_speed_logs.npy", 3, "v command and true", transpose=True)
+    Reader.LoadAndPlotDualLogs("com_omega_logs.npy", "true_omega_logs.npy", 3, "omega command and true", transpose=True)
+    
     # convert to euler
     theta_true = R.from_quat(np.load(Reader.prefix + "true_theta_logs.npy")).as_euler('xyz').T
+    theta_com = R.from_quat(np.load(Reader.prefix + "com_theta_logs.npy")).as_euler('xyz').T
     theta_out = R.from_quat(np.load(Reader.prefix + "theta_out.npy").T).as_euler('xyz').T
+
     _, n1 = theta_true.shape
-    _, n2 = theta_out.shape
-    n = Reader.fall
-    Reader.grapher.SetLegend(["Theta true", "Theta out"], ndim=3)
-    #Reader.grapher.CompareNDdatas([theta_true[:, :n], theta_out[:, :n]], datatype='radian', title='Attitude as Euler', mitigate=[1])
+    _, n2 = theta_com.shape
+    n = min(min(n1, n2), Reader.fall)
+    
+    Reader.grapher.SetLegend(["Theta true", "Theta command"], ndim=3)
+    Reader.grapher.CompareNDdatas([theta_true[:, :n], theta_com[:, :n]], datatype='radian', title='Attitude as Euler', mitigate=[1])
     Reader.grapher.SetLegend(["Error on theta"], ndim=3)
-    #Reader.grapher.CompareNDdatas([theta_true[:, :n]-theta_out[:, :n]], datatype='radian', title='Error on Attitude as Euler', mitigate=[1])
+    Reader.grapher.CompareNDdatas([theta_true[:, :n]-theta_com[:, :n]], datatype='radian', title='Error on Attitude com as Euler', mitigate=[1])
+    
+    theta_true = np.load(Reader.prefix + "true_theta_logs.npy")
+    theta_com = np.load(Reader.prefix + "com_theta_logs.npy")
+    print(theta_true[70, :]-theta_com[70, :])
+    print(theta_true[150, :]-theta_com[150, :])
+
+    # Reader.grapher.SetLegend(["Theta true", "Theta out"], ndim=3)
+    # Reader.grapher.CompareNDdatas([theta_true[:, :n], theta_out[:, :n]], datatype='radian', title='Attitude as Euler', mitigate=[1])
+    # Reader.grapher.SetLegend(["Error on theta"], ndim=3)
+    # Reader.grapher.CompareNDdatas([theta_true[:, :n]-theta_out[:, :n]], datatype='radian', title='Error on Attitude out as Euler', mitigate=[1])
+   
+
     Reader.EndPlot()
 
 
