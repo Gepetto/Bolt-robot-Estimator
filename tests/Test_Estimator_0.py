@@ -41,7 +41,7 @@ def main():
     T  = N*dt
     kf = 3
     #ToPlot = "inputs, position, vitesse, accélération, attitude, omega, tau, q, qdot, contact, trust, forces, g "
-    ToPlot = "vitesse  "
+    ToPlot = "vitesse attitude "
 
     # create objects
     testlogger = Log("test", PrintOnFlight=True)
