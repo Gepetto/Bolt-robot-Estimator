@@ -1,6 +1,6 @@
 import sys
 #sys.path.append('/home/niels/Supaéro/Stage 2A/Gepetto/Code/Bolt-robot---Estimator/src/python')
-sys.path.append('/home/nalbrecht//Bolt-Estimator/Bolt-robot---Estimator/src/python')
+sys.path.append('/home/nalbrecht//Bolt-Estimator/Bolt-robot-Estimator/src/python')
 import numpy as np
 from scipy.spatial.transform import Rotation as R
 import time as t
@@ -13,8 +13,8 @@ from Bolt_Estimator_0 import Estimator
 from DeviceEmulator import DeviceEmulator
 from TrajectoryGenerator import TrajectoryGenerator
 from Bolt_Filter_Complementary import ComplementaryFilter
-#sys.path.append('/home/niels/Supaéro/Stage 2A/Gepetto/Code/Bolt-robot---Estimator/data')
-sys.path.append('/home/nalbrecht//Bolt-Estimator/Bolt-robot---Estimator/data')
+#sys.path.append('/home/niels/Supaéro/Stage 2A/Gepetto/Code/Bolt-robot-Estimator/data')
+sys.path.append('/home/nalbrecht/Bolt-Estimator/Bolt-robot-Estimator/data')
 from DataReader import DataReader
 
 
@@ -41,7 +41,7 @@ def main():
     T  = N*dt
     kf = 3
     #ToPlot = "inputs, position, vitesse, accélération, attitude, omega, tau, q, qdot, contact, trust, forces, g "
-    ToPlot = "vitesse attitude "
+    ToPlot = "vitesse attitude position "
 
     # create objects
     testlogger = Log("test", PrintOnFlight=True)
@@ -67,6 +67,7 @@ def main():
                     parametersTI = [10, 60, 2], # réglé
                     TimeStep = dt,
                     IterNumber = N,
+                    T0posDriftComp = 2.0,
                     EstimatorLogging=logging,
                     ContactLogging=logging,
                     TiltLogging=logging)
@@ -99,7 +100,7 @@ def main():
     
     # run the estimator as if
     # device will iterate over generated data each time estimator calls it
-    start=200
+    start=0
     device.iter = start
     t0 = t.time()
     for j in range(start, N-1):

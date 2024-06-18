@@ -104,7 +104,7 @@ class ComplementaryFilter():
         return self.Estimate
 
     # standard filter with offset commpensation and adaptative gain for quicker convergence
-    def RunFilterOffset3(self, x, xdot) -> np.ndarray:
+    def RunFilterOffsetAdaptive(self, x, xdot) -> np.ndarray:
         # complementary filter x and its temporal derivative xdot. Updates previous estimates and returns current estimate.
         # check data
         if (not isinstance(x, np.ndarray) or not isinstance(xdot, np.ndarray)):

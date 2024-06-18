@@ -12,11 +12,11 @@ Uses IMU and kinematics data to estimate the rotation betwwen world frame and fo
 
 
 
-class BenallegueEstimator():
+class FootAttitudeEstimator():
     def __init__(self,
                 parameters=[0.001, 2],
                 dt=0.01,
-                name="[Benallegue]",
+                name="[Foot attitude estimator]",
                 talkative=False,
                 logger=None,
                 ) -> None:
@@ -47,7 +47,7 @@ class BenallegueEstimator():
         if logger is not None : 
             self.logger = logger
             self.Talkative = False
-        if self.Talkative : self.logger.LogTheLog("Filter '" + self.name + "' initialized with parameters " + str(self.parameters))
+        if self.Talkative : self.logger.LogTheLog("Estimator '" + self.name + "' initialized with parameters " + str(self.parameters))
 
 
     def Y1(self, yg):
@@ -71,11 +71,11 @@ class BenallegueEstimator():
         
 
 
-    # run filter
+    # run estimator
     # take :
         # Base pose with regard to the foot touching the ground
         # accelerometer and gyrometer acc. and rot.
-    def RunFilter(self, IMUKinPos, IMUKinRot, ya, yg) -> np.ndarray:
+    def Estimator(self, IMUKinPos, IMUKinRot, ya, yg) -> np.ndarray:
         # run estimator
         if self.k==0:
             # estimator runs for the first time

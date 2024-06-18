@@ -5,9 +5,9 @@ from scipy.spatial.transform import Rotation as R
 
 import sys
 #sys.path.append('/home/niels/Supaéro/Stage 2A/Gepetto/Code/Bolt-robot---Estimator/tests')
-sys.path.append('/home/nalbrecht//Bolt-Estimator/Bolt-robot---Estimator/tests')
+sys.path.append('/home/nalbrecht//Bolt-Estimator/Bolt-robot-Estimator/tests')
 from Graphics import Graphics
-sys.path.append('/home/nalbrecht//Bolt-Estimator/Bolt-robot---Estimator/src/python')
+sys.path.append('/home/nalbrecht//Bolt-Estimator/Bolt-robot-Estimator/src/python')
 #sys.path.append('/home/niels/Supaéro/Stage 2A/Gepetto/Code/Bolt-robot---Estimator/src/python')
 from Bolt_Utils import Log
 
@@ -247,15 +247,15 @@ def LogLoading():
     Reader = DataReader(logger=logger, start=START)
     #Reader.LoadAndPlotLog("theta_out.npy", 4, "theta")
     #Reader.LoadAndPlotLog("c_out.npy", 3, "c out")
-    Reader.fall = 3500-1
+    Reader.fall = 4500-1
     #Reader.LoadAndPlotDualLogs("g_out.npy", "true_g_logs.npy", 3, "g out and true")
     #Reader.LoadAndPlotDualLogs("g_tilt.npy", "true_g_logs.npy", 3, "g tilt and true")
-    Reader.LoadAndPlotDualLogs("v_out.npy", "true_speed_logs.npy", 3, "v out and true", False)
-    Reader.LoadAndPlotDualLogs("v_tilt.npy", "true_speed_logs.npy", 3, "v tilt and true", True)
-    #Reader.LoadAndPlotDualLogs("c_switch.npy", "true_pos_logs.npy", 3, "pos from switch and true")
-    Reader.LoadAndPlotDualLogs("c_out.npy", "true_pos_logs.npy", 3, "pos out and true")
-    Reader.LoadAndPlotDualLogs("theta_out.npy", "true_theta_logs.npy", 4, "theta out and true")
-    Reader.LoadAndPlotDualLogs("theta_tilt.npy", "true_theta_logs.npy", 4, "theta tilt and true")
+    # Reader.LoadAndPlotDualLogs("v_out.npy", "true_speed_logs.npy", 3, "v out and true", False)
+    # Reader.LoadAndPlotDualLogs("v_tilt.npy", "true_speed_logs.npy", 3, "v tilt and true", True)
+    Reader.LoadAndPlotDualLogs("c_switch.npy", "true_pos_logs.npy", 3, "pos from switch and true")
+    # Reader.LoadAndPlotDualLogs("c_out.npy", "true_pos_logs.npy", 3, "pos out and true")
+    # Reader.LoadAndPlotDualLogs("theta_out.npy", "true_theta_logs.npy", 4, "theta out and true")
+    # Reader.LoadAndPlotDualLogs("theta_tilt.npy", "true_theta_logs.npy", 4, "theta tilt and true")
     #Reader.LoadAndPlotLog("a.npy", 3, "a")
     #Reader.LoadAndPlotLog("q.npy", 6, "q")
     #Reader.LoadAndPlotLog("qdot.npy", 6, "qdot")

@@ -5,9 +5,9 @@ from scipy.spatial.transform import Rotation as R
 
 import sys
 #sys.path.append('/home/niels/Supaéro/Stage 2A/Gepetto/Code/Bolt-robot---Estimator/tests')
-sys.path.append('/home/nalbrecht//Bolt-Estimator/Bolt-robot---Estimator/tests')
+sys.path.append('/home/nalbrecht//Bolt-Estimator/Bolt-robot-Estimator/tests')
 from Graphics import Graphics
-sys.path.append('/home/nalbrecht//Bolt-Estimator/Bolt-robot---Estimator/src/python')
+sys.path.append('/home/nalbrecht//Bolt-Estimator/Bolt-robot-Estimator/src/python')
 #sys.path.append('/home/niels/Supaéro/Stage 2A/Gepetto/Code/Bolt-robot---Estimator/src/python')
 from Bolt_Utils import Log
 
@@ -118,7 +118,7 @@ class DataReader():
         kfile = str(k)
         #prefix = "/home/nalbrecht/Bolt-Estimator/bipedal-control/bipedal-control/"
         #prefix = "/home/nalbrecht/Bolt-Estimator/bipedal-control/bipedal-control/Données cancer niels/" + kfile + "/"
-        prefix = "/home/nalbrecht/Bolt-Estimator/Bolt-robot---Estimator/data/" + kfile + "/"
+        prefix = "/home/nalbrecht/Bolt-Estimator/Bolt-robot-Estimator/data/" + kfile + "/"
         #prefix = "/home/niels/Supaéro/Stage 2A/Gepetto/Code/Bolt-robot---Estimator/data/" + kfile + "/"
         self.prefix=prefix
         

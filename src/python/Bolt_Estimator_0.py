@@ -13,7 +13,7 @@ from Bolt_TiltEstimator import TiltEstimator
 
 from Bolt_Filter import Filter
 from Bolt_Filter_Complementary import ComplementaryFilter
-from Bolt_Filter_Benallegue import BenallegueEstimator
+from Bolt_FootAttitudeEstimator import FootAttitudeEstimator
 
 
 """
@@ -224,7 +224,7 @@ class Estimator():
         
         
         # returns info on foot attitude
-        self.FootAttitudeEstimator = BenallegueEstimator(parameters=[self.TimeStep, 2],
+        self.FootAttitudeEstimator = FootAttitudeEstimator(parameters=[self.TimeStep, 2],
                                                          dt=self.TimeStep,
                                                          name="Foot Attitude Estimator",
                                                          talkative=Talkative,
