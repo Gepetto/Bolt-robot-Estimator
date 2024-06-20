@@ -41,7 +41,7 @@ def main():
     T  = N*dt
     kf = 3
     #ToPlot = "inputs, position, vitesse, accélération, attitude, omega, tau, q, qdot, contact, trust, forces, g "
-    ToPlot = "vitesse attitude position "
+    ToPlot = "position"
 
     # create objects
     testlogger = Log("test", PrintOnFlight=True)
@@ -84,6 +84,8 @@ def main():
 
     # get some data from simulation to compare to
     True_LCF = reader.Get("lcf")
+    True_RCF = reader.Get("rcf")
+
     True_v = reader.Get("v")
     True_a = reader.Get("a")[:, 1, :]
     True_g = device.AccG_true - device.Acc_true
@@ -245,14 +247,19 @@ def main():
         
         grapher.SetLegend(["Right force from 3D",], ndim=3)
         grapher.CompareNDdatas([RCF_3D], datatype='force', title='3D right contact force')
+        
         grapher.SetLegend(["Right force from torques",], ndim=3)
         grapher.CompareNDdatas([RCF_T], datatype='force', title='torque right contact force')
     
         grapher.SetLegend(["Left force from 3D", "Left force from torques", "Right force from 3D", "Right force from torques",], ndim=1)
-        grapher.CompareNDdatas([LCF_3D[2:, :], LCF_T[2:, :], RCF_3D[2:, :], RCF_T[2:, :]], datatype='force', title='comparing contact force')
+        grapher.CompareNDdatas([LCF_3D[2:, :], LCF_T[2:, :], RCF_3D[2:, :], RCF_T[2:, :]], datatype='force', title='comparing Z contact force')
         
         grapher.SetLegend(["Left Z force from 3D", "Left force from torques", "True left Force"], ndim=1)
-        grapher.CompareNDdatas([LCF_3D[2:, :],  LCF_T[2:, :], [True_LCF[start:N, 2]]], datatype='force', title='comparing contact force')
+        grapher.CompareNDdatas([LCF_3D[2:, :],  LCF_T[2:, :], [True_LCF[start:N, 2]]], datatype='force', title='comparing left Z contact force')
+        
+        grapher.SetLegend(["Right Z force from 3D", "Right force from torques", "True right Force"], ndim=1)
+        grapher.CompareNDdatas([RCF_3D[2:, :],  RCF_T[2:, :], [True_RCF[start:N, 2]]], datatype='force', title='comparing right Z contact force')
+    
     
     if "vitesse" in ToPlot :
         """
@@ -319,7 +326,8 @@ def main():
         R3DNorm = np.linalg.norm(RCF_3D, axis=0)
     
         grapher.SetLegend(["Left force from 3D", "Left force from torques", "Right force from 3D", "Right force from torques",], ndim=1)
-        grapher.CompareNDdatas([[L3DNorm], LCF_T[2:, :], [R3DNorm], RCF_T[2:, :]], datatype='force', title='comparing contact force TOTAL')
+        grapher.CompareNDdatas([[L3DNorm], LCF_T[2:, :], [R3DNorm], RCF_T[2:, :]], datatype='force', title='comparing contact force norms')
+
         
     if "trust" in ToPlot :
         # plot trust, slips and contact

@@ -303,10 +303,10 @@ class ContactEstimator():
                     print("gougi")
         return CF
     
-    def ContactForces3d(self, frames=[10,18]) -> tuple[np.ndarray, np.ndarray]:
+    def ContactForces3d_(self, frames=[10,18]) -> tuple[np.ndarray, np.ndarray]:
         return np.zeros(3), np.zeros(3)
 
-    def ContactForces3d_(self, frames=[10,18]) -> tuple[np.ndarray, np.ndarray]:
+    def ContactForces3d(self, frames=[10,18]) -> tuple[np.ndarray, np.ndarray]:
         """ compute contact forces using jacobian and torques"""
         # set left foot and right foot data apart
         LF_id, RF_id = frames[0], frames[1]
