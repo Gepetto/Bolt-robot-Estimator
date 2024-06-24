@@ -17,15 +17,15 @@ from Bolt_FootAttitudeEstimator import FootAttitudeEstimator
 
 
 """
-An estimator for Bolt Bipedal Robot
+An estimator for attitude, speed, and position using only an IMU
 
-    This code uses Pinocchio, encoders and IMU data to provide an estimate of Bolt's
+    This code uses Pinocchio, encoders and IMU data to provide an estimate of the robot
     base attitude, base speed and position, and center of mass' speed.
 
     The Estimator Class contains the different filters and sub-estimators 
     needed to merge the relevant data. Its main method is Estimator.Estimate() .
 
-    The estimators called by Estimator are : ContactEstimator and TiltEstimator.
+    The estimator called by Estimator is TiltEstimator.
     
     Documentation can be found at  $ $ $  G I T  $ $ $ 
 
@@ -153,7 +153,6 @@ class Estimator():
         self.p_out[2] = np.linalg.norm(c)
         self.p_out[2] += 0.02 # TODO : radius of bolt foot
         self.p_out[2] = 0.34 # TODO stop doing this
-        self.AllTimeSwitchDeltas[2] = self.p_out[2]
         
         if self.EstimatorLogging : self.UpdateLogMatrixes()
         self.iter += 1
@@ -194,24 +193,7 @@ class Estimator():
                                                 talkative=Talkative, 
                                                 logger=self.logger, 
                                                 ndim=1)
-        
-
-        # returns info on Slips, Contact Forces, Contact with the ground
-        self.ContactEstimator = ContactEstimator(robot=self.robot, 
-                                                 LeftFootFrameID=self.FeetIndexes[0], 
-                                                 RightFootFrameID=self.FeetIndexes[1], 
-                                                 LeftKneeFrameID=7, # self.robot.model.getFrameId("FL_KNEE"),
-                                                 RightKneeFrameID=15, # self.robot.model.getFrameId("FR_KNEE"),
-                                                 LeftKneeTorqueID=2,
-                                                 RightKneeTorqueID=5,
-                                                 IterNumber=self.IterNumber,
-                                                 dt=self.TimeStep,
-                                                 MemorySize=5,
-                                                 Logging=self.ContactLogging,
-                                                 Talkative=self.Talkative,
-                                                 logger=self.logger)
-        if self.Talkative : self.logger.LogTheLog("Contact Estimator added.", ToPrint=Talkative)
-        
+      
         # returns info on Slips, Contact Forces, Contact with the ground
         self.TiltandSpeedEstimator = TiltEstimator(robot=self.robot,
                                                    Q0=self.q,
@@ -550,148 +532,12 @@ class Estimator():
 
 
         return None
-    
 
-    def UpdateContactInformation(self):
-        """ get contact information from Contact Estimator"""
-        # boolean contact
-        self.LeftContact, self.RightContact = self.ContactEstimator.LegsOnGround(self.q, 
-                                                                                 self.qdot,
-                                                                                 self.a_imu, 
-                                                                                 self.tau,
-                                                                                 self.g_tilt,
-                                                                                 TorqueForceMingler=1.0, 
-                                                                                 ProbThresold=0.45, 
-                                                                                 TrustThresold=0.5
-                                                                                 )
-        # contact forces
-        self.FLContact, self.RLContact = self.ContactEstimator.Get("current_cf_averaged")
-        
-        # contact foot
-        if self.LeftContact and self.RightContact :
-            self.ContactFoot = "both"
-        elif self.LeftContact :
-            self.ContactFoot = "left"
-        elif self.RightContact :
-            self.ContactFoot = "right"
-        else :
-            self.ContactFoot = "none"
             
     
         
 
-        
-        
-    def FootStepLen(self, LeftContact, RightContact, MaxSwitchLen=20):
-        """
-        Measure length of a footstep
-        Bolt switch contact foot when LeftContact = RightContact
-        ----------
-        LeftContact : Bool
-        RightContact : Bool
-        ----------
-        Returns None
-        """
-        self.EndingSwitch = False
-        
-        # entering switch phase
-        if (LeftContact != self.PreviousLeftContact or RightContact != self.PreviousRightContact) and not self.Switch :
-            #if self.Talkative : self.logger.LogTheLog(f"Switch started on iter {self.iter}", "subinfo")
-            # switch start
-            self.Switch = True
-            self.SwitchLen = 0
-            # foot in contact at the beginning of the switch
-            if self.PreviousLeftContact :
-                self.PreviousContactFoot = 0
-            else :
-                self.PreviousContactFoot = 1
-                      
-        # switching
-        if self.Switch :
-            self.SwitchLen += 1
-            # compute foot to foot distance
-            BaseToBackFoot, _ = self.ComputeFramePose(self.FeetIndexes[self.PreviousContactFoot])
-            BaseToFrontFoot, _ = self.ComputeFramePose(self.FeetIndexes[1-self.PreviousContactFoot])
-            # average distance over the current switch
-            self.SwitchDelta = ( self.SwitchDelta*(self.SwitchLen - 1) + (BaseToFrontFoot - BaseToBackFoot) ) / self.SwitchLen
-            #self.SwitchDelta = BaseToBackFoot - BaseToFrontFoot
-            
-        # switch finished
-        if (LeftContact!=self.PreviousLeftContact and RightContact!=self.PreviousRightContact):
-            # ending switch
-            self.EndingSwitch = True
-            
-        # did not initialize correctly, or got lost somehow
-        if self.Switch and self.SwitchLen > MaxSwitchLen and not (LeftContact and RightContact):
-            # ending switch
-            self.EndingSwitch= True
-            if self.Talkative : self.logger.LogTheLog(f"Switch stopped on iter {self.iter} : exceding max switch duration {MaxSwitchLen} iter ", "warn")
-            
-        if self.EndingSwitch :
-            # ending switch
-            self.Switch = False
-            self.StepDuration = self.iter - self.StepStart
-            self.StepStart = self.iter
-            # updating all-time distance
-            self.AllTimeSwitchDeltas[:] += self.SwitchDelta[:]
-            # updating contact info
-            self.PreviousLeftContact = LeftContact
-            self.PreviousRightContact = RightContact
-            if self.Talkative : self.logger.LogTheLog(f"Switch ended on iter {self.iter}, step of length {self.SwitchDelta} lasting {self.SwitchLen} iter.", "subinfo")
-
-        
-
-
     
-    # TODO : update with benallegue
-    def KinematicAttitude(self) -> np.ndarray:
-        # uses robot model and rotation speed to provide attitude estimate based on encoder data
-        
-        # consider the right contact frames, depending on which foot is in contact with the ground
-        if self.LeftContact and self.RightContact :
-            if self.Talkative : self.logger.LogTheLog("Both feet are touching the ground", style="warn", ToPrint=self.Talkative)
-            ContactFrames = [0, 1]
-        elif self.LeftContact :
-            if self.Talkative : self.logger.LogTheLog("left foot touching the ground", ToPrint=self.Talkative)
-            ContactFrames = [0]
-        elif self.RightContact :
-            if self.Talkative : self.logger.LogTheLog("right foot touching the ground", ToPrint=self.Talkative)
-            ContactFrames = [1]
-        else :
-            self.logger.LogTheLog("No feet are touching the ground", style="warn", ToPrint=self.Talkative)
-            ContactFrames = []
-
-        # Compute the base's attitude for each foot in contact
-        FrameAttitude = []
-        
-        pin.forwardKinematics(self.robot.model, self.robot.data, self.q)
-        pin.updateFramePlacements(self.robot.model, self.robot.data)
-        pin.computeAllTerms(self.robot.model, self.robot.data, self.q, self.qdot)
-        
-        if self.LeftContact :
-            ContactFootID = self.FeetIndexes[0]
-        else :
-            ContactFootID = self.FeetIndexes[1]
-        BaseID = 1
-        
-        for foot in ContactFrames:
-            
-            # attitude from foot to base
-            FootBasePose = self.robot.data.oMf[ContactFootID].inverse()*self.robot.data.oMf[BaseID]
-            FootBaseAttitude = np.array(FootBasePose.rotation).copy()
-            FootBasePosition = np.array(FootBasePose.translation).copy()
-            
-            # attitude of the foot
-            WorldFootAttitude = self.FootAttitudeEstimator.RunFilter(IMUKinPos=FootBasePosition, IMUKinRot=FootBaseAttitude, ya=self.ag_imu, yg=self.w_imu)
-            
-            
-            # combined attitude
-            WorldBaseAttitude = WorldFootAttitude + FootBaseAttitude
-        
-        self.theta_kin = R.from_euler(WorldBaseAttitude)
-
-        #return self.theta_kin.as_euler('xyz')
-        return WorldBaseAttitude
     
     def KinematicPosition(self):
         """
@@ -745,73 +591,11 @@ class Estimator():
         # 3DM-CX5-AHRS sensor returns Δθ
         return self.DeltaTheta.as_euler('xyz')
 
-    
-
 
     def IMUSpeed(self) -> np.ndarray:
         # direclty uses IMU data to approximate speed
         return self.ReferenceSpeed + self.DeltaV
 
-    
-    def KinematicSpeed(self) -> tuple((np.ndarray, np.ndarray)):
-        # uses Kinematic data
-        # along with contact and rotation speed information to approximate speed
-
-        # consider the right contact frames, depending on which foot is in contact with the ground
-        if self.LeftContact and self.RightContact :
-            if self.Talkative : self.logger.LogTheLog("Both feet are touching the ground on iter " + str(self.iter), style="warn", ToPrint=self.Talkative)
-            ContactFrames = [0,1]
-        elif self.LeftContact :
-            if self.Talkative : self.logger.LogTheLog("left foot touching the ground", ToPrint=False)
-            ContactFrames = [0]
-        elif self.RightContact :
-            if self.Talkative : self.logger.LogTheLog("right foot touching the ground", ToPrint=False)
-            ContactFrames = [1]
-        else :
-            self.logger.LogTheLog("No feet are touching the ground on iter " + str(self.iter), style="warn", ToPrint=self.Talkative)
-            ContactFrames = []
-
-        # Compute the base's speed for each foot in contact
-        FrameSpeed = []
-        FrameRotSpeed = []
-
-        pin.forwardKinematics(self.robot.model, self.robot.data, self.q)
-        pin.updateFramePlacements(self.robot.model, self.robot.data)
-        pin.computeAllTerms(self.robot.model, self.robot.data, self.q, self.qdot)
-
-        for ContactFootID in ContactFrames:
-            # speed of Base wrt its immobile foot
-            oMf = self.robot.data.oMf[ContactFootID]
-            p_speed_l = oMf.inverse().action @ pin.getFrameVelocity(self.robot.model, self.robot.data, self.BaseID, pin.WORLD)
-            speed = np.array(p_speed_l[:3]).copy()
-            # rotation speed of base frame in contact foot frame
-            omega = np.array(p_speed_l[3:]).copy()
-
-            FrameSpeed.append(speed)
-            FrameRotSpeed.append(omega)
-        
-        if self.LeftContact and self.RightContact :
-            # averages results
-            self.v_kin = np.mean(np.array(FrameSpeed), axis=0)
-            self.w_kin = np.mean(np.array(FrameRotSpeed), axis=0)
-        elif self.LeftContact or self.RightContact :
-            # one foot in contact
-            self.v_kin = np.array(FrameSpeed)
-            self.w_kin = np.array(FrameRotSpeed)
-        else :
-            # no foot touching the ground, keeping old speed data
-            if self.EstimatorLogging : 
-                v_avg = np.mean(self.log_v_kin[:, max(0, self.iter-10):self.iter-1], axis=1)
-                w_avg = np.mean(self.log_w_kin[:, max(0, self.iter-10):self.iter-1], axis=1)
-            else :
-                v_avg, w_avg = self.v_kin, self.w_kin
-            self.w_kin = w_avg
-            self.v_kin = v_avg
-        
-        # filter speed
-        #self.v_kin = self.SpeedFilter.RunFilter(self.v_kin, self.a_imu)
-
-        return self.v_kin, self.w_kin
 
 
     def SpeedFusion(self, mitigate=[0.1, 0.2, 0.7]) -> None:
@@ -845,23 +629,6 @@ class Estimator():
     
 
 
-    def TiltfromG_(self, g0) -> np.ndarray:
-        """
-        From estimated g in base frame, get the euler angles between world frame and base frame
-        """
-        g = g0[:]
-        g = g/np.linalg.norm(g)
-        gworld = np.array([0, 0, 1])
-        v = np.cross(gworld, g)
-        s = np.linalg.norm(v)
-        c = utils.scalar(gworld, g)
-        if c != -1 :
-            RotM = np.eye(3) + utils.S(v) + utils.S(v**2)*(1/(1+c))
-        else :
-            RotM = -np.eye(3) # TODO : check
-            if self.Talkative : self.logger.LogTheLog("Could not compute g rot matrix on iter "+self.iter, "warn")
-        euler = R.from_matrix(RotM).as_euler("xyz")
-        return euler
     
     
     
@@ -902,10 +669,12 @@ class Estimator():
         
     
     
-    def Estimate(self, TimeStep=None):
+    def Estimate(self, ContactFrame, BaseFrame=1, TimeStep=None):
         """ this is the main function"""
         if TimeStep is not None :
             self.TimeStep = TimeStep
+        self.ContactFrame = ContactFrame
+        self.BaseFrame = BaseFrame
         
         # update all variables with latest available measurements
         if self.device is not None :

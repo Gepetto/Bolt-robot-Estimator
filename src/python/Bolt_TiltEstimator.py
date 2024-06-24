@@ -65,7 +65,7 @@ class TiltEstimator():
 
         return None
     
-    def SetInitValues(self, BaseSpeed, BaseAccG, UnitGravity, UnitGravityDerivative, BaseWRTFootOrientationAsMatrix):
+    def SetInitValues(self, BaseSpeed, BaseAccG, UnitGravity, UnitGravityDerivative, BaseWRTFootOrientationAsMatrix) -> None:
         """ modify init values """
         self.x1_hat = BaseSpeed.copy()
         self.x2_prime = UnitGravity.copy()
@@ -75,9 +75,8 @@ class TiltEstimator():
         self.x2_hat_dot = UnitGravityDerivative.copy()
         self.x2_prime_dot = UnitGravityDerivative.copy()
         self.c_R_l = BaseWRTFootOrientationAsMatrix
+        return None
         
-        print(self.x1_hat_dot)
-        print("aaaaaaaaaaaaaaa")
     
     
     def InitLogs(self)-> None :
@@ -189,7 +188,7 @@ class TiltEstimator():
         
         return None
     
-    def CheckDim(self, x, a, b):
+    def CheckDim(self, x, a, b) -> bool:
         if a==0:
             dim = (b,)
         else :
