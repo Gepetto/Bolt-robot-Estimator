@@ -1,0 +1,6 @@
+Metadata-Version: 2.1
+Name: bolt_estimator
+Version: 0.8.0
+Summary: first bolt estimator package try
+Author-email: Niels Albrecht <niels@niels.com>
+Requires-Dist: numpy

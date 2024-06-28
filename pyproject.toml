@@ -1,0 +1,22 @@
+[project]
+name = "bolt_estimator"
+description = "first bolt estimator package try"
+version = "0.8.0"
+authors = [
+    { name = "Niels Albrecht", email = "niels@niels.com" }
+]
+dependencies = [
+	"numpy"
+]
+
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+
+[tool.setuptools.packages.find]
+# All the following settings are optional:
+#where = ["src"]  # ["."] by default
+include = ["estimator", "tests", "utils"]  # ["*"] by default
+exclude = ["pin", "models"]  # empty by default
