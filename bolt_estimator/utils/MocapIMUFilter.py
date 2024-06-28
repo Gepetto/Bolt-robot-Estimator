@@ -6,7 +6,7 @@ Created on Fri Jun 21 12:16:08 2024
 @author: niels
 """
 
-from bolt_estimator.estimator.Bolt_Filter_Complementary import ComplementaryFilter
+from application.Bolt_Filter_Complementary import ComplementaryFilter
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -24,11 +24,16 @@ class MocapIMUFilter():
                  ):
         # params
         self.TimeStep = dt
-        self.iter=0
+        self.iter = 0
         self.Logging = Logging
         self.FS = FilterSpeed
         self.FA = FilterAttitude
         self.FP = FilterPosition
+
+        self.LearningIter = 0
+        self.omega_bias = np.zeros((3,))
+        self.a_bias = np.zeros((3,))
+
         
         # filters params
         parametersSF = [self.TimeStep] + parametersSF
@@ -39,7 +44,9 @@ class MocapIMUFilter():
                                                 name="speed complementary filter", 
                                                 talkative=Talkative, 
                                                 logger=None, 
-                                                ndim=3)
+                                                ndim=3,
+                                                MemorySize=100,
+                                                OffsetGain=0.005)
         self.PositionFilter = ComplementaryFilter(parameters=parametersPF, 
                                                 name="speed complementary filter", 
                                                 talkative=Talkative, 
@@ -62,14 +69,27 @@ class MocapIMUFilter():
         self.v_logs = np.zeros((self.Logging, 3))
         self.q_logs = np.zeros((self.Logging, 4))
         self.w_logs = np.zeros((self.Logging, 3))
+
+        self.p_logs_mocap = np.zeros((self.Logging, 3))
+        self.v_logs_mocap = np.zeros((self.Logging, 3))
+        self.q_logs_mocap = np.zeros((self.Logging, 4))
+
+        self.a_logs_imu = np.zeros((self.Logging, 3))
+
         
-    def UpdateLogs(self, p, v, q, w):
+    def UpdateLogs(self, p, v, q, w, p_mocap, v_mocap, q_mocap, a_imu):
         if self.iter>=self.Logging :
             return None
         self.p_logs[self.iter, :] = p[:]
         self.v_logs[self.iter, :] = v[:]
         self.q_logs[self.iter, :] = q[:]
         self.w_logs[self.iter, :] = w[:]
+
+        self.p_logs_mocap[self.iter, :] = p_mocap[:]
+        self.v_logs_mocap[self.iter, :] = v_mocap[:]
+        self.q_logs_mocap[self.iter, :] = q_mocap[:]
+
+        self.a_logs_imu[self.iter, :] = a_imu[:]
         return None
     
     def GetLogs(self, data="position"):
@@ -86,6 +106,10 @@ class MocapIMUFilter():
             return self.w_logs
         else :
             print("wrong data getter")
+
+    def LearnIMUBias(self, a_imu, omega_imu):
+        self.a_bias = (self.LearningIter * self.a_bias + a_imu)/(self.LearningIter + 1)
+        self.omega_bias = (self.LearningIter * self.omega_bias + omega_imu)/(self.LearningIter + 1)
     
     def PlotLogs(self):
         if self.Logging==0:
@@ -95,7 +119,7 @@ class MocapIMUFilter():
         
         plt.figure()
         plt.grid()
-        plt.title("position")
+        plt.title("position out")
         plt.plot(self.p_logs[:, 0], label="position X out")
         plt.plot(self.p_logs[:, 1], label="position Y out")
         plt.plot(self.p_logs[:, 2], label="position Z out")
@@ -103,11 +127,25 @@ class MocapIMUFilter():
         
         plt.figure()
         plt.grid()
-        plt.title("speed")
+        plt.title("speed out")
         plt.plot(self.v_logs[:, 0], label="speed X out")
         plt.plot(self.v_logs[:, 1], label="speed Y out")
         plt.plot(self.v_logs[:, 2], label="speed Z out")
-        plt.legend
+        plt.legend()
+
+        # plt.figure()
+        # plt.grid()
+        # plt.title("speed derived from position out")
+        # plt.plot(self.p_logs[1:, 0] - self.p_logs[:-1, 0]*1.6, label="computed speed X for 1600Hz") # HARD CODED
+        # plt.legend()
+
+
+        plt.figure()
+        plt.grid()
+        plt.title("speed X comparison")
+        plt.plot(self.v_logs_mocap[:, 0], label="speed X mocap")
+        plt.plot(self.v_logs[:, 0], label="speed X out")
+        plt.legend()
         
         plt.figure()
         plt.grid()
@@ -121,27 +159,38 @@ class MocapIMUFilter():
         plt.plot(self.w_logs[:, 0], label="angular speed X out")
         plt.plot(self.w_logs[:, 1], label="angular speed Y out")
         plt.plot(self.w_logs[:, 2], label="angular speed Z out")
-        plt.legend
+        plt.legend()
+
+        plt.figure()
+        plt.grid()
+        plt.title("acceleration imu")
+        plt.plot(self.a_logs_imu[:, 0], label="acc X imu")
+        plt.plot(self.a_logs_imu[:, 1], label="acc Y imu")
+        plt.plot(self.a_logs_imu[:, 2], label="acc Z imu")
+        plt.legend()
         
         plt.show()
 
     
     
-    def Run(self, p_mocap, v_mocap, quat_mocap, omega_imu, a_imu):
+    def Run(self, p_mocap, v_mocap, quat_mocap, omega_imu, a_imu, dt=None):
+        # correct learned bias
+        a_imu_corr = a_imu - self.a_bias
+        omega_imu_corr = omega_imu - self.omega_bias
         # initialize data
         p_out = np.copy(p_mocap)
         v_out = np.copy(v_mocap)
         quat_out = np.copy(quat_mocap)
-        omega_out = np.copy(omega_imu)
+        omega_out = np.copy(omega_imu_corr)
         
         
         
         # filter speed
-        v_filter = self.SpeedFilter.RunFilter(v_mocap, a_imu)
+        v_filter = self.SpeedFilter.RunFilter(v_mocap, a_imu_corr, dt)
         # filter attitude
-        quat_filter = self.AttitudeFilter.RunFilterQuaternion(quat_mocap, omega_imu)
+        quat_filter = self.AttitudeFilter.RunFilterQuaternion(quat_mocap, omega_imu_corr, dt)
         # filter position
-        p_filter = self.PositionFilter.RunFilter(p_mocap, v_filter)
+        p_filter = self.PositionFilter.RunFilter(p_mocap, v_filter, dt)
         
         if self.FP:
             p_out = p_filter
@@ -151,7 +200,7 @@ class MocapIMUFilter():
             quat_out = quat_filter
         
         if self.Logging != 0 :
-            self.UpdateLogs(p_out, v_out, quat_out, omega_out)
+            self.UpdateLogs(p_out, v_out, quat_out, omega_out, p_mocap, v_mocap, quat_mocap, a_imu)
         
         self.iter += 1
         
