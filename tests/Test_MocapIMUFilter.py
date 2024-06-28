@@ -6,7 +6,7 @@ Created on Fri Jun 21 13:02:02 2024
 @author: niels
 """
 
-from utils.MocapIMUFilter import MocapIMUFilter
+from bolt_estimator.utils.MocapIMUFilter import MocapIMUFilter
 import numpy as np
 
 Filter = MocapIMUFilter(parametersSF = [2],

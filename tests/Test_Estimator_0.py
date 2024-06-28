@@ -4,14 +4,14 @@ from scipy.spatial.transform import Rotation as R
 import time as t
 from decimal import Decimal
 
-from estimator.Bolt_Estimator_0 import Estimator
-from utils.Graphics import Graphics
-from utils.Bolt_Utils import Log, utils
+from bolt_estimator.estimator.Bolt_Estimator_0 import Estimator
+from bolt_estimator.utils.Graphics import Graphics
+from bolt_estimator.utils.Bolt_Utils import Log, utils
 
-from utils.DeviceEmulator import DeviceEmulator
-from utils.TrajectoryGenerator import TrajectoryGenerator
-from estimator.Bolt_Filter_Complementary import ComplementaryFilter
-from data.DataReader import DataReader
+from bolt_estimator.utils.DeviceEmulator import DeviceEmulator
+from bolt_estimator.utils.TrajectoryGenerator import TrajectoryGenerator
+from bolt_estimator.estimator.Bolt_Filter_Complementary import ComplementaryFilter
+from bolt_estimator.data.DataReader import DataReader
 
 
 

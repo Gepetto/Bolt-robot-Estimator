@@ -1,11 +1,10 @@
 
 import numpy as np
-import sys
-#sys.path.append('/home/nalbrecht/Bolt-Estimator/Bolt-robot---Estimator/src/python')
-from utils.Bolt_Utils import utils, Log
-from utils.TrajectoryGenerator import TrajectoryGenerator, Metal
-from utils.Graphics import Graphics
-from estimator.Bolt_Filter_Complementary import ComplementaryFilter
+
+from bolt_estimator.utils.Bolt_Utils import utils, Log
+from bolt_estimator.utils.TrajectoryGenerator import TrajectoryGenerator, Metal
+from bolt_estimator.utils.Graphics import Graphics
+from bolt_estimator.estimator.Bolt_Filter_Complementary import ComplementaryFilter
 
 
 '''

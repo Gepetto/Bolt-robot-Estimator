@@ -3,11 +3,11 @@ import numpy as np
 from scipy.spatial.transform import Rotation as R
 
 
-from utils.Graphics import Graphics
-from utils.Bolt_Utils import Log
+from bolt_estimator.utils.Graphics import Graphics
+from bolt_estimator.utils.Bolt_Utils import Log
 
-from data.DataImprover import improve
-from utils.TrajectoryGenerator import TrajectoryGenerator, Metal
+from bolt_estimator.data.DataImprover import improve
+from bolt_estimator.utils.TrajectoryGenerator import TrajectoryGenerator, Metal
 
 
 class DataReader():
@@ -43,7 +43,8 @@ class DataReader():
     
     def LoadAndPlotLog(self, file, ndim, title, toprint=False):
         #prefix = "/home/nalbrecht/Bolt-Estimator/Bolt-robot---Estimator/data/simu/"
-        prefix = "/home/nalbrecht/Bolt-Estimator/bipedal-control/"
+        #prefix = "/home/nalbrecht/Bolt-Estimator/bipedal-control/"
+        prefix = "./"
         filename = prefix + file
         Y = np.load(filename)
         self.logger.LogTheLog("loaded file " + filename+ " in " + prefix, "info")
@@ -55,7 +56,8 @@ class DataReader():
     
     def LoadAndPlotDualLogs(self, file1, file2, ndim, title, toprint=False, transpose=False):
         #prefix = "/home/nalbrecht/Bolt-Estimator/Bolt-robot---Estimator/data/simu/"
-        prefix = "/home/nalbrecht/Bolt-Estimator/bipedal-control/"
+        #prefix = "/home/nalbrecht/Bolt-Estimator/bipedal-control/"
+        prefix = "./"
         self.prefix = prefix
         filename1 = prefix + file1
         filename2 = prefix + file2
@@ -153,8 +155,9 @@ class DataReader():
     
     def AutoLoadSimulatedData(self, style="standing"):
         self.logger.LogTheLog("DataReader : Auto loading simulated data")
-        #prefix = "/home/nalbrecht/Bolt-Estimator/Bolt-robot---Estimator/data/" + kfile + "/"
-        prefix = "/home/niels/Supaéro/Stage 2A/Gepetto/Code/Bolt-robot---Estimator/data/Data_" + style + "/true_"
+        #prefix = "/home/nalbrecht/Bolt-Estimator/Bolt-robot-Estimator/data/" + kfile + "/"
+        #prefix = "/home/niels/Supaéro/Stage 2A/Gepetto/Code/Bolt-robot-Estimator/data/Data_" + style + "/true_"
+        prefix = "/data/" + kfile + "/"
         self.prefix=prefix
         
         self.q_file = prefix + "q_logs.npy"
