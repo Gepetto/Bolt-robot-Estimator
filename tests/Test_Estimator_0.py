@@ -1,21 +1,17 @@
-import sys
-#sys.path.append('/home/niels/Supaéro/Stage 2A/Gepetto/Code/Bolt-robot---Estimator/src/python')
-sys.path.append('/home/nalbrecht//Bolt-Estimator/Bolt-robot-Estimator/src/python')
+
 import numpy as np
 from scipy.spatial.transform import Rotation as R
 import time as t
 from decimal import Decimal
 
-from Bolt_Utils import Log, utils
-from Graphics import Graphics
-from Bolt_Estimator_0 import Estimator
+from estimator.Bolt_Estimator_0 import Estimator
+from utils.Graphics import Graphics
+from utils.Bolt_Utils import Log, utils
 
-from DeviceEmulator import DeviceEmulator
-from TrajectoryGenerator import TrajectoryGenerator
-from Bolt_Filter_Complementary import ComplementaryFilter
-#sys.path.append('/home/niels/Supaéro/Stage 2A/Gepetto/Code/Bolt-robot-Estimator/data')
-sys.path.append('/home/nalbrecht/Bolt-Estimator/Bolt-robot-Estimator/data')
-from DataReader import DataReader
+from utils.DeviceEmulator import DeviceEmulator
+from utils.TrajectoryGenerator import TrajectoryGenerator
+from estimator.Bolt_Filter_Complementary import ComplementaryFilter
+from data.DataReader import DataReader
 
 
 
@@ -71,6 +67,10 @@ def main():
                     EstimatorLogging=logging,
                     ContactLogging=logging,
                     TiltLogging=logging)
+    estimator.SetIMUToBaseTransformation(XYZ=[0, 0, 0], EulerXYZ=[np.pi, 0, 0])
+    #x = estimator.ExternalDataCaster("acceleration_imu", np.array([1, 2, 3]))
+
+
     
     # plot the pseudo-measured (ie noisy and drifting) generated trajectories
     Input_Acc = device.Acc
@@ -99,6 +99,8 @@ def main():
 
     Computed_Theta = np.zeros((3, N))
     print(True_w.shape)
+
+
     
     # run the estimator as if
     # device will iterate over generated data each time estimator calls it
@@ -151,10 +153,10 @@ def main():
     v_kin = estimator.Get("v_logs_kin")
         # out data
     v_out = estimator.Get("v_out_logs")
-    c_out = estimator.Get("c_logs")
+    p_out = estimator.Get("p_logs")
     theta_out = estimator.Get("theta_logs_euler")
     g_out = estimator.Get("g_out_logs")
-    c_switch = estimator.Get("c_switch_logs")
+    p_switch = estimator.Get("p_switch_logs")
         # quat
     quat_out = estimator.Get("theta_logs")
     quat_tilt = estimator.Get("theta_tilt_logs")
@@ -284,10 +286,10 @@ def main():
         grapher.CompareNDdatas([v_out, v_tilt, True_v[start:N, 1, :].T], datatype='speed', title='Etimator output, speed', mitigate=[2])
     if "position" in ToPlot :
         grapher.SetLegend(["base pos out", "True base pos"], ndim=3)
-        grapher.CompareNDdatas([c_out,  True_x[start:N, :].T], datatype='position', title='Estimator output, position', mitigate=[1])
+        grapher.CompareNDdatas([p_out,  True_x[start:N, :].T], datatype='position', title='Estimator output, position', mitigate=[1])
 
         grapher.SetLegend(["base pos switch", "True base pos"], ndim=3)
-        grapher.CompareNDdatas([c_switch,  True_x[start:N, :].T], datatype='position', title='Estimator switch out, position', mitigate=[1])
+        grapher.CompareNDdatas([p_switch,  True_x[start:N, :].T], datatype='position', title='Estimator switch out, position', mitigate=[1])
 
 
     if "attitude" in ToPlot :

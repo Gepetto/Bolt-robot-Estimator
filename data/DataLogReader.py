@@ -3,16 +3,11 @@ import numpy as np
 from scipy.spatial.transform import Rotation as R
 
 
-import sys
-#sys.path.append('/home/niels/Supaéro/Stage 2A/Gepetto/Code/Bolt-robot---Estimator/tests')
-sys.path.append('/home/nalbrecht//Bolt-Estimator/Bolt-robot-Estimator/tests')
-from Graphics import Graphics
-sys.path.append('/home/nalbrecht//Bolt-Estimator/Bolt-robot-Estimator/src/python')
-#sys.path.append('/home/niels/Supaéro/Stage 2A/Gepetto/Code/Bolt-robot---Estimator/src/python')
-from Bolt_Utils import Log
+from utils.Graphics import Graphics
+from utils.Bolt_Utils import Log
 
-from DataImprover import improve
-from TrajectoryGenerator import TrajectoryGenerator, Metal
+from data.DataImprover import improve
+from utils.TrajectoryGenerator import TrajectoryGenerator, Metal
 
 
 class DataReader():

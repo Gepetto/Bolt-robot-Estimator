@@ -1,13 +1,12 @@
-import sys
-sys.path.append('/home/nalbrecht/Bolt-Estimator/Bolt-robot---Estimator/src/python')
-from Bolt_Utils import utils
-from Bolt_Utils import Log
 
-from DataReader import DataReader
 
-from TrajectoryGenerator import TrajectoryGenerator, Metal
-from Graphics import Graphics
-from Bolt_Filter_Complementary import ComplementaryFilter
+from utils.Bolt_Utils import utils, Log
+
+from data.DataReader import DataReader
+
+from utils.TrajectoryGenerator import TrajectoryGenerator, Metal
+from utils.Graphics import Graphics
+from estimator.Bolt_Filter_Complementary import ComplementaryFilter
 import numpy as np
 
 
@@ -36,19 +35,19 @@ def main(N=500, NoiseLevel=20, Drift=40):
  
     dataset = [TrueTraj, TrueSpeed, TrueAcc]
     grapher.SetLegend(["Traj ", "Speed", "Acceleration"], 1)
-    grapher.CompareNDdatas(dataset, "", "TestGenerator : true values", StyleAdapter=False, AutoLeg=False, width=1.5)
+    grapher.CompareNDdatas(dataset, "", "TestGenerator : true values", StyleAdapter=False, width=1.5)
 
     dataset = [NoisyTraj, DriftNoisyTraj, TrueTraj, DriftTraj]
     grapher.SetLegend(["Noisy traj (" + str(NoiseLevel) + "%)", "Drifting noisy traj", "True traj", "Drifting traj"], 1)
-    grapher.CompareNDdatas(dataset, "position", "TestGenerator : positions", StyleAdapter=False, AutoLeg=False, width=1)
+    grapher.CompareNDdatas(dataset, "position", "TestGenerator : positions", StyleAdapter=False, width=1)
 
     dataset = [NoisySpeed, DriftNoisySpeed, TrueSpeed, DriftSpeed]
     grapher.SetLegend(["Noisy speed (" + str(NoiseLevel) + "%)", "Drifting noisy speed", "True speed", "Drifting speed"], 1)
-    #grapher.CompareNDdatas(dataset, "speed", "TestGenerator : speeds", StyleAdapter=False, AutoLeg=False, width=0.8)
+    #grapher.CompareNDdatas(dataset, "speed", "TestGenerator : speeds", StyleAdapter=False, width=0.8)
 
     dataset = [NoisyAcc, DriftNoisyAcc, TrueAcc, DriftAcc]
     grapher.SetLegend(["Noisy acceleration (" + str(NoiseLevel) + "%)", "Drifting noisy acc", "True acceleration", "Drifting acceleration"], 1)
-    #grapher.CompareNDdatas(dataset, "acceleration", "TestGenerator : accelerations", StyleAdapter=False, AutoLeg=False, width=0.8)
+    #grapher.CompareNDdatas(dataset, "acceleration", "TestGenerator : accelerations", StyleAdapter=False, , width=0.8)
 
     grapher.end()
 
