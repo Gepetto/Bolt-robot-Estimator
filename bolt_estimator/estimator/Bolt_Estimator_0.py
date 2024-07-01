@@ -99,7 +99,7 @@ class Estimator():
         else:
             self.logger = Log("default " + self.MsgName+ " log")
         self.logger.LogTheLog(" Starting log of" + self.MsgName, ToPrint=False)
-        if self.Talkative : self.logger.LogTheLog("Initializing " + self.MsgName + "...", style="title", ToPrint=Talkative)
+        self.logger.LogTheLog("Initializing " + self.MsgName + "...", style="title", ToPrint=Talkative)
         
         # iteration and timing
         self.IterNumber = IterNumber
@@ -110,11 +110,11 @@ class Estimator():
         
         # loading data from file
         if UrdfPath=="" or ModelPath=="":
-            self.logger.LogTheLog("No URDF path or ModelPath addeds", style="warn", ToPrint=True)
+            self.logger.LogTheLog("No URDF path or ModelPath addeds", style="warn", ToPrint=self.Talkative)
             self.robot = example_robot_data.load("bolt")
         else :
             #model, collision_model, visual_model = pin.buildModelsFromUrdf(UrdfPath, ModelPath, pin.JointModelFreeFlyer())
-            self.logger.LogTheLog("Bypassing URDF path or ModelPath", style="warn", ToPrint=True)
+            self.logger.LogTheLog("Bypassing URDF path or ModelPath", style="warn", ToPrint=self.Talkative)
             self.robot = example_robot_data.load("bolt")
 
             self.robot = pin.RobotWrapper.BuildFromURDF(UrdfPath, ModelPath)
@@ -135,7 +135,7 @@ class Estimator():
         if device is not None :
             self.device = device
         else :
-            self.logger.LogTheLog("No device added", style="warn", ToPrint=True)
+            self.logger.LogTheLog("No device added", style="warn", ToPrint=self.Talkative)
             self.device=None
         
         # initializes data & logs with np.zeros arrays
@@ -148,7 +148,7 @@ class Estimator():
         # check that sensors can be read
         if self.device is not None :
             self.ReadSensor()
-            if self.Talkative : self.logger.LogTheLog("Sensors read, initial data acquired", ToPrint=Talkative)
+            self.logger.LogTheLog("Sensors read, initial data acquired", ToPrint=Talkative, ToPrint=self.Talkative)
         
 
         # update height of CoM value, assuming Bolt is vertical
@@ -377,6 +377,8 @@ class Estimator():
         self.log_theta_out = np.zeros([4, self.IterNumber])
         self.log_theta_out[3, :] = np.ones((self.IterNumber, ))
         self.log_g_out = np.zeros([3, self.IterNumber])
+        self.log_p_out = np.zeros([3, self.IterNumber])
+
         # imu data log
         self.log_v_imu = np.zeros([3, self.IterNumber])
         self.log_w_imu = np.zeros([3, self.IterNumber])
@@ -399,11 +401,10 @@ class Estimator():
         self.log_theta_tilt[3, :] = np.ones((self.IterNumber, ))
         
         # other logs
-        self.log_p_out = np.zeros([3, self.IterNumber])
         self.log_contactforces = np.zeros([6, self.IterNumber])
         
         # Contact switch log
-        self.log_switch = np.zeros([3, self.IterNumber])
+        self.log_p_switch = np.zeros([3, self.IterNumber])
         
         # time
         self.TimeStamp = np.zeros((self.IterNumber, ))
@@ -424,6 +425,8 @@ class Estimator():
         self.log_a_out[:, LogIter] = self.a_out[:]
         self.log_theta_out[:, LogIter] = self.theta_out[:]#.as_quat()[:]
         self.log_g_out[:, LogIter] = self.g_out[:]
+        self.log_p_out[:, LogIter] = self.p_out[:]
+
         # imu data log
         self.log_v_imu[:, LogIter] = self.v_imu[:]
         self.log_w_imu[:, LogIter] = self.w_imu[:]#self.w_imu.as_quat()[:]
@@ -441,11 +444,10 @@ class Estimator():
         self.log_g_tilt[:, LogIter] = self.g_tilt[:]
         self.log_theta_tilt[:, LogIter] = self.theta_tilt[:]
         # other
-        self.log_p_out[:, LogIter] = self.p_out[:]
         self.log_contactforces[:3, LogIter] = self.FLContact[:]
         self.log_contactforces[3:, LogIter] = self.FRContact[:]
         # switch
-        self.log_switch[:, LogIter] = self.AllTimeSwitchDeltas[:]
+        self.log_p_switch[:, LogIter] = self.AllTimeSwitchDeltas[:]
         # time
         self.TimeStamp[LogIter] = self.TimeRunning
         return None
@@ -526,7 +528,7 @@ class Estimator():
             return R.from_quat(self.log_theta_tilt.T).as_euler("xyz").T
         
         elif data=="p_switch_logs":
-            return self.log_switch
+            return self.log_p_switch
         elif data=="timestamp_logs" or data=="t_logs":
             return self.TimeStamp
         
@@ -557,7 +559,50 @@ class Estimator():
             self.logger.LogTheLog("Could not get data '" + data + "'. Unrecognised data getter.", style="danger", ToPrint=self.Talkative)
             return None
 
+    def SaveLogs(self, out=True, tilt=False, contact=True, imu=False, kin=False) -> None :
+        # save logs
+        if out :
+            # base velocitie & co, post-filtering logs
+            np.save("estimator_logs_v_out", self.log_v_out)
+            np.save("estimator_logs_w_out", self.log_w_out)
+            np.save("estimator_logs_a_out", self.log_a_out)
+            np.save("estimator_logs_theta_out", self.log_theta_out)
+            np.save("estimator_logs_g_out", self.log_g_out)
+            np.save("estimator_logs_p_out", self.log_p_out)
+        
+        if imu :
+            # imu input data log
+            np.save("estimator_logs_v_imu", self.log_v_imu)
+            np.save("estimator_logs_w_imu", self.log_w_imu)
+            np.save("estimator_logs_a_imu", self.log_a_imu)
+            np.save("estimator_logs_theta_imu", self.log_theta_imu)
+        if kin :
+            # forward kinematics data log
+            np.save("estimator_logs_v_kin", self.log_v_kin)
+            np.save("estimator_logs_z_kin", self.log_z_kin)
+            np.save("estimator_logs_q", self.log_q)
+            np.save("estimator_logs_qdot", self.log_qdot)
+            np.save("estimator_logs_theta_kin", self.log_theta_kin)
+            np.save("estimator_logs_w_kin", self.log_w_kin)
+        if tilt : 
+            # tilt log 
+            np.save("estimator_logs_v_tilt", self.log_v_tilt)
+            np.save("estimator_logs_g_tilt", self.log_g_tilt)
+            np.save("estimator_logs_theta_tilt", self.log_theta_tilt)
+        if contact : 
+            # contact logs
+            np.save("estimator_logs_contact_forces", self.log_contactforces)
+            np.save("estimator_logs_contact_bool", self.ContactEstimator.Get("contact_bool"))
+            np.save("estimator_logs_contact_prob", self.ContactEstimator.Get("contact_prob"))
+            # Contact switch log
+            np.save("estimator_logs_p_switch", self.log_p_switch)
 
+        # time
+        np.save("estimator_logs_t", self.TimeStamp)
+        # logs
+        np.save("estimator_logs_logs", self.logger.GetLog())
+        
+        return None
 
     def ReadSensor(self) -> None:
         # rotation are updated supposing the value returned by device is xyz euler angles, in radians
@@ -678,7 +723,7 @@ class Estimator():
         if self.Switch and self.SwitchLen > MaxSwitchLen and not (LeftContact and RightContact):
             # ending switch
             self.EndingSwitch= True
-            if self.Talkative : self.logger.LogTheLog(f"Switch stopped on iter {self.iter} : exceding max switch duration {MaxSwitchLen} iter ", "warn")
+            self.logger.LogTheLog(f"Switch stopped on iter {self.iter} : exceding max switch duration {MaxSwitchLen} iter ", "warn", ToPrint=self.Talkative)
             
         if self.EndingSwitch :
             # ending switch
@@ -690,7 +735,7 @@ class Estimator():
             # updating contact info
             self.PreviousLeftContact = LeftContact
             self.PreviousRightContact = RightContact
-            if self.Talkative : self.logger.LogTheLog(f"Switch ended on iter {self.iter}, step of length {self.SwitchDelta} lasting {self.SwitchLen} iter.", "subinfo")
+            self.logger.LogTheLog(f"Switch ended on iter {self.iter}, step of length {self.SwitchDelta} lasting {self.SwitchLen} iter.", "subinfo", ToPrint=self.Talkative)
 
         
 
@@ -702,13 +747,13 @@ class Estimator():
         
         # consider the right contact frames, depending on which foot is in contact with the ground
         if self.LeftContact and self.RightContact :
-            if self.Talkative : self.logger.LogTheLog("Both feet are touching the ground", style="warn", ToPrint=self.Talkative)
+            self.logger.LogTheLog("Both feet are touching the ground", style="warn", ToPrint=self.Talkative)
             ContactFrames = [0, 1]
         elif self.LeftContact :
-            if self.Talkative : self.logger.LogTheLog("left foot touching the ground", ToPrint=self.Talkative)
+            self.logger.LogTheLog("left foot touching the ground", ToPrint=self.Talkative)
             ContactFrames = [0]
         elif self.RightContact :
-            if self.Talkative : self.logger.LogTheLog("right foot touching the ground", ToPrint=self.Talkative)
+            self.logger.LogTheLog("right foot touching the ground", ToPrint=self.Talkative)
             ContactFrames = [1]
         else :
             self.logger.LogTheLog("No feet are touching the ground", style="warn", ToPrint=self.Talkative)
@@ -887,7 +932,7 @@ class Estimator():
         self.v_out[:] = self.SpeedFilter.RunFilter(self.v_tilt.copy(), self.a_imu.copy())
         # filter speed with data from imu
         if np.linalg.norm(self.ag_imu - self.a_imu)<9:
-            if self.Talkative : self.logger.LogTheLog(f"anormal gravity input : {self.ag_imu - self.a_imu} on iter {self.iter}", "warn")
+            self.logger.LogTheLog(f"anormal gravity input : {self.ag_imu - self.a_imu} on iter {self.iter}", "warn", ToPrint=self.Talkative)
 
         return None
     
@@ -899,7 +944,7 @@ class Estimator():
         From estimated g in base frame, get the quaternion between world frame and base frame
         """
         g = g0[:]
-        if self.Talkative and np.linalg.norm(g0) > 10:
+        if abs(np.linalg.norm(g0) - 9.81) > 1:
             self.logger.LogTheLog(f"gravity computed on iter {self.iter} is anormal : {g0}", "warn")
         g = g/np.linalg.norm(g)
         gworld = np.array([0, 0, -1])
@@ -910,7 +955,7 @@ class Estimator():
 
         q = np.concatenate((gg0, q0), axis=0)
         if np.linalg.norm(q) == 0 and self.Talkative :
-            self.logger.LogTheLog(f"Null norm quaternion computed for gworld -> grobot at iter {self.iter} with gworld {gworld} and g measured {g0}", "danger")
+            self.logger.LogTheLog(f"Null norm quaternion computed for gworld -> grobot at iter {self.iter} with gworld {gworld} and g measured {g0}", "danger", ToPrint=self.Talkative)
             return np.array([0, 0, 0, 1])    
         return q / np.linalg.norm(q)
 
@@ -922,10 +967,10 @@ class Estimator():
 
         """
         if np.linalg.norm(q) < 1e-6:
-            self.logger.LogTheLog(f"Norm of quaternion {name} is NULL : {q} on iter {self.iter}", "danger")
+            self.logger.LogTheLog(f"Norm of quaternion {name} is NULL : {q} on iter {self.iter}", "danger", ToPrint=self.Talkative)
             return np.array([0, 0, 0, 1])
         if np.linalg.norm(q)< 0.99 or  np.linalg.norm(q)> 1.01:
-            self.logger.LogTheLog(f"Norm of quaternion {name} is NOT ONE : {q} on iter {self.iter}", "danger")
+            self.logger.LogTheLog(f"Norm of quaternion {name} is NOT ONE : {q} on iter {self.iter}", "danger", ToPrint=self.Talkative)
             return q/np.linalg.norm(q)
         return q
         
@@ -1002,7 +1047,7 @@ class Estimator():
         if self.iter % 100 == 0 :
             print(f" iter {self.iter} \t dt {self.TimeStep}")
         if self.iter==1 :
-            if self.Talkative : self.logger.LogTheLog("executed Estimator for the first time", "subinfo")
+            self.logger.LogTheLog("executed Estimator for the first time", "subinfo", ToPrint=self.Talkative)
         self.prev_w_imu = self.w_imu.copy()
         self.iter += 1
         self.TimeRunning += self.TimeStep
