@@ -17,6 +17,12 @@ class utils():
     def normalize(a):
         return a/np.linalg.norm(a)
     
+    def normalizeQ(q:np.ndarray):
+        q_out = q # copy position, quaternion and joints state
+        q_out[3:7] = q[3:7]/np.linalg.norm(q[3:7]) # quaternion normalization
+        return q_out
+
+    
     def MatrixFromVectors(L, n=3):
         # L tuple of numpy vectors
         A = np.stack(L).reshape((-1, n))

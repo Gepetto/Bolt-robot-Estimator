@@ -144,7 +144,7 @@ class DeviceEmulator():
         
         # DATA THAT ESTIMATOR WILL ACCESS
         # base acceleration
-        noise.SetNoise(NoiseLevel=10, DriftingCoeff=0.)
+        noise.SetNoise(NoiseLevel=0, DriftingCoeff=0.)
         self.Acc = noise.makeNoiseAdaptativeAmplitude(self.Acc_true)
         self.AccG = noise.makeNoiseAdaptativeAmplitude(self.AccG_true)
         # base rotation speed

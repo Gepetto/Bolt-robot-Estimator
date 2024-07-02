@@ -980,7 +980,7 @@ class Estimator():
         if np.linalg.norm(q) < 1e-6:
             self.logger.LogTheLog(f"Norm of quaternion {name} is NULL : {q} on iter {self.iter}", "danger", ToPrint=self.Talkative)
             return np.array([0, 0, 0, 1])
-        if np.linalg.norm(q)< 0.99 or  np.linalg.norm(q)> 1.01:
+        if abs(np.linalg.norm(q)-1) > 1e-3:
             self.logger.LogTheLog(f"Norm of quaternion {name} is NOT ONE : {q} on iter {self.iter}", "danger", ToPrint=self.Talkative)
             return q/np.linalg.norm(q)
         return q
@@ -1001,6 +1001,8 @@ class Estimator():
         self.w_imu = self.ExternalDataCaster("angular_speed_imu", self.w_imu)
         self.a_imu = self.ExternalDataCaster("acceleration_imu", self.a_imu)
         self.v_imu = self.ExternalDataCaster("speed_imu", self.v_imu)
+        # check normalization of quat
+        utils.normalizeQ(self.q)
         
         print("external data caster done")
         # run contact estimator
