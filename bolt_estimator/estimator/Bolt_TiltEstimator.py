@@ -148,9 +148,12 @@ class TiltEstimator():
         """ Update pinocchio data with forward kinematics and update FK variables"""
         
         # update pinocchio data
-        pin.forwardKinematics(self.bolt.model, self.data, self.Q)
-        pin.computeAllTerms(self.bolt.model, self.data, self.Q, self.Qd)
+        pin.forwardKinematics(self.bolt.model, self.data, self.Q, self.Qd)
+        print("fk done in tilt")
+        #pin.computeAllTerms(self.bolt.model, self.data, self.Q, self.Qd)
+        print("cat done in tilt")
         pin.updateFramePlacements(self.bolt.model, self.data)
+        print("ufp done in tilt")
         
         # update relevant data
         # rotation matrix of base frame (l) in contact foot frame (c)
@@ -206,7 +209,7 @@ class TiltEstimator():
                   dt:float, 
                   ) -> tuple[np.ndarray, np.ndarray] : 
         """ update state variables and return current tilt and speed estimates """
-        
+        print("entering tilt")
         # store measurement
         self.ya = ya.copy()
         self.yg = yg.copy()
@@ -214,7 +217,9 @@ class TiltEstimator():
         self.Q = Q.copy()
         self.Qd = Qd.copy()
         self.PinocchioUpdate(BaseID, ContactFootID, dt)
+        print("updated pin")
         self.yv = self.GetYV_v1()
+        print("got yv")
         # check dimensions
         if not self.CheckDim(ya, 0, 3) : print("dim error ya")
         if not self.CheckDim(yg, 0, 3) : print("dim error yg")
@@ -227,7 +232,7 @@ class TiltEstimator():
         
         self.x2_hat_dot = -self.S(yg - self.gamma*self.S(self.x2_hat) @ self.x2_prime) @ self.x2_hat
         
-        
+        print("updated variable")
         # state variable integration
         self.x1_hat += dt * self.x1_hat_dot
         self.x2_hat += dt * self.x2_hat_dot
@@ -236,6 +241,7 @@ class TiltEstimator():
         
         # error update
         self.ErrorUpdate(dt)
+        print("updated error")
         
         # logging
         if self.Logging : self.UpdateLogs()

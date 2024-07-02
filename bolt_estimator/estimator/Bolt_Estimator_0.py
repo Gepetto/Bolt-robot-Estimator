@@ -109,16 +109,16 @@ class Estimator():
         self.TimeStep = TimeStep
         
         # loading data from file
-        if UrdfPath=="" or ModelPath=="":
+        if  ModelPath=="":#or UrdfPath=="" :
             self.logger.LogTheLog("No URDF path or ModelPath addeds", style="warn", ToPrint=self.Talkative)
             self.robot = example_robot_data.load("bolt")
         else :
             #model, collision_model, visual_model = pin.buildModelsFromUrdf(UrdfPath, ModelPath, pin.JointModelFreeFlyer())
             self.logger.LogTheLog("Bypassing URDF path or ModelPath", style="warn", ToPrint=self.Talkative)
-            self.robot = example_robot_data.load("bolt")
+            self.robot = example_robot_data.load(ModelPath)
 
-            self.robot = pin.RobotWrapper.BuildFromURDF(UrdfPath, ModelPath)
-            self.logger.LogTheLog("URDF built", ToPrint=Talkative)
+            #self.robot = pin.RobotWrapper.BuildFromURDF(UrdfPath, ModelPath)
+            #self.logger.LogTheLog("URDF built", ToPrint=Talkative)
         # adding IMU frame with default data
         self.IMUBaseTransform = pin.SE3.Identity()
         self.IMUBaseQuat = np.array([0, 0, 0, 1])
@@ -148,12 +148,13 @@ class Estimator():
         # check that sensors can be read
         if self.device is not None :
             self.ReadSensor()
-            self.logger.LogTheLog("Sensors read, initial data acquired", ToPrint=Talkative, ToPrint=self.Talkative)
+            self.logger.LogTheLog("Sensors read, initial data acquired", ToPrint=Talkative)
         
 
         # update height of CoM value, assuming Bolt is vertical
         pin.forwardKinematics(self.robot.model, self.robot.data, self.q)
         pin.updateFramePlacements(self.robot.model, self.robot.data)
+        print("forward kin done")
         c = np.array((self.robot.data.oMf[self.FeetIndexes[0]].inverse()*self.robot.data.oMf[self.BaseID]).translation).copy()
         self.p_out[2] = np.linalg.norm(c)
         self.p_out[2] += 0.02 # TODO : radius of bolt foot
@@ -240,6 +241,8 @@ class Estimator():
         self.logger.LogTheLog(self.MsgName +" initialized successfully.", ToPrint=Talkative)
         return None
     
+
+    
     def SetInitValues(self, BaseSpeed, BaseAccG, UnitGravity, UnitGravityDerivative, ContactFootID, Q, Qd):
         """ modify init values """
         self.q[:] = Q
@@ -299,11 +302,19 @@ class Estimator():
         M = pin.SE3(ROT, XYZ)
         IMUFrame = pin.Frame("IMU", self.BaseJointID, self.BaseID, M, pin.FrameType.OP_FRAME)
         # add frame
+        """
         self.robot.model.addFrame(IMUFrame)
         self.robot.data = self.robot.model.createData()
+        """
         self.IMUBaseTransform = M
         self.IMUBaseQuat = R.from_matrix(M.rotation).as_quat()
         self.logger.LogTheLog("added IMU frame", "subinfo", ToPrint=self.Talkative)
+        """
+        # recreate contact estimator data to make up for the added frame
+        self.ContactEstimator.dataT = self.robot.model.createData()
+        self.ContactEstimator.data3D = self.robot.model.createData()
+        self.ContactEstimator.data1D = self.robot.model.createData()
+        """
         return None
 
 
@@ -912,7 +923,7 @@ class Estimator():
         
         """
         # uses Kinematic-derived speed estimate and IMU to estimate speed
-        self.KinematicSpeed()
+        #self.KinematicSpeed()
 
         # runs speed and tilt estimator
         if self.LeftContact :
@@ -944,7 +955,7 @@ class Estimator():
         From estimated g in base frame, get the quaternion between world frame and base frame
         """
         g = g0[:]
-        if abs(np.linalg.norm(g0) - 9.81) > 1:
+        if abs(np.linalg.norm(g0) - 1) > 0.1:
             self.logger.LogTheLog(f"gravity computed on iter {self.iter} is anormal : {g0}", "warn")
         g = g/np.linalg.norm(g)
         gworld = np.array([0, 0, -1])
@@ -959,7 +970,7 @@ class Estimator():
             return np.array([0, 0, 0, 1])    
         return q / np.linalg.norm(q)
 
-        
+
     
     def CheckQuat(self, q, name="") -> np.ndarray:
         """
@@ -980,6 +991,7 @@ class Estimator():
         """ this is the main function"""
         if TimeStep is not None :
             self.TimeStep = TimeStep
+        print("timestep setting done")
         
        # update all variables with latest available measurements
         if self.device is not None :
@@ -990,18 +1002,21 @@ class Estimator():
         self.a_imu = self.ExternalDataCaster("acceleration_imu", self.a_imu)
         self.v_imu = self.ExternalDataCaster("speed_imu", self.v_imu)
         
+        print("external data caster done")
         # run contact estimator
         self.UpdateContactInformation()
         if self.iter < 3 :
             self.PreviousLeftContact = self.LeftContact
             self.PreviousRightContact = self.RightContact
             self.Switch = False
-
+        print("contact information done")
         # estimate speed
         self.SpeedFusion(mitigate=[0., 0., 1.])
         
         # integrate speed to get position
         self.p_out += self.v_out[:]*self.TimeStep
+
+        print("position done")
 
         # derive data & runs filter
 
@@ -1013,12 +1028,14 @@ class Estimator():
         self.theta_tilt =  self.CheckQuat(self.theta_tilt, "theta_tilt")
 
         self.g_out = R.from_quat(self.theta_out).apply(np.array([0, 0, -1]))
+        print("g computation done")
 
         self.a_out[:] = self.a_imu[:]
         self.w_out[:] = self.w_imu[:]
         
         # correct z position using kin
         BaseKinPos = self.KinematicPosition()
+        print("kin pos done")
 
         if BaseKinPos is not None :
             # at least one foot is touching the ground, correcting base height
@@ -1039,6 +1056,7 @@ class Estimator():
                     PosDrift = sat
                 self.PosDriftCompensation = PosDrift/self.StepDuration
             self.p_out[0] += self.PosDriftCompensation
+        print("footstep update done")
         
 
         # update all logs & past variables
@@ -1054,20 +1072,6 @@ class Estimator():
         
 
         return None
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

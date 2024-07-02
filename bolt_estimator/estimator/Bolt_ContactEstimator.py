@@ -28,6 +28,11 @@ class ContactEstimator():
         self.data3D = self.bolt.model.createData()
         self.dataT = self.bolt.model.createData()
         self.dt = dt
+
+        print("wsh les asserts")
+        print(self.bolt.model.check(self.dataT))
+        print(self.bolt.model.check(self.data3D))
+
         # Q includes base position, which is updated by pinocchio, and position from encoders
         self.Q = pin.neutral(self.bolt.model)
         self.Qd = pin.utils.zero(self.nv)
@@ -303,10 +308,10 @@ class ContactEstimator():
                     print("gougi")
         return CF
     
-    def ContactForces3d_(self, frames=[10,18]) -> tuple[np.ndarray, np.ndarray]:
+    def ContactForces3d(self, frames=[10,18]) -> tuple[np.ndarray, np.ndarray]:
         return np.zeros(3), np.zeros(3)
 
-    def ContactForces3d(self, frames=[10,18]) -> tuple[np.ndarray, np.ndarray]:
+    def ContactForces3d_(self, frames=[10,18]) -> tuple[np.ndarray, np.ndarray]:
         """ compute contact forces using jacobian and torques"""
         # set left foot and right foot data apart
         LF_id, RF_id = frames[0], frames[1]
@@ -433,9 +438,12 @@ class ContactEstimator():
         
     def ContactProbability_Torque(self, Vertical, KneeTorque, KneeID = 8, FootID=10, Center=4, Stiffness=5)-> tuple[np.ndarray, float]:
         """ compute force based on knee torques, and return the estimated force and contact probability"""
-        
+        print("before FK")
+        print(self.bolt.model.check(self.dataT))
+
         pin.forwardKinematics(self.bolt.model, self.dataT, self.Q)
         pin.updateFramePlacements(self.bolt.model, self.dataT)
+        print("after FK")
         # normalized vertical vector
         Vertical = Vertical / np.linalg.norm(Vertical)
         
@@ -460,7 +468,10 @@ class ContactEstimator():
         """   
         # slipery level : horizontal norm over vertical DISTANCE
         # can be < 0
-        Mu = np.sqrt(ContactForce3d[0]**2 + ContactForce3d[1]**2) / ContactForce3d[2]
+        if ContactForce3d[2] == 0:
+            Mu = 10
+        else :
+            Mu = np.sqrt(ContactForce3d[0]**2 + ContactForce3d[1]**2) / ContactForce3d[2]
         Slip0 = self.__SigmoidDiscriminator(Mu, MuTrigger, 4)
 
         # uses kinematics to compute foot horizontal speed
@@ -532,6 +543,7 @@ class ContactEstimator():
         self.Q = Q.copy()
         self.Qd = Qd.copy()
         self.Tau = Torques.copy()
+        print("starting T")
 
         # compute probability of contact based on knee's torque
         self.LcF_T, self.ContactProbL_T = self.ContactProbability_Torque(Vertical=Vertical, 
@@ -544,7 +556,7 @@ class ContactEstimator():
                                                                          KneeID=self.RightKneeFrameID, 
                                                                          FootID=self.RightFootFrameID, 
                                                                          Center=4, Stiffness=2)
-        # print("T done", self.Q)
+        print("T done", self.Q)
         # get the contact forces # TODO : debug 1D
         self.LcF_1d, self.RcF_1d = np.zeros(3), np.zeros(3) #self.ContactForces1d(Torques=Torques, Q=Q, Qd=Qd, BaseAccelerationIMU=Acc , Dynamic=0.4, Resolution=7)
         # print("1D done", self.Q)

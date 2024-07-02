@@ -32,12 +32,17 @@ class ComplementaryFilter():
         if self.Talkative : self.logger.LogTheLog("Filter '" + self.name + "' initialized with parameters " + str(self.parameters))
 
 
-
+    def Setdt(self, dt) -> None:
+        if dt is not None :
+            self.T = dt
+            self.b = self.a / (self.T + self.a)
+        return None
 
     # standard filter
-    def RunFilter(self, x, xdot) -> np.ndarray:
+    def RunFilter(self, x, xdot, dt=None) -> np.ndarray:
         # complementary filter x and its temporal derivative xdot. Updates previous estimates and returns current estimate.
         # check data
+        self.Setdt(dt)
         if self.ndim==1 :
             if  not isinstance(x, float) or not isinstance(xdot, float):
                 self.logger.LogTheLog(f"giving unadapted argument to filter '{self.name}' of dim. 1 : expected float, got {type(x)}" , style="danger")
@@ -57,9 +62,10 @@ class ComplementaryFilter():
         return self.Estimate
     
     
-    def RunFilterQuaternion(self, q, w) -> np.ndarray:
+    def RunFilterQuaternion(self, q, w, dt=None) -> np.ndarray:
         # complementary filter for q [scalar-last format] and angular speed w
         # check data
+        self.Setdt(dt)
         if (not isinstance(q, np.ndarray)) or (not isinstance(w, np.ndarray)) or (q.shape!=(4,) or w.shape!=(3,) ):  
             if self.Talkative : self.logger.LogTheLog(f"giving unadapted argument to filter '{self.name}' : expected np.array of dim 4 and 3" , style="danger")           
         if self.k==0:
@@ -80,10 +86,11 @@ class ComplementaryFilter():
 
     
     # standard filter with non-idiotic offset compensation
-    def RunFilterOffset(self, x, xdot) -> np.ndarray:
+    def RunFilterOffset(self, x, xdot, dt=None) -> np.ndarray:
         # better averaging technique
         # complementary filter x and its temporal derivative xdot. Updates previous estimates and returns current estimate.
         # check data
+        self.Setdt(dt)
         if (not isinstance(x, np.ndarray) or not isinstance(xdot, np.ndarray)):
             self.logger.LogTheLog(f"giving unadapted argument to filter '{self.name}' : expected np.array" , style="danger")
             return None
@@ -104,9 +111,10 @@ class ComplementaryFilter():
         return self.Estimate
 
     # standard filter with offset commpensation and adaptative gain for quicker convergence
-    def RunFilterOffsetAdaptive(self, x, xdot) -> np.ndarray:
+    def RunFilterOffsetAdaptive(self, x, xdot, dt=None) -> np.ndarray:
         # complementary filter x and its temporal derivative xdot. Updates previous estimates and returns current estimate.
         # check data
+        self.Setdt(dt)
         if (not isinstance(x, np.ndarray) or not isinstance(xdot, np.ndarray)):
             self.logger.LogTheLog(f"giving unadapted argument to filter '{self.name}' : expected np.array" , style="danger")
             return None
