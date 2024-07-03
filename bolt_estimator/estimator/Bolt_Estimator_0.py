@@ -325,9 +325,7 @@ class Estimator():
         self.w_imu = np.zeros((3,))
         self.theta_imu = np.array([0, 0, 0, 1])
         self.prev_w_imu = np.zeros((3,))
-        # angles ? quaternion ?
-        self.DeltaTheta = R.from_euler('xyz', np.zeros(3))
-        self.DeltaV = np.zeros((3,))
+        # imu pre integrated speed
         self.v_imu = np.zeros((3,))
 
 
@@ -624,11 +622,12 @@ class Estimator():
         self.device.Read() # FOR TESTING ONLY #PPP
         # base acceleration, acceleration with gravity and rotation speed from IMU
         self.a_imu[:] = self.device.baseLinearAcceleration[:] # COPIED FROM SOLO CODE, CHECK CONSISTENCY WITH BOLT MASTERBOARD
-        self.ag_imu[:] = self.device.baseLinearAccelerationGravity[:] # uncertain
+        self.ag_imu[:] = self.device.baseLinearAccelerationGravity[:]
+        
         self.w_imu[:] = self.device.baseAngularVelocity[:]
         # integrated data from IMU
-        self.DeltaTheta = R.from_euler('xyz', self.device.baseOrientation - self.device.offset_yaw_IMU) # bs, to be found
-        self.DeltaV[:] = self.device.baseSpeed[:] - self.device.offset_speed_IMU[:] # bs
+        self.theta_imu[:] = self.device.baseAttitude[:]
+        self.v_imu[:] = self.device.baseSpeed[:]
         # Kinematic data from encoders
         self.q[:] = self.device.q_mes[:]
         self.qdot[:] = self.device.v_mes[:]
@@ -643,6 +642,8 @@ class Estimator():
     def ReadExternalSensor(self, 
                             baseLinearAcceleration,
                             baseLinearAccelerationGravity,
+                            baseSpeed,
+                            baseAttitude,
                             baseAngularVelocity,
                             q_mes,
                             v_mes,
@@ -650,9 +651,11 @@ class Estimator():
                             # acc with g is absolutely needed
         # rotation are updated supposing the value returned by device is xyz euler angles, in radians
         # base acceleration, acceleration with gravity and rotation speed from IMU
-        self.a_imu[:] = baseLinearAcceleration[:]# COPIED FROM SOLO CODE, CHECK CONSISTENCY WITH BOLT MASTERBOARD
-        self.ag_imu[:] = baseLinearAccelerationGravity[:] # uncertain
+        self.a_imu[:] = baseLinearAcceleration[:]
+        self.ag_imu[:] = baseLinearAccelerationGravity[:]
+        self.theta_imu[:] = baseAttitude[:]
         self.w_imu[:] = baseAngularVelocity[:]
+        self.v_imu[:] = baseSpeed[:]
         # integrated data from IMU
 
         # Kinematic data from encoders
@@ -846,19 +849,7 @@ class Estimator():
         g0 = self.ag_imu - self.a_imu
         self.theta_imu = self.TiltfromG(g0)
         return self.theta_imu #.as_euler('xyz')
-
     
-    def GyroAttitude(self) -> np.ndarray:
-        # Uses integrated angular velocity to derive rotation angles 
-        # 3DM-CX5-AHRS sensor returns Δθ
-        return self.DeltaTheta.as_euler('xyz')
-
-    
-
-
-    def IMUSpeed(self) -> np.ndarray:
-        # direclty uses IMU data to approximate speed
-        return self.ReferenceSpeed + self.DeltaV
 
     
     def KinematicSpeed(self) -> tuple((np.ndarray, np.ndarray)):

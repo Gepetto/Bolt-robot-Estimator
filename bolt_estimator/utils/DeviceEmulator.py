@@ -225,7 +225,7 @@ class DeviceEmulator():
         
 
             self.baseAngularVelocity = self.Omega[self.iter, :]
-            self.baseOrientation = np.zeros(3)#self.Theta[self.iter, :]
+            self.baseAttitude = np.array([0, 0, 0, 1])#self.Theta[self.iter, :]
             self.q_mes = self.Q[self.iter, :]
             self.v_mes = self.Qd[self.iter, :]
 
