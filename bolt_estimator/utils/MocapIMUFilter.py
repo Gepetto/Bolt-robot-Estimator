@@ -110,6 +110,7 @@ class MocapIMUFilter():
     def LearnIMUBias(self, a_imu, omega_imu):
         self.a_bias = (self.LearningIter * self.a_bias + a_imu)/(self.LearningIter + 1)
         self.omega_bias = (self.LearningIter * self.omega_bias + omega_imu)/(self.LearningIter + 1)
+        print("learning")
     
     def PlotLogs(self):
         if self.Logging==0:

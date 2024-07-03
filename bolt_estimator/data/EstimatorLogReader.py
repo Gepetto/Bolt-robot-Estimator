@@ -21,7 +21,8 @@ class DataReader():
             prefix = "data/"
         else :
             prefix=prefix
-        
+        # np.save(prefix + "blub", np.zeros(3))
+        # print("done")
 
         
         if out :

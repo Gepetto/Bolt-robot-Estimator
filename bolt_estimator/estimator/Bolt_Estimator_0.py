@@ -847,8 +847,8 @@ class Estimator():
         # IMU gives us acceleration and acceleration without gravity
         # measured gravity
         g0 = self.ag_imu - self.a_imu
-        self.theta_imu = self.TiltfromG(g0)
-        return self.theta_imu #.as_euler('xyz')
+        self.theta_g = self.TiltfromG(g0)
+        return self.theta_g
     
 
     
