@@ -333,6 +333,7 @@ class ContactEstimator():
         LcF = -np.linalg.pinv(JL.T) @ (TauPin - g - b)
         RcF = -np.linalg.pinv(JR.T) @ (TauPin - g - b)
 
+
         # compute contact wrench using method from ETH zurich, RD2017 p73 3.61
         
         """
