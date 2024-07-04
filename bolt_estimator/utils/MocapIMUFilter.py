@@ -172,12 +172,21 @@ class MocapIMUFilter():
         
         plt.show()
 
+    def DeBiasIMU(self, acc, accg, gyro):
+        return acc-self.a_bias, accg-self.a_bias, gyro-self.omega_bias
     
     
-    def Run(self, p_mocap, v_mocap, quat_mocap, omega_imu, a_imu, dt=None):
-        # correct learned bias
-        a_imu_corr = a_imu - self.a_bias
-        omega_imu_corr = omega_imu - self.omega_bias
+    def Run(self, p_mocap, v_mocap, quat_mocap, omega_imu, a_imu, dt=None, deBias=False):
+        if deBias : 
+            # correct learned bias
+            a_imu_corr = a_imu - self.a_bias
+            omega_imu_corr = omega_imu - self.omega_bias
+        else :
+            # bias is already corrected
+            a_imu_corr = a_imu
+            omega_imu_corr = omega_imu
+
+
         # initialize data
         p_out = np.copy(p_mocap)
         v_out = np.copy(v_mocap)
