@@ -5,22 +5,21 @@ Center of Mass Estimator for Bolt bipedal robot
 
 
 ###################################################################
-###			What is this Git ?			###
+###			                  What is this Git ?			              ###
 ###################################################################
 
-This Git contains the code of a Center of mass (CoM) estimator, to be implemented on bipedal robot Bolt.
+This Git contains the code of a speed, position, attitude and contact estimator, to be implemented on bipedal robot Bolt.
 
 
 
 
 
 ###################################################################
-###			What is Bolt ?				###
+###			                  What is Bolt ?				                ###
 ###################################################################
 
-Bolt is a robot developed by 
-in 20
-It is a bipedal Variant of Solo-12 quadruped robot.
+Bolt is a 6-DOF robot developed by the Open Dynamic Robot Initiative.
+It is a bipedal variant of Solo-12 quadruped robot.
 Its main function is to serve as a developpment platform for reasearch purposes. 
 
 
@@ -28,40 +27,27 @@ Its main function is to serve as a developpment platform for reasearch purposes.
 
 
 ###################################################################
-###		How is the code structured ?			###
+###		            Was this code implemented ? 			            ###
 ###################################################################
 
-follows google truc
-
-
-
-###################################################################
-###		Was this code implemented ? 			###
-###################################################################
-
-cf constant
-
-
+This code was tested in simulation and briefly in real-life.
+See https://github.com/nnniels/Bolt-Robot-TechnicalDoc
 
 
 ###################################################################
 ###		How to use this code ?				###
 ###################################################################
 
-License
-Laas
-
-
+This code is under BSD-2 license.
+It was written by N.Albrecht in 2024 for the Gepetto team of LAAS-CNRS.
 
 
 
 ###################################################################
-###	Where to find additionnal ressources linked to this ?	###
+###	   Where to find additionnal ressources linked to this ?	  ###
 ###################################################################
 
-quelques refs de biblio, git de TF, git de Solo, git de OS
-
-git de Constant
+There : https://github.com/nnniels/Bolt-Robot-TechnicalDoc
 
 
 
