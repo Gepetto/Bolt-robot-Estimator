@@ -1,31 +1,31 @@
 
 
-from bolt_estimator.utils.Bolt_Utils import utils, Log
+from bolt_estimator.utils.Utils import utils, Log
 from bolt_estimator.utils.TrajectoryGenerator import TrajectoryGenerator, Metal
-from bolt_estimator.estimator.Bolt_Filter_Complementary import ComplementaryFilter
+from bolt_estimator.estimator.Filter_Complementary import ComplementaryFilter
 import numpy as np
 from bolt_estimator.utils.Graphics import Graphics
 
 
 
 
-def main(N=1000, NoiseLevel=60):
+def main(N=1000, noise_level=60):
 
     # generate useful objects
-    testlogger = Log("test", PrintOnFlight=True)
-    grapher = Graphics(logger=testlogger)
+    test_logger = Log("test", PrintOnFlight=True)
+    grapher = Graphics(logger=test_logger)
 
     # start generator
-    generator = TrajectoryGenerator(logger=testlogger)
-    generator.Generate("polynomial5", NoiseLevel=NoiseLevel, N=N)
+    generator = TrajectoryGenerator(logger=test_logger)
+    generator.Generate("polynomial5", NoiseLevel=noise_level, N=N)
 
     # start filter
     ComplementaryFilterT = ComplementaryFilter(parameters=(1/N, 2), 
                                         ndim=1, 
                                         talkative=True, 
                                         name="Standard complementary",
-                                        logger=testlogger)
-    FilterTraj = []
+                                        logger=test_logger)
+    filter_traj = []
     FilterSpeed = []
     FilterAcc = []
     
@@ -33,59 +33,59 @@ def main(N=1000, NoiseLevel=60):
     ComplementaryFilterO = ComplementaryFilter(parameters=(1/N, 2), 
                                         ndim=1, 
                                         talkative=True,
-                                        name="Offset-compensed complementary",
-                                        logger=testlogger,
+                                        name="offset-compensed complementary",
+                                        logger=test_logger,
                                         MemorySize=100,
                                         OffsetGain=0.3)
 
-    FilterTrajOffset = []
-    FilterSpeedOffset = []
-    FilterAccOffset = []
+    filter_traj_offset = []
+    filter_speed_offset = []
+    filter_acc_offset = []
 
     # start filter with different offset gains
     ComplementaryFilterO_1 = ComplementaryFilter(parameters=(1/N, 2), 
                                         ndim=1, 
                                         talkative=True,
-                                        name="Offset-compensed complementary 1",
-                                        logger=testlogger,
+                                        name="offset-compensed complementary 1",
+                                        logger=test_logger,
                                         MemorySize=20,
                                         OffsetGain=0.3)
-    FilterTrajOffset1 = []
+    filter_traj_offset1 = []
     ComplementaryFilterO_5 = ComplementaryFilter(parameters=(1/N, 2), 
                                         ndim=1, 
                                         talkative=True,
-                                        name="Offset-compensed complementary 5",
-                                        logger=testlogger,
+                                        name="offset-compensed complementary 5",
+                                        logger=test_logger,
                                         MemorySize=300,
                                         OffsetGain=0.3)
-    FilterTrajOffset5 = []
+    filter_traj_offset5 = []
 
 
     # get generated data
-    TrueTraj, TrueSpeed, TrueAcc = generator.GetTrueTraj()
-    NoisyTraj, NoisySpeed, NoisyAcc = generator.GetNoisyTraj()
-    #print(NoisyTraj)
+    true_traj, true_speed, true_acceleration = generator.GetTrueTraj()
+    noisy_traj, noisy_speed, noisy_acceleration = generator.GetNoisyTraj()
+    #print(noisy_traj)
 
 
     for k in range(N):
-        FilterTraj.append(ComplementaryFilterT.RunFilter(np.array(NoisyTraj[0,k]), np.array(NoisySpeed[0,k]) ))
-        FilterTrajOffset.append(ComplementaryFilterO.RunFilterOffset(np.array(NoisyTraj[0,k]), np.array(NoisySpeed[0,k]) ))
-        FilterTrajOffset1.append(ComplementaryFilterO_1.RunFilterOffset(np.array(NoisyTraj[0,k]), np.array(NoisySpeed[0,k]) ))
-        FilterTrajOffset5.append(ComplementaryFilterO_5.RunFilterOffset(np.array(NoisyTraj[0,k]), np.array(NoisySpeed[0,k]) ))
+        filter_traj.append(ComplementaryFilterT.RunFilter(np.array(noisy_traj[0,k]), np.array(noisy_speed[0,k]) ))
+        filter_traj_offset.append(ComplementaryFilterO.RunFilterOffset(np.array(noisy_traj[0,k]), np.array(noisy_speed[0,k]) ))
+        filter_traj_offset1.append(ComplementaryFilterO_1.RunFilterOffset(np.array(noisy_traj[0,k]), np.array(noisy_speed[0,k]) ))
+        filter_traj_offset5.append(ComplementaryFilterO_5.RunFilterOffset(np.array(noisy_traj[0,k]), np.array(noisy_speed[0,k]) ))
 
     # turn list to array (sorry for ugliness)
-    FilterTraj = np.array(FilterTraj).reshape(1, N)
+    filter_traj = np.array(filter_traj).reshape(1, N)
     #FilterSpeed = np.array(FilterSpeed).reshape(1, N)
     #FilterAcc = np.array(FilterAcc).reshape(1, N)
 
-    FilterTrajOffset = np.array(FilterTrajOffset).reshape(1, N)
-    FilterTrajOffset1 = np.array(FilterTrajOffset1).reshape(1, N)
-    FilterTrajOffset5 = np.array(FilterTrajOffset5).reshape(1, N)
-    #FilterSpeedOffset = np.array(FilterSpeedOffset).reshape(1, N)
-    #FilterAccOffset = np.array(FilterAccOffset).reshape(1, N)
+    filter_traj_offset = np.array(filter_traj_offset).reshape(1, N)
+    filter_traj_offset1 = np.array(filter_traj_offset1).reshape(1, N)
+    filter_traj_offset5 = np.array(filter_traj_offset5).reshape(1, N)
+    #FilterSpeed_offset = np.array(FilterSpeed_offset).reshape(1, N)
+    #FilterAcc_offset = np.array(FilterAcc_offset).reshape(1, N)
 
-    dataset = [NoisyTraj, TrueTraj, FilterTraj, FilterTrajOffset1, FilterTrajOffset, FilterTrajOffset5]
-    grapher.SetLegend(["Noisy position (" + str(NoiseLevel) + "%)", "True pos", "Filter out pos", "Filter w/OC out pos (memory=20)", "Filter w/OC out pos (memory=100)", "Filter w/OC out pos (memory=300)"])
+    dataset = [noisy_traj, true_traj, filter_traj, filter_traj_offset1, filter_traj_offset, filter_traj_offset5]
+    grapher.SetLegend(["Noisy position (" + str(noise_level) + "%)", "True pos", "Filter out pos", "Filter w/OC out pos (memory=20)", "Filter w/OC out pos (memory=100)", "Filter w/OC out pos (memory=300)"])
     grapher.CompareNDdatas(dataset, "position", "Test CF, position, polynomial (OCgain=0.3)", StyleAdapter=False, AutoLeg=False, width=1.3)
     return dataset
 

@@ -6,7 +6,7 @@ Created on Fri Jun 21 12:16:08 2024
 @author: niels
 """
 
-from bolt_estimator.estimator.Bolt_Filter_Complementary import ComplementaryFilter
+from bolt_estimator.estimator.Filter_Complementary import ComplementaryFilter
 import numpy as np
 import matplotlib.pyplot as plt
 

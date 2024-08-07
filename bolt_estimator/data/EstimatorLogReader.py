@@ -4,7 +4,7 @@ from scipy.spatial.transform import Rotation as R
 
 
 from bolt_estimator.utils.Graphics import Graphics
-from bolt_estimator.utils.Bolt_Utils import Log
+from bolt_estimator.utils.Utils import Log
 
 from bolt_estimator.data.DataImprover import improve
 from bolt_estimator.utils.TrajectoryGenerator import TrajectoryGenerator, Metal

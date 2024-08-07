@@ -2,10 +2,10 @@
 
 import numpy as np
 
-from bolt_estimator.utils.Bolt_Utils import utils, Log
+from bolt_estimator.utils.Utils import utils, Log
 from bolt_estimator.utils.TrajectoryGenerator import TrajectoryGenerator, Metal
 from bolt_estimator.utils.Graphics import Graphics
-from bolt_estimator.estimator.Bolt_Filter_Complementary import ComplementaryFilter
+from bolt_estimator.estimator.Filter_Complementary import ComplementaryFilter
 
 from bolt_estimator.data.DataReader import DataReader
 
@@ -20,22 +20,22 @@ Outputs all data as graphs
 
 
 class Test_Filter():
-    def __init__(self, FilterType="complementary",
+    def __init__(self, filter_type="complementary",
                         parameters=(1/1000, 2),
                         optparameters = (100, 0.005),
                         name="Standard complementary"):
-            self.FilterType=FilterType
+            self.filter_type=filter_type
             self.parameters=parameters
             self.optparameters = optparameters
             self.name = name
 
-    def TestDim(self, WishedDim, InputedDim):
+    def TestDim(self, desired_dim, inputed_dim):
         testlogger = Log("testing dimension input ", PrintOnFlight=True)
         print("# ", self.optparameters)
         memsize, integratorgain = self.optparameters
-        Filter = ComplementaryFilter(self.parameters, ndim=WishedDim, talkative=True, name=self.name, logger=testlogger, MemorySize=memsize, OffsetGain=integratorgain)
-        x = np.ones(InputedDim)
-        xdot = np.ones(InputedDim)
+        Filter = ComplementaryFilter(self.parameters, ndim=desired_dim, talkative=True, name=self.name, logger=testlogger, MemorySize=memsize, OffsetGain=integratorgain)
+        x = np.ones(inputed_dim)
+        xdot = np.ones(inputed_dim)
         Filter.RunFilter(x, xdot)
 
 
@@ -47,13 +47,13 @@ class Test_Filter():
 
         # load custom data
         if datatype=="custom":
-            pcom = np.load("/home/nalbrecht/Bolt-Estimator/Bolt-robot---Estimator/tests/com_pos_superplus.npy")
-            vcom = np.load("/home/nalbrecht/Bolt-Estimator/Bolt-robot---Estimator/tests/vcom_pos_superplus.npy")
+            pcom = np.load("./miscanellous/com_pos_superplus.npy")
+            vcom = np.load("./miscanellous/vcom_pos_superplus.npy")
             
             trajX = pcom[0, :, 0]
             trajY = pcom[0, :, 1]
             trajZ = pcom[0, :, 2]
-            AdaptedTraj = np.array([trajX, trajY, trajZ])
+            adapted_traj = np.array([trajX, trajY, trajZ])
             speedX = vcom[0, :, 0]
             speedY = vcom[0, :, 1]
             speedZ = vcom[0, :, 2]
@@ -66,7 +66,7 @@ class Test_Filter():
 
             # start generator
             generator = TrajectoryGenerator(logger=testlogger)
-            generator.Generate(datatype, NoiseLevel=NoiseLevel, N=N, traj=AdaptedTraj)
+            generator.Generate(datatype, NoiseLevel=NoiseLevel, N=N, traj=adapted_traj)
 
 
         elif datatype=="simulated":
@@ -76,7 +76,7 @@ class Test_Filter():
             a = reader.Get("a")[:, 1, :].copy()
             v = reader.Get("v")[:, 1, :].copy()
             
-            AdaptedTraj = np.array([v[:, 0], v[:, 1], v[:, 2]])
+            adapted_traj = np.array([v[:, 0], v[:, 1], v[:, 2]])
             AdaptedSpeed = np.array([a[:, 0], a[:, 1], a[:, 2]])
             print(" # shape ", AdaptedSpeed.shape)
 
@@ -86,7 +86,7 @@ class Test_Filter():
 
             # start generator
             generator = TrajectoryGenerator(logger=testlogger)
-            generator.Generate(datatype, NoiseLevel=NoiseLevel, N=N, traj=AdaptedTraj)
+            generator.Generate(datatype, NoiseLevel=NoiseLevel, N=N, traj=adapted_traj)
         
         elif datatype=="simulated 1D":
             datatype="custom"
@@ -95,7 +95,7 @@ class Test_Filter():
             a = reader.Get("a")[:, 1, 2].copy()
             v = reader.Get("v")[:, 1, 2].copy()
             
-            AdaptedTraj = np.array([v])
+            adapted_traj = np.array([v])
             AdaptedSpeed = np.array([a])
             print(" # shape ", AdaptedSpeed.shape)
 
@@ -105,7 +105,7 @@ class Test_Filter():
 
             # start generator
             generator = TrajectoryGenerator(logger=testlogger)
-            generator.Generate(datatype, NoiseLevel=NoiseLevel, N=N, traj=AdaptedTraj)
+            generator.Generate(datatype, NoiseLevel=NoiseLevel, N=N, traj=adapted_traj)
 
 
         else : 
@@ -114,7 +114,7 @@ class Test_Filter():
             generator.Generate(datatype, NoiseLevel=NoiseLevel, N=N, amplitude=0.1)
             ndim=1
         
-        if self.FilterType == "complementary":
+        if self.filter_type == "complementary":
             print(" # optparams ", self.optparameters)
             print(" # ndim ", ndim)
             memsize, integratorgain = self.optparameters
@@ -153,7 +153,7 @@ N = 1000
 # the desired level of noise in the signal to be filtered
 NoiseLevel=40
 # the filter to test
-filtertype =  "complementary"
+filter_type =  "complementary"
 parameters=(1/N, 0.04)
 optparameters = (50, 0.02)
 name="Standard complementary"
@@ -161,7 +161,7 @@ name="Standard complementary"
 
 
 
-TF = Test_Filter(filtertype, parameters, optparameters, name=name)
+TF = Test_Filter(filter_type, parameters, optparameters, name=name)
 # TF.TestDim(3, 3)
 # TF.RunTest(N, NoiseLevel=10, datatype="polynomial")
 # TF.RunTest(N, NoiseLevel=40, datatype="sinus")
