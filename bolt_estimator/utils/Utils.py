@@ -32,18 +32,18 @@ class utils():
         # returns a scalar b
         return np.sum(a*b)
 
-    def RotationMatrix(EulerArray) -> np.ndarray:
-        return Rotation.from_euler('zyx', EulerArray).as_matrix()
+    def RotationMatrix(euler_array) -> np.ndarray:
+        return Rotation.from_euler('zyx', euler_array).as_matrix()
     
-    def rotation(EulerArray, ArrayToRotate) -> np.ndarray:
-        R = Rotation.from_euler('xyz', EulerArray).as_matrix()
-        return R@ArrayToRotate
+    def rotation(euler_array, array_to_rotate) -> np.ndarray:
+        R = Rotation.from_euler('xyz', euler_array).as_matrix()
+        return R@array_to_rotate
     
-    def RotByQuat(ArrayToRotate,Q) -> np.ndarray :
+    def RotByQuat(array_to_rotate,Q) -> np.ndarray :
         q = Quat_Utils()
-        Qstar = q.ConjugateQuat(Q)
-        x = np.array([ArrayToRotate[0], ArrayToRotate[1], ArrayToRotate[2], 0])
-        return q.QuatProduct( q.QuatProduct(Q,x), Qstar)[:-1]
+        qstar = q.ConjugateQuat(Q)
+        x = np.array([array_to_rotate[0], array_to_rotate[1], array_to_rotate[2], 0])
+        return q.QuatProduct( q.QuatProduct(Q,x), qstar)[:-1]
     
     def S(x) -> np.ndarray:
         """ Skew-symetric operator """
@@ -61,9 +61,9 @@ class utils():
     def QuatProduct(x, y):
         q = Quat_Utils()
         return q.QuatProduct(x, y)
-    def RotateQuat(QuatToRotate, Quat):
+    def RotateQuat(quat_to_rotate, Quat):
         q = Quat_Utils()
-        return q.RotateQuat(QuatToRotate, Quat)
+        return q.RotateQuat(quat_to_rotate, Quat)
 
 
 
@@ -92,10 +92,10 @@ class Quat_Utils():
 
         return z
     
-    def RotateQuat(self, QuatToRotate, Quat):
+    def RotateQuat(self, quat_to_rotate, quat):
         # rotate a quaternion by a quaternion
-        QuatInv = self.InvQuat(Quat)
-        return self.QuatProduct(QuatInv, self.QuatProduct(QuatToRotate, Quat))
+        quat_inv = self.InvQuat(Quat)
+        return self.QuatProduct(quat_inv, self.QuatProduct(quat_to_rotate, quat))
 
 
 
@@ -106,12 +106,12 @@ A class to have a common log for all code
 Display logs on flight, or only when PrintLog() is called
 '''
 class Log():
-    def __init__(self, name="", PrintOnFlight=True):
-        self.PrintOnFlight = PrintOnFlight
+    def __init__(self, name="", print_on_flight=True):
+        self.print_on_flight = print_on_flight
         self.fulllog = "\n\n   ---   beginnig log:: " + name + " --- \n\n"
-        if self.PrintOnFlight : print(self.fulllog)
+        if self.print_on_flight : print(self.fulllog)
 
-    def LogTheLog(self, log, style="info", ToPrint=True):
+    def LogTheLog(self, log, style="info", to_print=True):
         if style=="info":
             log = "  -> " + log
         elif style=="subinfo":
@@ -124,7 +124,7 @@ class Log():
             log = "\n\n***\n\n " + log + "\n\n***\n\n "
         elif style=="subtitle":
             log = " ····> " + log
-        if ToPrint and self.PrintOnFlight: print(log)
+        if to_print and self.print_on_flight: print(log)
         self.fulllog  +=  log + "\n"
     def GetLog(self):
         return self.fulllog

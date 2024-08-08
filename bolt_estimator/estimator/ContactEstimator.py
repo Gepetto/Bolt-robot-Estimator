@@ -3,20 +3,20 @@ import pinocchio as pin
 from bolt_estimator.utils.Bolt_Utils import utils
 
 
-class ContactEstimator():
+class contactEstimator():
     def __init__(self, 
                 robot, 
-                LeftFootFrameID  : int=10, 
-                RightFootFrameID : int=18, 
-                LeftKneeFrameID  : int=4,
-                RightKneeFrameID : int=8,
-                LeftKneeTorqueID : int=2,
-                RightKneeTorqueID : int=5,
-                IterNumber       : int=1000,
+                left_foot_frame_id  : int=10, 
+                right_foot_frame_id : int=18, 
+                left_knee_frame_id  : int=4,
+                right_knee_frame_id : int=8,
+                left_knee_torque_id : int=2,
+                right_knee_torque_id : int=5,
+                iter_number       : int=1000,
                 dt               : float=1e-3,
-                MemorySize       : int=5,
-                Logging          : bool=True,
-                Talkative        : bool=True,
+                memory_size       : int=5,
+                logging          : bool=True,
+                talkative        : bool=True,
                 logger=None           ) -> None:
         
         # pinocchio
@@ -37,42 +37,42 @@ class ContactEstimator():
         self.Tau = np.zeros(6)
         
         # feet id
-        self.LeftFootFrameID = LeftFootFrameID
-        self.RightFootFrameID = RightFootFrameID
-        self.C_id = [LeftFootFrameID, RightFootFrameID]
+        self.left_foot_frame_id = leftfoot_frame_id
+        self.right_foot_frame_id = rightfoot_frame_id
+        self.C_id = [leftfoot_frame_id, rightfoot_frame_id]
         # knees id
-        self.LeftKneeFrameID = LeftKneeFrameID
-        self.RightKneeFrameID = RightKneeFrameID
-        self.LeftKneeTorqueID = LeftKneeTorqueID
-        self.RightKneeTorqueID = RightKneeTorqueID
+        self.left_knee_frame_id = LeftKneeFrameID
+        self.right_knee_frame_id = RightKneeFrameID
+        self.left_knee_torque_id = Leftknee_torqueID
+        self.right_knee_torque_id = right_knee_torque_id
         
         # logging options
         if logger is None :
-            self.Talkative=False
+            self.talkative=False
         else :
-            self.Talkative=Talkative
+            self.talkative=talkative
             self.logger = logger
-            self.logger.LogTheLog("Contact Forces Estimator started", style="subtitle")
-        self.Logging = Logging
+            self.logger.LogTheLog("contact forces Estimator started", style="subtitle")
+        self.logging = logging
 
         # compute bolt mass
         self.mass = pin.computeTotalMass(self.bolt.model)
         self.logger.LogTheLog("Mass of robot : " + str(self.mass), style="subinfo")
         
         # initialize all variables
-        self.IterNumber = IterNumber
+        self.iter_number = iter_number
         self.InitVariables()
-        if self.Logging : self.InitLogMatrixes()
+        if self.logging : self.InitLogMatrixes()
         self.iter = 0
 
-        self.TorqueContacts = [False, False]
+        self.Torquecontacts = [False, False]
 
-        # average contact probability over the last k=memorysize results
-        self.MemorySize = MemorySize
+        # average contact probability over the last k=memory_size results
+        self.memory_size = memory_size
         
         # coefficient for averaging contact forces
         self.coeffs = [0.0, 0.3, 0.7] #1D, 3D, torques-based
-        if sum(self.coeffs) != 1 and self.Talkative: self.logger.LogTheLog("Coeffs sum not equal to 1", "warn")
+        if sum(self.coeffs) != 1 and self.talkative: self.logger.LogTheLog("Coeffs sum not equal to 1", "warn")
         self.c1, self.c2, self.c3 = self.coeffs
     
     
@@ -81,55 +81,55 @@ class ContactEstimator():
     def InitLogMatrixes(self) -> None:
         
         # contact forces logs
-        self.Log_LcF_3d = np.zeros([3, self.IterNumber])
-        self.Log_LcF_1d = np.zeros([3, self.IterNumber])
-        self.Log_RcF_3d = np.zeros([3, self.IterNumber])
-        self.Log_RcF_1d = np.zeros([3, self.IterNumber])
-        self.Log_LcF_T = np.zeros([3, self.IterNumber])
-        self.Log_RcF_T = np.zeros([3, self.IterNumber])
+        self.log_lc_f_3d = np.zeros([3, self.iter_number])
+        self.log_lc_f_1d = np.zeros([3, self.iter_number])
+        self.log_rc_f_3d = np.zeros([3, self.iter_number])
+        self.log_rc_f_1d = np.zeros([3, self.iter_number])
+        self.log_lc_f_t = np.zeros([3, self.iter_number])
+        self.log_rc_f_t = np.zeros([3, self.iter_number])
         # left and right trust in contacts logs
-        self.Log_Delta1D = np.zeros([2, self.IterNumber])
-        self.Log_Delta3D = np.zeros([2, self.IterNumber])
-        self.Log_DeltaVertical = np.zeros([2, self.IterNumber])
+        self.log_delta1_d = np.zeros([2, self.iter_number])
+        self.log_delta3_d = np.zeros([2, self.iter_number])
+        self.log_delta_vertical = np.zeros([2, self.iter_number])
         # slipping logs
-        self.Log_Mu = np.zeros([2, self.IterNumber])
-        self.Log_SlipProb = np.zeros([2, self.IterNumber])
+        self.log_mu = np.zeros([2, self.iter_number])
+        self.log_slip_prob = np.zeros([2, self.iter_number])
         # boolean contact, probability of contact and trust in contact
-        self.Log_Contact = np.zeros([2, self.IterNumber], dtype=bool)
-        self.Log_ContactProbability = np.zeros([2, self.IterNumber])
-        self.Log_ContactProbability_F = np.zeros([2, self.IterNumber])
-        self.Log_ContactProbability_T = np.zeros([2, self.IterNumber])
-        self.Log_Trust = np.zeros([2, self.IterNumber])
+        self.log_contact = np.zeros([2, self.iter_number], dtype=bool)
+        self.log_contact_probability = np.zeros([2, self.iter_number])
+        self.log_contact_probability_f = np.zeros([2, self.iter_number])
+        self.log_contact_probability_T = np.zeros([2, self.iter_number])
+        self.log_trust = np.zeros([2, self.iter_number])
         return None
     
 
     def UpdateLogMatrixes(self) -> None:
-        LogIter = self.iter
-        if self.iter >= self.IterNumber:
+        log_iter = self.iter
+        if self.iter >= self.iter_number:
             # Logs matrices' size will not be sufficient
-            self.logger.LogTheLog("Excedind planned number of executions for ContactEstimator, IterNumber = " + str(self.IterNumber), style="warn", ToPrint=self.Talkative)
-            LogIter = self.IterNumber-1
+            self.logger.LogTheLog("Excedind planned number of executions for contactEstimator, iter_number = " + str(self.iter_number), style="warn", ToPrint=self.talkative)
+            log_iter = self.iter_number-1
 
         # contact forces logs
-        self.Log_LcF_3d[:, LogIter] = self.LcF_3d[:]
-        self.Log_LcF_1d[:, LogIter] = self.LcF_1d[:]
-        self.Log_RcF_3d[:, LogIter] = self.RcF_3d[:]
-        self.Log_RcF_1d[:, LogIter] = self.RcF_1d[:]
-        self.Log_LcF_T[:, LogIter] = self.LcF_T[:]
-        self.Log_RcF_T[:, LogIter] = self.RcF_T[:]
+        self.log_lc_f_3d[:, log_iter] = self.LcF_3d[:]
+        self.log_lc_f_1d[:, log_iter] = self.LcF_1d[:]
+        self.log_rc_f_3d[:, log_iter] = self.RcF_3d[:]
+        self.log_rc_f_1d[:, log_iter] = self.RcF_1d[:]
+        self.log_lc_f_t[:, log_iter] = self.LcF_T[:]
+        self.log_rc_f_t[:, log_iter] = self.RcF_T[:]
         # left and right trust in contacts logs
-        self.Log_Delta1D[:, LogIter] = [self.DeltaL, self.DeltaR]
-        self.Log_Delta3D[:, LogIter] = [self.DeltaL3d, self.DeltaR3d]
-        self.Log_DeltaVertical[:, LogIter] = [self.DeltaLV, self.DeltaRV]
+        self.log_delta1_d[:, log_iter] = [self.delta_l, self.delta_r]
+        self.log_delta3_d[:, log_iter] = [self.delta_l3d, self.delta_r3d]
+        self.log_delta_vertical[:, log_iter] = [self.delta_lV, self.delta_rV]
         # slipping logs
-        self.Log_Mu[:, LogIter] = [self.MuL, self.MuR]
-        self.Log_SlipProb[:, LogIter] = [self.SlipProbL, self.SlipProbR]
+        self.log_mu[:, log_iter] = [self.mu_l, self.mu_r]
+        self.log_slip_prob[:, log_iter] = [self.slip_probL, self.slip_probR]
         # boolean contact, probability of contact and trust in contact
-        self.Log_Contact[:, LogIter] = [self.LeftContact, self.RightContact]
-        self.Log_ContactProbability[:, LogIter] = [self.ContactProbL, self.ContactProbR]
-        self.Log_ContactProbability_F[:, LogIter] = [self.ContactProbL_F, self.ContactProbR_F]
-        self.Log_ContactProbability_T[:, LogIter] = [self.ContactProbL_T, self.ContactProbR_T]
-        self.Log_Trust[:, LogIter] = [self.TrustL, self.TrustR]
+        self.log_contact[:, log_iter] = [self.left_contact, self.right_contact]
+        self.log_contact_probability[:, log_iter] = [self.contact_prob_l, self.contact_prob_r]
+        self.log_contact_probability_f[:, log_iter] = [self.contact_prob_l_F, self.contact_prob_r_F]
+        self.log_contact_probability_T[:, log_iter] = [self.contact_prob_l_T, self.contact_prob_r_T]
+        self.log_trust[:, log_iter] = [self.trust_l, self.trust_r]
         # number of updates
         self.iter += 1
         return None
@@ -149,33 +149,33 @@ class ContactEstimator():
         
         # contact forces log
         elif data=='cf_1d':
-            return self.Log_LcF_1d, self.Log_RcF_1d
+            return self.log_lc_f_1d, self.log_rc_f_1d
         elif data=='cf_3d':
-            return self.Log_LcF_3d, self.Log_RcF_3d
+            return self.log_lc_f_3d, self.log_rc_f_3d
         elif data=='cf_torques':
-            return self.Log_LcF_T, self.Log_RcF_T
+            return self.log_lc_f_t, self.log_rc_f_t
         
         # trusts and co
         elif data=='delta_1d':
-            return self.Log_Delta1D
+            return self.log_delta1_d
         elif data=='delta_3d':
-            return self.Log_Delta3D
+            return self.log_delta3_d
         elif data=='mu':
-            return self.Log_Mu
+            return self.log_mu
         elif data=='slip_prob':
-            return self.Log_SlipProb
+            return self.log_slip_prob
         elif data=="trust":
-            return self.Log_Trust
+            return self.log_trust
         
         # bool log
         elif data=="contact_bool":
-           return self.Log_Contact
+           return self.log_contact
         elif data=="contact_prob":
-           return self.Log_ContactProbability
+           return self.log_contact_probability
         elif data=="contact_prob_force":
-           return self.Log_ContactProbability_F
+           return self.log_contact_probability_f
         elif data=="contact_prob_torque":
-           return self.Log_ContactProbability_T
+           return self.log_contact_probability_T
                 
         
         
@@ -183,17 +183,17 @@ class ContactEstimator():
         
     def InitVariables(self) -> None:
         # deltas and slips
-        self.DeltaL, self.DeltaL3d, self.DeltaLV, self.MuL, self.TrustL = 0., 0., 0., 0., 0.
-        self.DeltaR, self.DeltaR3d, self.DeltaRV, self.MuR, self.TrustR = 0., 0., 0., 0., 0.
-        self.SlipProbL = 0.
-        self.SlipProbR = 0.
+        self.delta_l, self.delta_l3d, self.delta_lV, self.mu_l, self.trust_l = 0., 0., 0., 0., 0.
+        self.delta_r, self.delta_r3d, self.delta_rV, self.mu_r, self.trust_r = 0., 0., 0., 0., 0.
+        self.slip_probL = 0.
+        self.slip_probR = 0.
         # contact and trust
-        self.ContactProbL = 0.
-        self.ContactProbR = 0.
-        self.TrustL = 0.
-        self.TrustR = 0.
-        self.LeftContact = False
-        self.RightContact = False
+        self.contact_prob_l = 0.
+        self.contact_prob_r = 0.
+        self.trust_l = 0.
+        self.trust_r = 0.
+        self.left_contact = False
+        self.right_contact = False
 
         # contact forces
         self.LcF_1d = np.zeros(3)
@@ -204,12 +204,12 @@ class ContactEstimator():
         self.RcF_T = np.zeros(3)
 
         # foot position
-        self.RightFootPos = np.zeros(3)
-        self.LeftFootPos = np.zeros(3)
+        self.right_foot_pos = np.zeros(3)
+        self.left_foot_pos = np.zeros(3)
 
         # contact memory
-        self.PastProbL = 0.
-        self.PastProbR = 0.
+        self.past_prob_l = 0.
+        self.past_prob_r = 0.
      
         
     def __SigmoidDiscriminator(self, x, center, stiffness=5) -> np.ndarray:
@@ -220,7 +220,7 @@ class ContactEstimator():
             return 1
         return 1/ (1 + np.exp(-b*x + b0))
     
-    def __ApplyForce(self, ContactForces):
+    def __ApplyForce(self, contact_forces):
         """ return forces in the right fomat for pinocchio """
         # volé à victor
         ### Build force list for ABA
@@ -228,8 +228,8 @@ class ContactEstimator():
         # I am supposing here that all contact frames are on separate joints. This is asserted below:
         #assert( len( set( [ cmodel.frames[idf].parentJoint for idf in contactIds ]) ) == len(contactIds) )
         
-        for f,idf in zip(ContactForces,self.C_id):
-            # Contact forces introduced in ABA as spatial forces at joint frame.
+        for f,idf in zip(contact_forces,self.C_id):
+            # contact forces introduced in ABA as spatial forces at joint frame.
             forces[self.bolt.model.frames[idf].parent] = self.bolt.model.frames[idf].placement * pin.Force(f, 0.*f)
         forces_out = pin.StdVec_Force()
         for f in forces:
@@ -240,54 +240,54 @@ class ContactEstimator():
 
 
     
-    def ContactForces1d(self, Torques, Q, Qd, BaseAccelerationIMU, Dynamic=0.4, Resolution=10) -> tuple[np.ndarray, np.ndarray]:
+    def contact_forces1d(self, torques, Q, Qd, base_acceleration_imu, dynamic=0.4, resolution=10) -> tuple[np.ndarray, np.ndarray]:
         """this function assumes that the weight is somehow distributed over both feet, and search an approximation of that distribution"""
-        # NO EXTERNAL FORCES
-        # contact forces ASSUMED VERTICAL
-        a_mes = BaseAccelerationIMU
-        Deltas = []
-        DeltaMin = 1e6 #np.linalg.norm(a_mes)
+        # NO EXTERNAL forces
+        # contact forces ASSUMED vertical
+        a_mes = base_acceleration_imu
+        deltas = []
+        delta_min = 1e6 #np.linalg.norm(a_mes)
         CF = (np.zeros(3), np.zeros(3))
         
 
         # update data from encoders
         self.Q[:] = Q[:]
         self.Qd[:] = Qd[:]
-        TauPin = np.zeros(self.bolt.model.nv)
-        TauPin[-6:] = Torques[:]
+        tau_pin = np.zeros(self.bolt.model.nv)
+        tau_pin[-6:] = torques[:]
         
-        # Dynamic states that contact forces sum is in [weight * (1-dynamic) , weight * (1+dynamic)]
+        # dynamic states that contact forces sum is in [weight * (1-dynamic) , weight * (1+dynamic)]
         # minimal contact force is 0
-        MinForce = 0
+        min_force = 0
         # maximal contact force is weight * (1+dynamic)
-        MaxForce = self.mass*9.81 * (1+Dynamic)
+        max_force = self.mass*9.81 * (1+dynamic)
         # the lower and upper indices such that contact forces sum is in [weight * (1-dynamic) , weight * (1+dynamic)]
-        upper = int(np.floor(Resolution*(1+Dynamic)))
-        lower = int(np.ceil(Resolution*(1-Dynamic/2)))
+        upper = int(np.floor(resolution*(1+dynamic)))
+        lower = int(np.ceil(resolution*(1-dynamic/2)))
         #print(f'upper : {upper}, lower : {lower}')
         # possible force range from min to max force
-        PossibleForce_Left = np.linspace(MinForce, MaxForce, upper)
-        PossibleForce_Right = PossibleForce_Left.copy()        
+        possible_force_left = np.linspace(min_force, max_force, upper)
+        possible_force_right = possible_force_left.copy()        
         
         for i in range(upper):
             # left contact force takes all possible values
             # for a given value of the left contact force, contact forces sum is in [weight * (1-dynamic) , weight * (1+dynamic)]
-            ReasonnableMin = max(0, lower-i)
-            ReasonnableMax = max(0, upper-i)
-            for j in range( ReasonnableMin, ReasonnableMax):
-                #print(f'Indices :  {i} ; {j}           Répartition :  {np.floor(PossibleForce_Left[i])}/{np.floor(PossibleForce_Right[j])}')
+            reasonnable_min = max(0, lower-i)
+            reasonnable_max = max(0, upper-i)
+            for j in range( reasonnable_min, reasonnable_max):
+                #print(f'Indices :  {i} ; {j}           Répartition :  {np.floor(possible_force_left[i])}/{np.floor(possible_force_right[j])}')
                 
                 # both our contact forces are within reasonnable range. Looking for the most likely forces repartition.
-                # contact forces ASSUMED VERTICAL
-                LcF = np.array([0, 0, PossibleForce_Left[i]])
-                RcF = np.array([0, 0, PossibleForce_Right[j]])
-                Forces = self.__ApplyForce([LcF, RcF])
+                # contact forces ASSUMED vertical
+                LcF = np.array([0, 0, possible_force_left[i]])
+                RcF = np.array([0, 0, possible_force_right[j]])
+                forces = self.__ApplyForce([LcF, RcF])
                 
                 # compute forward dynamics
-                self.Qdd = pin.aba(self.bolt.model, self.bolt.data, self.Q, self.Qd, TauPin, Forces)
+                self.Qdd = pin.aba(self.bolt.model, self.bolt.data, self.Q, self.Qd, tau_pin, forces)
 
                 pin.forwardKinematics(self.bolt.model, self.bolt.data, self.Q, self.Qd, np.zeros(self.bolt.model.nv))
-                a_pin = pin.getFrameAcceleration(self.bolt.model, self.bolt.data, 1, pin.ReferenceFrame.LOCAL).linear
+                a_pin = pin.getFrameacceleration(self.bolt.model, self.bolt.data, 1, pin.ReferenceFrame.LOCAL).linear
 
                 
                 # update speed and position
@@ -297,24 +297,24 @@ class ContactEstimator():
                 
                 dxx = np.linalg.norm(a_pin-a_mes)
                 #print(f"LCF : {LcF}\n RCF : {RcF}\n a_pin : {a_pin}\n delta  : {dxx}")
-                Deltas.append( np.linalg.norm(a_pin-a_mes))
-                if Deltas[-1] < DeltaMin:
+                deltas.append( np.linalg.norm(a_pin-a_mes))
+                if deltas[-1] < delta_min:
                     # error is minimal
-                    DeltaMin = Deltas[-1]
+                    delta_min = deltas[-1]
                     CF = (LcF, RcF)
         return CF
     
-    def ContactForces3d(self, frames=[10,18]) -> tuple[np.ndarray, np.ndarray]:
+    def contact_forces3d(self, frames=[10,18]) -> tuple[np.ndarray, np.ndarray]:
         return np.zeros(3), np.zeros(3)
 
-    def ContactForces3d_(self, frames=[10,18]) -> tuple[np.ndarray, np.ndarray]:
+    def contact_forces3d_(self, frames=[10,18]) -> tuple[np.ndarray, np.ndarray]:
         """ compute contact forces using jacobian and torques"""
         # set left foot and right foot data apart
         LF_id, RF_id = frames[0], frames[1]
         
-        # adapt dimension of Torques
-        TauPin = np.zeros(self.bolt.model.nv)
-        TauPin[-6:] = self.Tau[:]
+        # adapt dimension of torques
+        tau_pin = np.zeros(self.bolt.model.nv)
+        tau_pin[-6:] = self.Tau[:]
 
         # update data
         pin.forwardKinematics(self.bolt.model, self.data3D, self.Q)
@@ -330,8 +330,8 @@ class ContactEstimator():
         b = self.data3D.nle
       
         # compute 6d contact wrenches
-        LcF = -np.linalg.pinv(JL.T) @ (TauPin - g - b)
-        RcF = -np.linalg.pinv(JR.T) @ (TauPin - g - b)
+        LcF = -np.linalg.pinv(JL.T) @ (tau_pin - g - b)
+        RcF = -np.linalg.pinv(JR.T) @ (tau_pin - g - b)
 
 
         # compute contact wrench using method from ETH zurich, RD2017 p73 3.61
@@ -343,7 +343,7 @@ class ContactEstimator():
         u = self.Qd
         
         t1 = JL @ np.linalg.pinv(M) @ JL.T
-        t2 = JL @ np.linalg.pinv(M) @ (TauPin - g)
+        t2 = JL @ np.linalg.pinv(M) @ (tau_pin - g)
         t3 = JLd@u
         
         LcF = np.linalg.pinv(t1) @ (t2 + t3)     
@@ -353,182 +353,182 @@ class ContactEstimator():
         return LcF[:3], RcF[:3]
 
 
-    def ConsistencyChecker_DEPRECATED(self, ContactForce1d, ContactForce3d) -> tuple[float, float, float]:
+    def ConsistencyChecker_DEPRECATED(self, contact_force1d, contact_force3d) -> tuple[float, float, float]:
         """ Check the consistency of a contact force computed by two functions."""
         # difference between both contact forces norms      
-        Delta = np.abs(np.linalg.norm(ContactForce1d) - np.linalg.norm(ContactForce3d))
+        delta = np.abs(np.linalg.norm(contact_force1d) - np.linalg.norm(contact_force3d))
    
-        Delta3d = np.linalg.norm(ContactForce1d - ContactForce3d)
-        DeltaVertical = np.linalg.norm(ContactForce1d[2] - ContactForce3d[2])
+        delta3d = np.linalg.norm(contact_force1d - contact_force3d)
+        delta_vertical = np.linalg.norm(contact_force1d[2] - contact_force3d[2])
         
-        return Delta, Delta3d, DeltaVertical
+        return delta, delta3d, delta_vertical
     
     
-    def ConsistencyChecker(self, ContactForce1d, ContactForce3d, ContactForceTorque, coeffs=[0.25, 0.25, 0.5]) -> tuple[float, float, float]:
+    def ConsistencyChecker(self, contact_force1d, contact_force3d, contact_force_torque, coeffs=[0.25, 0.25, 0.5]) -> tuple[float, float, float]:
         """ Check the consistency of a contact force computed by three functions."""
         # average contact force
-        ContactForceAvg = coeffs[0]*ContactForce1d + coeffs[1]*ContactForce3d + coeffs[2]*ContactForceTorque
+        contact_force_avg = coeffs[0]*contact_force1d + coeffs[1]*contact_force3d + coeffs[2]*contact_force_torque
         
         # norm delta
-        Delta = (np.abs(coeffs[0]* (np.linalg.norm(ContactForce1d) - np.linalg.norm(ContactForceAvg))) +\
-                 np.abs(coeffs[1]* (np.linalg.norm(ContactForce3d) - np.linalg.norm(ContactForceAvg))) +\
-                 np.abs(coeffs[2]* (np.linalg.norm(ContactForceTorque) - np.linalg.norm(ContactForceAvg))) )/3
+        delta = (np.abs(coeffs[0]* (np.linalg.norm(contact_force1d) - np.linalg.norm(contact_force_avg))) +\
+                 np.abs(coeffs[1]* (np.linalg.norm(contact_force3d) - np.linalg.norm(contact_force_avg))) +\
+                 np.abs(coeffs[2]* (np.linalg.norm(contact_force_torque) - np.linalg.norm(contact_force_avg))) )/3
         
         # vector delta
-        Delta3d = ( coeffs[0]* np.linalg.norm(ContactForce1d - ContactForceAvg) +\
-                    coeffs[1]* np.linalg.norm(ContactForce3d - ContactForceAvg) +\
-                    coeffs[2]* np.linalg.norm(ContactForceTorque - ContactForceAvg) )/3
+        delta3d = ( coeffs[0]* np.linalg.norm(contact_force1d - contact_force_avg) +\
+                    coeffs[1]* np.linalg.norm(contact_force3d - contact_force_avg) +\
+                    coeffs[2]* np.linalg.norm(contact_force_torque - contact_force_avg) )/3
         
-        # print(ContactForce1d)
-        # print(ContactForce3d)
-        # print(ContactForceTorque)
+        # print(contact_force1d)
+        # print(contact_force3d)
+        # print(contact_force_torque)
         # vertical delta    
-        DeltaVertical = (coeffs[0]* np.linalg.norm(ContactForce1d[2] - ContactForceAvg[2]) +\
-                    coeffs[1]* np.linalg.norm(ContactForce3d[2] - ContactForceAvg[2]) +\
-                    coeffs[2]* np.linalg.norm(ContactForceTorque[2] - ContactForceAvg[2]) )/3
+        delta_vertical = (coeffs[0]* np.linalg.norm(contact_force1d[2] - contact_force_avg[2]) +\
+                    coeffs[1]* np.linalg.norm(contact_force3d[2] - contact_force_avg[2]) +\
+                    coeffs[2]* np.linalg.norm(contact_force_torque[2] - contact_force_avg[2]) )/3
         
-        return Delta, Delta3d, DeltaVertical
+        return delta, delta3d, delta_vertical
     
     
-    def ContactProbability_Force(self, ContactForce1d, ContactForce3d, ContactForceT, trigger=5, stiffness=3, coeffs=[0.3, 0.3, 0.4]) -> float:
+    def contact_probability_Force(self, contact_force1d, contact_force3d, contact_force_t, trigger=5, stiffness=3, coeffs=[0.3, 0.3, 0.4]) -> float:
         """ compute probability of contact based on three force estimations """
         c1, c2, c3 = coeffs
-        if c1+c2+c3 != 1.0 and self.Talkative: self.logger.LogTheLog("Coeff sum != 1 in ContactProbability_Force", style="warn")
+        if c1+c2+c3 != 1.0 and self.talkative: self.logger.LogTheLog("Coeff sum != 1 in contact_probability_Force", style="warn")
 
         # average vertical force
-        VerticalForce = (c1*ContactForce1d[2] + c2*ContactForce3d[2] + c3*ContactForceT[2])/3
+        verticalForce = (c1*contact_force1d[2] + c2*contact_force3d[2] + c3*contact_force_t[2])/3
         # return probability
-        return self.__SigmoidDiscriminator(VerticalForce, trigger, stiffness)
+        return self.__SigmoidDiscriminator(verticalForce, trigger, stiffness)
 
 
-    def ContactProbability_Force_3D(self, LeftContactForce3d, RightContactForce3d, iter, center=0.01, stiffness=0.1) -> float:
+    def contact_probability_Force_3D(self, left_contact_force3d, right_contact_force3d, iter, center=0.01, stiffness=0.1) -> float:
         """ compute probability of contact """
         if iter==0:
-            self.Previous3D_L = []
-            self.Previous3D_R = []
+            self.previous3_d_l = []
+            self.previous3_d_r = []
         
-        LeftVerticalForce = LeftContactForce3d[2]
-        RightVerticalForce = RightContactForce3d[2]
-        self.Previous3D_L.append(LeftVerticalForce)
-        self.Previous3D_R.append(RightVerticalForce)
+        left_vertical_force = left_contact_force3d[2]
+        right_vertical_force = right_contact_force3d[2]
+        self.previous3_d_l.append(left_vertical_force)
+        self.previous3_d_r.append(right_vertical_force)
 
         # check if force is increasing (contact) or decreasing (not in contact)
-        deltaL = center
-        deltaR = center
+        delta_l = center
+        delta_r = center
         if iter>=1 and iter < 20 :
-            deltaL = self.Previous3D_L[-1] - self.Previous3D_L[-2]
-            deltaR = self.Previous3D_R[-1] - self.Previous3D_R[-2]
+            delta_l = self.previous3_d_l[-1] - self.previous3_d_l[-2]
+            delta_r = self.previous3_d_r[-1] - self.previous3_d_r[-2]
         
         
         elif iter >= 20 :
-            PreviousAverageL = sum(self.Previous3D_L[-20:-10])/10
-            CurrentAverageL = sum(self.Previous3D_L[-10:])/10
-            deltaL = CurrentAverageL - PreviousAverageL
+            previous_average_l = sum(self.previous3_d_l[-20:-10])/10
+            current_average_l = sum(self.previous3_d_l[-10:])/10
+            delta_l = current_average_l - previous_average_l
 
-            PreviousAverageR = sum(self.Previous3D_R[-20:-10])/10
-            CurrentAverageR = sum(self.Previous3D_R[-10:])/10
-            deltaR = CurrentAverageR - PreviousAverageR
+            previous_average_r = sum(self.previous3_d_r[-20:-10])/10
+            current_average_r = sum(self.previous3_d_r[-10:])/10
+            delta_r = current_average_r - previous_average_r
 
-        return self.__SigmoidDiscriminator(deltaL, center, stiffness), self.__SigmoidDiscriminator(deltaR, center, stiffness)
+        return self.__SigmoidDiscriminator(delta_l, center, stiffness), self.__SigmoidDiscriminator(delta_r, center, stiffness)
 
        
         
-    def ContactProbability_Torque(self, Vertical, KneeTorque, KneeID = 8, FootID=10, Center=4, Stiffness=5)-> tuple[np.ndarray, float]:
+    def contactProbability_Torque(self, vertical, knee_torque, knee_id = 8, foot_id=10, center=4, stiffness=5)-> tuple[np.ndarray, float]:
         """ compute force based on knee torques, and return the estimated force and contact probability"""
 
         pin.forwardKinematics(self.bolt.model, self.dataT, self.Q)
         pin.updateFramePlacements(self.bolt.model, self.dataT)
         # normalized vertical vector
-        Vertical = Vertical / np.linalg.norm(Vertical)
+        vertical = vertical / np.linalg.norm(vertical)
         
         # knee to foot vector (both expressed in world frame)
-        delta = self.dataT.oMf[KneeID].translation - self.dataT.oMf[FootID].translation
+        delta = self.dataT.oMf[knee_id].translation - self.dataT.oMf[foot_id].translation
         # norm of horizontal components
-        hdist = np.linalg.norm(delta -  utils.scalar(delta, Vertical)*Vertical)
+        hdist = np.linalg.norm(delta -  utils.scalar(delta, vertical)*vertical)
         if hdist < 0.05 or hdist > 0.25 : 
-            self.logger.LogTheLog(f"Computed distance from knee : {KneeID} to foot : {FootID} is anormal :: {hdist} m")
+            self.logger.LogTheLog(f"Computed distance from knee : {knee_id} to foot : {foot_id} is anormal :: {hdist} m")
             hdist = 0.12
 
         # compute force
-        ContactForce = np.array([0, 0, KneeTorque / hdist])
-        ContactProb = self.__SigmoidDiscriminator(ContactForce[2], Center, Stiffness)  
-        return ContactForce, ContactProb
+        contact_force = np.array([0, 0, knee_torque / hdist])
+        contact_prob = self.__SigmoidDiscriminator(contact_force[2], center, stiffness)  
+        return contact_force, contact_prob
           
     
-    def Slips(self, ContactForce3d, FootFrameID, MuTrigger=0.2, FootAcc=np.zeros(3), AccTrigger=2., mingler=1.) -> float:
+    def Slips(self, contact_force3d, foot_frame_id, mu_trigger=0.2, foot_acc=np.zeros(3), acc_trigger=2., mingler=1.) -> float:
         """ Compute a coefficient about wether or not foot is slipping
         Args :
         Return : an average (weighted with mingler) of computed slipping probabilities
         """   
         # slipery level : horizontal norm over vertical DISTANCE
         # can be < 0
-        if ContactForce3d[2] == 0:
+        if contact_force3d[2] == 0:
             Mu = 10
         else :
-            Mu = np.sqrt(ContactForce3d[0]**2 + ContactForce3d[1]**2) / ContactForce3d[2]
-        Slip0 = self.__SigmoidDiscriminator(Mu, MuTrigger, 4)
+            Mu = np.sqrt(contact_force3d[0]**2 + contact_force3d[1]**2) / contact_force3d[2]
+        slip0 = self.__SigmoidDiscriminator(Mu, mu_trigger, 4)
 
         # uses kinematics to compute foot horizontal speed
         
         # uses Kinematics to compute foot acceleration and determin if the feet is slipping
-        HorizontalAcc = np.linalg.norm(FootAcc[:2])
-        Slip1 = self.__SigmoidDiscriminator(HorizontalAcc, AccTrigger, 5)
+        horizontal_acc = np.linalg.norm(foot_acc[:2])
+        slip1 = self.__SigmoidDiscriminator(horizontal_acc, acc_trigger, 5)
         # 0 : feet stable , 0.8 : feet potentially slipping
-        SlipProb = mingler * Slip0 + (1-mingler) * Slip1
-        #print(Slip0, Slip1)
-        #print(SlipProb)
+        slip_prob = mingler * slip0 + (1-mingler) * slip1
+        #print(slip0, slip1)
+        #print(slip_prob)
   
-        return SlipProb 
+        return slip_prob 
         
         
-    def TrustContact(self,Delta, Delta3d, DeltaVertical, Mu, coeffs = (0.1, 0.2, 0.1, 0.1)) -> float:
+    def trustcontact(self,delta, delta3d, delta_vertical, Mu, coeffs = (0.1, 0.2, 0.1, 0.1)) -> float:
         c1, c2, c3, c4 = coeffs
-        Trust = 1.0 - ( c1*Delta + c2*Delta3d + c3*DeltaVertical + c4*Mu)
-        return Trust
+        trust = 1.0 - ( c1*delta + c2*delta3d + c3*delta_vertical + c4*Mu)
+        return trust
 
 
-    def ContactBool(self, Contact, ContactProb, Trust, ProbThresold, TrustThresold, side) -> bool:
+    def contactBool(self, contact, contact_prob, trust, prob_thresold, trust_thresold, side) -> bool:
         """ Compute a contact boolean based on a contact probability"""
         # pseudo-integrator of probability
-        memorysize = self.MemorySize
-        if self.iter < memorysize :
+        memory_size = self.memory_size
+        if self.iter < memory_size :
             if side=="left":
-                self.PastProbL = ContactProb
+                self.past_prob_l = contact_prob
             if side=="right":
-                self.PastProbR = ContactProb
+                self.past_prob_r = contact_prob
         else :
             if side=="left":
-                self.PastProbL = ( self.PastProbL*(memorysize-1) + ContactProb )/memorysize
-                ContactProb = self.PastProbL
+                self.past_prob_l = ( self.past_prob_l*(memory_size-1) + contact_prob )/memory_size
+                contact_prob = self.past_prob_l
             if side=="right":
-                self.PastProbR = ( self.PastProbR*(memorysize-1) + ContactProb )/memorysize
-                ContactProb = self.PastProbR
+                self.past_prob_r = ( self.past_prob_r*(memory_size-1) + contact_prob )/memory_size
+                contact_prob = self.past_prob_r
         
         
 
-        if ContactProb > ProbThresold :
-            if ContactProb > 1.2*ProbThresold:
+        if contact_prob > prob_thresold :
+            if contact_prob > 1.2*prob_thresold:
                 # high probability of contact
-                Contact = True
-            elif Trust > TrustThresold:
+                contact = True
+            elif trust > trust_thresold:
                 # mid probability but high trust
-                Contact = True
+                contact = True
             else :
                 # mid probability and low trust
-                Contact = Contact # no change to variable (keeping previous state)
+                contact = contact # no change to variable (keeping previous state)
         else :
             # low contact probability
-            if Trust < TrustThresold:
+            if trust < trust_thresold:
                 # low trust
-                Contact=False
+                contact=False
                 #pass # no change
             else :
                 # high trust
-                Contact = False
-        return Contact
+                contact = False
+        return contact
 
 
-    def LegsOnGround(self, Q, Qd, Acc, Torques, Vertical, TorqueForceMingler=0.0, ProbThresold=0.5, TrustThresold=0.5 ) -> tuple[bool, bool]:
+    def LegsOnGround(self, Q, Qd, acc, torques, vertical, torque_force_mingler=0.0, prob_thresold=0.5, trust_thresold=0.5 ) -> tuple[bool, bool]:
         """Return wether or not left and right legs are in contact with the ground
         Args = 
         Return = 
@@ -536,87 +536,87 @@ class ContactEstimator():
         # updates encoders and torques
         self.Q = Q.copy()
         self.Qd = Qd.copy()
-        self.Tau = Torques.copy()
+        self.Tau = torques.copy()
 
         # compute probability of contact based on knee's torque
-        self.LcF_T, self.ContactProbL_T = self.ContactProbability_Torque(Vertical=Vertical, 
-                                                                         KneeTorque=self.Tau[self.LeftKneeTorqueID], 
-                                                                         KneeID=self.LeftKneeFrameID, 
-                                                                         FootID=self.LeftFootFrameID, 
-                                                                         Center=4, Stiffness=2)
-        self.RcF_T, self.ContactProbR_T = self.ContactProbability_Torque(Vertical=Vertical, 
-                                                                         KneeTorque=self.Tau[self.RightKneeTorqueID], 
-                                                                         KneeID=self.RightKneeFrameID, 
-                                                                         FootID=self.RightFootFrameID, 
-                                                                         Center=4, Stiffness=2)
+        self.LcF_T, self.contact_prob_l_T = self.contact_probability_Torque(vertical=vertical, 
+                                                                         knee_torque=self.Tau[self.Leftknee_torqueID], 
+                                                                         knee_id=self.LeftKneeFrameID, 
+                                                                         foot_id=self.leftfoot_frame_id, 
+                                                                         center=4, stiffness=2)
+        self.RcF_T, self.contact_prob_r_T = self.contact_probability_Torque(vertical=vertical, 
+                                                                         knee_torque=self.Tau[self.Rightknee_torqueID], 
+                                                                         knee_id=self.RightKneeFrameID, 
+                                                                         foot_id=self.rightfoot_frame_id, 
+                                                                         center=4, stiffness=2)
         # get the contact forces # TODO : debug 1D
-        self.LcF_1d, self.RcF_1d = np.zeros(3), np.zeros(3) #self.ContactForces1d(Torques=Torques, Q=Q, Qd=Qd, BaseAccelerationIMU=Acc , Dynamic=0.4, Resolution=7)
+        self.LcF_1d, self.RcF_1d = np.zeros(3), np.zeros(3) #self.contact_forces1d(torques=torques, Q=Q, Qd=Qd, base_acceleration_imu=acc , dynamic=0.4, resolution=7)
         # print("1D done", self.Q)
-        self.LcF_3d, self.RcF_3d = self.ContactForces3d(frames=[self.LeftFootFrameID, self.RightFootFrameID])
+        self.LcF_3d, self.RcF_3d = self.contact_forces3d(frames=[self.leftfoot_frame_id, self.rightfoot_frame_id])
         # print("3D done", self.Q)
         # get deltas
-        self.DeltaL, self.DeltaL3d, self.DeltaLV = self.ConsistencyChecker(self.LcF_1d, self.LcF_3d, self.LcF_T, coeffs=self.coeffs)
-        self.DeltaR, self.DeltaR3d, self.DeltaRV = self.ConsistencyChecker(self.RcF_1d, self.RcF_3d, self.RcF_T, coeffs=self.coeffs)
+        self.delta_l, self.delta_l3d, self.delta_lV = self.ConsistencyChecker(self.LcF_1d, self.LcF_3d, self.LcF_T, coeffs=self.coeffs)
+        self.delta_r, self.delta_r3d, self.delta_rV = self.ConsistencyChecker(self.RcF_1d, self.RcF_3d, self.RcF_T, coeffs=self.coeffs)
 
         # get probability of slip
-        LFootAcc = np.zeros(3) # TODO : mod
-        RFootAcc = np.zeros(3)
-        self.SlipProbL = self.Slips(self.LcF_3d, self.LeftFootFrameID, MuTrigger=0.2, FootAcc=LFootAcc, AccTrigger=2., mingler=0.99)
-        self.SlipProbR = self.Slips(self.RcF_3d, self.RightFootFrameID, MuTrigger=0.2, FootAcc=RFootAcc, AccTrigger=2., mingler=0.99)
+        Lfoot_acc = np.zeros(3) # TODO : mod
+        Rfoot_acc = np.zeros(3)
+        self.slip_probL = self.Slips(self.LcF_3d, self.leftfoot_frame_id, mu_trigger=0.2, foot_acc=Lfoot_acc, acc_trigger=2., mingler=0.99)
+        self.slip_probR = self.Slips(self.RcF_3d, self.rightfoot_frame_id, mu_trigger=0.2, foot_acc=Rfoot_acc, acc_trigger=2., mingler=0.99)
 
         # compute probability of contact based on vertical contact forces from 3 DIFFERENT ESTIMATIONS
         
-        #self.ContactProbL_F = self.ContactProbability_Force(self.LcF_1d, self.LcF_3d, self.LcF_T, trigger=4, stiffness=3, coeffs=[0., 1.0, 0.])
-        #self.ContactProbR_F = self.ContactProbability_Force(self.RcF_1d, self.RcF_3d, self.RcF_T, trigger=4, stiffness=3, coeffs=[0., 1.0, 0.])
+        #self.contact_prob_l_F = self.contact_probability_Force(self.LcF_1d, self.LcF_3d, self.LcF_T, trigger=4, stiffness=3, coeffs=[0., 1.0, 0.])
+        #self.contact_prob_r_F = self.contact_probability_Force(self.RcF_1d, self.RcF_3d, self.RcF_T, trigger=4, stiffness=3, coeffs=[0., 1.0, 0.])
         
-        self.ContactProbL_F, self.ContactProbR_F = self.ContactProbability_Force_3D(self.LcF_3d, self.RcF_3d, iter=self.iter, center=0.01, stiffness=0.03)
+        self.contact_prob_l_F, self.contact_prob_r_F = self.contact_probability_Force_3D(self.LcF_3d, self.RcF_3d, iter=self.iter, center=0.01, stiffness=0.03)
         
         # merge probability of contact from force and torque
-        self.ContactProbL = self.ContactProbL_T * TorqueForceMingler + self.ContactProbL_F * (1-TorqueForceMingler)
-        self.ContactProbR = self.ContactProbR_T * TorqueForceMingler + self.ContactProbR_F * (1-TorqueForceMingler)
+        self.contact_prob_l = self.contact_prob_l_T * torque_force_mingler + self.contact_prob_l_F * (1-torque_force_mingler)
+        self.contact_prob_r = self.contact_prob_r_T * torque_force_mingler + self.contact_prob_r_F * (1-torque_force_mingler)
 
 
         # compute trust in contact
-        self.TrustL = self.TrustContact(self.DeltaL, self.DeltaL3d, self.DeltaLV, self.MuL, coeffs=(0.1, 0.1, 0.2, 0.1))
-        self.TrustR = self.TrustContact(self.DeltaR, self.DeltaR3d, self.DeltaRV, self.MuR, coeffs=(0.1, 0.1, 0.2, 0.1))
+        self.trust_l = self.trustcontact(self.delta_l, self.delta_l3d, self.delta_lV, self.mu_l, coeffs=(0.1, 0.1, 0.2, 0.1))
+        self.trust_r = self.trustcontact(self.delta_r, self.delta_r3d, self.delta_rV, self.mu_r, coeffs=(0.1, 0.1, 0.2, 0.1))
         
-        self.LeftContact = self.ContactBool(self.LeftContact, self.ContactProbL, self.TrustL, ProbThresold, TrustThresold, "left")
-        self.RightContact = self.ContactBool(self.RightContact, self.ContactProbR, self.TrustR, ProbThresold, TrustThresold, "right")
+        self.left_contact = self.contactBool(self.left_contact, self.contact_prob_l, self.trust_l, prob_thresold, trust_thresold, "left")
+        self.right_contact = self.contactBool(self.right_contact, self.contact_prob_r, self.trust_r, prob_thresold, trust_thresold, "right")
          
         # log contact forces and deltas and contact
-        if self.Logging : self.UpdateLogMatrixes()
+        if self.logging : self.UpdateLogMatrixes()
         
-        return self.LeftContact, self.RightContact
+        return self.left_contact, self.right_contact
 
 
 
 
 
-    def LegsOnGroundKin(self, Kinpos, vertical) -> tuple[bool, bool]:
+    def LegsOnGroundKin(self, kinpos, vertical) -> tuple[bool, bool]:
         # return iwether or not left and right legs are in contact with the ground
         # uses the z distance from foot to base, with kinematics only and a vertical direction provided by IMU
         
-        self.bolt.framesForwardKinematics(q=Kinpos)
+        self.bolt.framesForwardKinematics(q=kinpos)
         self.bolt.updateFramePlacements()
 
-        LeftFootPos = self.bolt.oMf[self.LeftFootFrameID].translation
-        RightFootPos = self.bolt.data.oMf[self.RightFootFrameID].translation
+        left_foot_pos = self.bolt.oMf[self.leftfoot_frame_id].translation
+        right_foot_pos = self.bolt.data.oMf[self.rightfoot_frame_id].translation
         
-        VerticalDistLeft = utils.scalar(LeftFootPos, vertical)
-        VerticalDistRight = utils.scalar(RightFootPos, vertical)
+        vertical_dist_left = utils.scalar(left_foot_pos, vertical)
+        vertical_dist_right = utils.scalar(right_foot_pos, vertical)
 
-        if pin.isapprox(VerticalDistLeft, VerticalDistRight, eps=3e-3):
+        if pin.isapprox(vertical_dist_left, vertical_dist_right, eps=3e-3):
             # both feet might be in contact
-            LeftContact, RightContact = True, True
-        elif VerticalDistLeft > VerticalDistRight :
+            left_contact, right_contact = True, True
+        elif vertical_dist_left > vertical_dist_right :
             # Left foot is much further away than right foot, and therefore should be in contact with the ground
-            LeftContact, RightContact = True, False
+            left_contact, right_contact = True, False
         else : 
             # Right foot is much further away than right foot, and therefore should be in contact with the ground
-            LeftContact, RightContact = False, True
-        return LeftContact, RightContact
+            left_contact, right_contact = False, True
+        return left_contact, right_contact
 
 
     def FeetPositions(self) -> tuple[np.ndarray, np.ndarray]:
         # parce que Constant en a besoin
-        return self.LeftFootPos, self.RightFootPos
+        return self.left_foot_pos, self.right_foot_pos

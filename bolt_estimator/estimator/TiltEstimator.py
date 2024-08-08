@@ -65,16 +65,16 @@ class TiltEstimator():
 
         return None
     
-    def SetInitValues(self, BaseSpeed, BaseAccG, UnitGravity, UnitGravityDerivative, BaseWRTFootOrientationAsMatrix) -> None:
+    def SetInitValues(self, base_speed, base_acc_g, unit_gravity, unit_gravity_derivative, base_wrt_foot_orientation_as_matrix) -> None:
         """ modify init values """
-        self.x1_hat = BaseSpeed.copy()
-        self.x2_prime = UnitGravity.copy()
-        self.x2_hat = UnitGravity.copy()
+        self.x1_hat = base_speed.copy()
+        self.x2_prime = unit_gravity.copy()
+        self.x2_hat = unit_gravity.copy()
         
-        self.x1_hat_dot = BaseAccG.copy() + UnitGravity*9.81
-        self.x2_hat_dot = UnitGravityDerivative.copy()
-        self.x2_prime_dot = UnitGravityDerivative.copy()
-        self.c_R_l = BaseWRTFootOrientationAsMatrix
+        self.x1_hat_dot = base_acc_g.copy() + unit_gravity*9.81
+        self.x2_hat_dot = unit_gravity_derivative.copy()
+        self.x2_prime_dot = unit_gravity_derivative.copy()
+        self.c_R_l = base_wrt_foot_orientation_as_matrix
         return None
         
     
@@ -134,17 +134,17 @@ class TiltEstimator():
         return yv
 
     
-    def GetYV_v2(self, LFootID, RFootID, BaseID, eta) -> np.ndarray:
+    def GetYV_v2(self, l_foot_id, r_foot_id, base_id, eta) -> np.ndarray:
         """ Estimate Yv and return it. This computation is an updated version, which is not present in the original paper """
-        c_P_anchor = eta *  self.data.oMf[LFootID].translation + (1-eta) * self.data.oMf[RFootID].translation
-        v1 = pin.getFrameVelocity(self.bolt.model, self.data, LFootID)
-        v2 = pin.getFrameVelocity(self.bolt.model, self.data, RFootID)
+        c_P_anchor = eta *  self.data.oMf[l_foot_id].translation + (1-eta) * self.data.oMf[r_foot_id].translation
+        v1 = pin.getFrameVelocity(self.bolt.model, self.data, l_foot_id)
+        v2 = pin.getFrameVelocity(self.bolt.model, self.data, r_foot_id)
         c_Pdot_anchor = eta *  v1.translation + (1-eta) * v2.translation
         yv = -self.S(self.yg) @ c_P_anchor - c_Pdot_anchor
         return yv
 
     
-    def PinocchioUpdate(self, BaseID, ContactFootID, dt) -> None:
+    def PinocchioUpdate(self, base_id, contact_foot_id, dt) -> None:
         """ Update pinocchio data with forward kinematics and update FK variables"""
         
         # update pinocchio data
@@ -155,16 +155,16 @@ class TiltEstimator():
         # update relevant data
         # rotation matrix of base frame (l) in contact foot frame (c)
         self.prev_c_R_l[:, :] = self.c_R_l.copy()
-        self.c_R_l = np.array(self.data.oMf[BaseID].rotation.copy()) @ np.array(self.data.oMf[ContactFootID].rotation.copy()).T
+        self.c_R_l = np.array(self.data.oMf[base_id].rotation.copy()) @ np.array(self.data.oMf[contact_foot_id].rotation.copy()).T
         #self.c_Rdot_l =  (self.c_R_l - self.prev_c_R_l) / dt # TODO : chk
 
         # position of base frame in contact foot frame
-        self.c_P_l = np.array((self.data.oMf[ContactFootID].inverse()*self.data.oMf[BaseID]).translation).copy()
+        self.c_P_l = np.array((self.data.oMf[contact_foot_id].inverse()*self.data.oMf[base_id]).translation).copy()
         #self.c_P_l = np.array(self.c_P_l.translation).copy()
 
         # speed of base frame in contact foot frame
-        oMf = self.data.oMf[ContactFootID]
-        c_speed_l = oMf.inverse().action @ pin.getFrameVelocity(self.bolt.model, self.data, BaseID, pin.WORLD)
+        oMf = self.data.oMf[contact_foot_id]
+        c_speed_l = oMf.inverse().action @ pin.getFrameVelocity(self.bolt.model, self.data, base_id, pin.WORLD)
         self.c_Pdot_l = np.array(c_speed_l[:3]).copy()
 
         # rotation speed of base frame in contact foot frame
@@ -199,8 +199,8 @@ class TiltEstimator():
     def Estimate(self, 
                   Q:np.ndarray,
                   Qd:np.ndarray,
-                  BaseID:int,
-                  ContactFootID:int,
+                  base_id:int,
+                  contact_foot_id:int,
                   ya:np.ndarray, 
                   yg:np.ndarray, 
                   dt:float, 
@@ -212,7 +212,7 @@ class TiltEstimator():
         # speed estimate
         self.Q = Q.copy()
         self.Qd = Qd.copy()
-        self.PinocchioUpdate(BaseID, ContactFootID, dt)
+        self.PinocchioUpdate(base_id, contact_foot_id, dt)
         self.yv = self.GetYV_v1()
         # check dimensions
         if not self.CheckDim(ya, 0, 3) : print("dim error ya")

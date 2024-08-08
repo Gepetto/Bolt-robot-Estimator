@@ -59,14 +59,14 @@ def main():
 
     
     # plot the pseudo-measured (ie noisy and drifting) generated trajectories
-    Input_Acc = device.Acc
-    Input_AccG = device.AccG
-    Input_Speed = device.Speed
-    Input_Omega = device.Omega
-    Input_Theta = device.Theta
-    Input_Q = device.Q
-    Input_Qd = device.Qd
-    Input_Tau = device.Tau
+    input_acc = device.Acc
+    input_accG = device.AccG
+    input_speed = device.Speed
+    input_omega = device.Omega
+    input_theta = device.Theta
+    input_q = device.Q
+    input_qd = device.Qd
+    input_tau = device.Tau
 
     # get some data from simulation to compare to
     true_LCF = reader.Get("lcf")
@@ -177,16 +177,16 @@ def main():
     # plot input data
     if "q" in to_plot :
         grapher.SetLegend(["Q in", "Q true "], 2)
-        grapher.CompareNDdatas([Input_Q[:, 6:8].T, true_Q[:, 6:8].T], "theta", "Inputed and true Q, left leg", StyleAdapter=True)
+        grapher.CompareNDdatas([input_q[:, 6:8].T, true_Q[:, 6:8].T], "theta", "Inputed and true Q, left leg", StyleAdapter=True)
     if "qdot" in to_plot :
         grapher.SetLegend(["Qd in ", "Qd true"], 2)
-        grapher.CompareNDdatas([Input_Qd[:, 5:7].T, true_Qd[:, 5:7].T], "omega", "Inputed and true Qd, left leg", StyleAdapter=True)
+        grapher.CompareNDdatas([input_qd[:, 5:7].T, true_Qd[:, 5:7].T], "omega", "Inputed and true Qd, left leg", StyleAdapter=True)
     if "tau" in to_plot :
         grapher.SetLegend(["Tau in", "Tau true"], 3)
-        grapher.CompareNDdatas([Input_Tau[:, :3].T, true_Tau[:, :3].T], "Nm", "Inputed and true Tau, left leg", StyleAdapter=True)
+        grapher.CompareNDdatas([input_tau[:, :3].T, true_Tau[:, :3].T], "Nm", "Inputed and true Tau, left leg", StyleAdapter=True)
     if "input" in to_plot :
         grapher.SetLegend(["a in", "a true"], 3)
-        grapher.CompareNDdatas([Input_Acc.T, true_a.T], "m/s2", "Inputed acceleration", StyleAdapter=True)
+        grapher.CompareNDdatas([input_acc.T, true_a.T], "m/s2", "Inputed acceleration", StyleAdapter=True)
 
 
 

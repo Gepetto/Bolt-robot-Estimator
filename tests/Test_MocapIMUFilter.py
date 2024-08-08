@@ -12,12 +12,12 @@ import numpy as np
 Filter = MocapIMUFilter(parametersSF = [2],
                         parametersAF = [1.1],
                         parametersPF = [2],
-                        FilterSpeed=True,
-                        FilterAttitude=True,
-                        FilterPosition=True,
+                        filter_speed=True,
+                        filter_attitude=True,
+                        filter_position=True,
                         dt = 0.001,
-                        Logging=0,
-                        Talkative=False)
+                        logging=0,
+                        talkative=False)
 
 N=100
 

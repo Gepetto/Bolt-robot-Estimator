@@ -7,6 +7,6 @@ class Filter():
                 talkative=False):
         self.name=name
         self.parameters = parameters
-        if Talkative : print("Filter " + self.name + " initialized with parameters " + str(self.parameters))
+        if talkative : print("Filter " + self.name + " initialized with parameters " + str(self.parameters))
     
     # uses a prebuilt filtering system

@@ -30,7 +30,7 @@ def main(N=500, noise_level=20, drift=40):
     filter_traj = []
     filter_speed = []
     filter_acc = []
-    Filterdrift_speed = []
+    filterdrift_speed = []
 
 
 
@@ -45,7 +45,7 @@ def main(N=500, noise_level=20, drift=40):
     # run filter over time, with noisy data as inputs
     for k in range(N):
         filter_speed.append(ComplementaryFilterT.RunFilter(np.array(noisy_speed[0,k]), np.array(noisy_acceleration[0,k]) ))
-        Filterdrift_speed.append(ComplementaryFilterT.RunFilter(np.array(noisy_speed[0,k]), np.array(drift_noisy_acceleration[0,k]) ))
+        filterdrift_speed.append(ComplementaryFilterT.RunFilter(np.array(noisy_speed[0,k]), np.array(drift_noisy_acceleration[0,k]) ))
 
 
     #filter_traj = np.array(filter_traj).reshape(1, N)
@@ -53,21 +53,21 @@ def main(N=500, noise_level=20, drift=40):
     #filter_acc = np.array(filter_acc).reshape(1, N)
 
     #filter_trajOffset = np.array(filter_trajOffset).reshape(1, N)
-    Filterdrift_speed = np.array(Filterdrift_speed).reshape(1, N)
+    filterdrift_speed = np.array(filterdrift_speed).reshape(1, N)
     #filter_accOffset = np.array(filter_accOffset).reshape(1, N)
 
 
     dataset = [noisy_speed, drift_noisy_speed, true_speed, drift_speed]
     grapher.SetLegend(["Noisy speed (" + str(noise_level) + "%)", "drift_ing noisy speed", "True speed", "drift_ing Speed"], 1)
-    grapher.CompareNDdatas(dataset, "speed", "Test CF, speed, sinusoidal", StyleAdapter=False, width=0.8)
+    grapher.CompareNDdatas(dataset, "speed", "Test CF, speed, sinusoidal", style_adapter=False, width=0.8)
 
-    dataset = [true_speed, true_acceleration, drift_acc, Filterdrift_speed]
+    dataset = [true_speed, true_acceleration, drift_acc, filterdrift_speed]
     grapher.SetLegend(["Theta ", "Omega", "drift_ing Omega",  "Filter acting on\nnoisy Theta & drift_ing noisy Omega"], 1)
-    grapher.CompareNDdatas(dataset, "speed", "Test CF, theta, sinusoidal", StyleAdapter=True,  width=1.5)
+    grapher.CompareNDdatas(dataset, "speed", "Test CF, theta, sinusoidal", style_adapter=True,  width=1.5)
 
     dataset = [true_speed, true_acceleration, noisy_acceleration, filter_speed]
     grapher.SetLegend(["Theta ", "Omega", "Noisy Omega",  "Filter acting on\nnoisy Theta &  Omega"], 1)
-    grapher.CompareNDdatas(dataset, "speed", "Test CF, theta, sinusoidal", StyleAdapter=True,  width=1.5)
+    grapher.CompareNDdatas(dataset, "speed", "Test CF, theta, sinusoidal", style_adapter=True,  width=1.5)
 
 
     grapher.end()

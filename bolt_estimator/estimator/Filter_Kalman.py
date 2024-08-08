@@ -31,13 +31,13 @@ class KalmanFilter():
         # Q : TransitionCovariance
         # R : ObservationCovariance
         # K : Kalman gain
-        self.A, self.B, self.H, self.Q, self.R, self.InitialValue = self.parameters
-        self.X = self.InitialValue
+        self.A, self.B, self.H, self.Q, self.R, self.initial_value = self.parameters
+        self.X = self.initial_value
         self.U = 0.#???
         kf = KalmanFilter(transition_matrices=self.A,
                         observation_matrices=self.H,
                         command_matrices = self.B,
-                        initial_state_mean=self.InitialValue,
+                        initial_state_mean=self.initial_value,
                         observation_covariance=self.Q,
                         transition_covariance=self.R)
         if logger is not None : self.logger = logger
@@ -48,21 +48,21 @@ class KalmanFilter():
         A = np.eye(self.n)
         A[0:3, 3:6] = self.TimeStep * np.eye(3)
 
-        ControlMatrix = np.zeros((self.n, 3))
-        ControlMatrix[:, :3] += 0.5*self.TimeStep**2*np.eye(3)
-        ControlMatrix[:, 3:6] += self.TimeStep*np.eye(3)
+        control_matrix = np.zeros((self.n, 3))
+        control_matrix[:, :3] += 0.5*self.TimeStep**2*np.eye(3)
+        control_matrix[:, 3:6] += self.TimeStep*np.eye(3)
 
         H = np.zeros((self.m, self.n))
 
         Q = np.zeros((self.n, self.n))
         R = np.zeros((self.m, self.m))
-        InitialValue = np.zeros()
-        return A, B, H, Q, R, InitialValue
+        initial_value = np.zeros()
+        return A, B, H, Q, R, initial_value
 
     def FilterAttitude(self, RobotState) -> np.ndarray:
         # Runs the Kalman filter
-        self.FilteredStateMean, self.FilteredStateCovariance = kf.filter(RobotState)
-        return self.FilteredStateMean
+        self.filtered_state_mean, self.filtered_state_covariance = kf.filter(RobotState)
+        return self.filtered_state_mean
 
 
 

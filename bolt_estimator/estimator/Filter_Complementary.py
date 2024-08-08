@@ -7,11 +7,11 @@ class ComplementaryFilter():
                 ndim=1,
                 talkative=False,
                 logger=None,
-                MemorySize=100,
-                OffsetGain=0.005) -> None:
+                memory_size=100,
+                offset_gain=0.005) -> None:
         self.name=name
         self.parameters = parameters
-        self.Talkative = talkative
+        self.talkative = talkative
         self.ndim = ndim
         # number of filter run
         self.k = 0
@@ -19,17 +19,17 @@ class ComplementaryFilter():
         self.T, self.a = self.parameters[0], self.parameters[1]
         self.b = self.a / (self.T + self.a)
         # initializing current output
-        self.Estimate = np.zeros(self.ndim)
+        self.estimate = np.zeros(self.ndim)
         # averaging system for offset correction
-        self.MemorySize = MemorySize
-        self.ErrorHistory = np.zeros((self.MemorySize, self.ndim))
-        self.Offset = np.zeros(self.ndim)
-        self.OffsetGain=OffsetGain
+        self.memory_size = memory_size
+        self.error_history = np.zeros((self.memory_size, self.ndim))
+        self.offset = np.zeros(self.ndim)
+        self.offset_gain = offset_gain
         # logs
         if logger is not None : 
             self.logger = logger
-            self.Talkative = False
-        if self.Talkative : self.logger.LogTheLog("Filter '" + self.name + "' initialized with parameters " + str(self.parameters))
+            self.talkative = False
+        if self.talkative : self.logger.LogTheLog("Filter '" + self.name + "' initialized with parameters " + str(self.parameters))
 
 
     def Setdt(self, dt) -> None:
@@ -54,12 +54,12 @@ class ComplementaryFilter():
             return None
         if self.k==0:
             # filter runs for the first time
-            self.Estimate = x
-        self.Estimate = self.b*self.Estimate + self.T*self.b*xdot + (1-self.b)*x
+            self.estimate = x
+        self.estimate = self.b*self.estimate + self.T*self.b*xdot + (1-self.b)*x
         self.k += 1
-        # if (self.Estimate.shape != (self.ndim, ) ):  
-        #     self.logger.LogTheLog(f"anormal output shape {self.Estimate.shape}" , style="warn")           
-        return self.Estimate
+        # if (self.estimate.shape != (self.ndim, ) ):  
+        #     self.logger.LogTheLog(f"anormal output shape {self.estimate.shape}" , style="warn")           
+        return self.estimate
     
     
     def RunFilterQuaternion(self, q, w, dt=None) -> np.ndarray:
@@ -67,10 +67,10 @@ class ComplementaryFilter():
         # check data
         self.Setdt(dt)
         if (not isinstance(q, np.ndarray)) or (not isinstance(w, np.ndarray)) or (q.shape!=(4,) or w.shape!=(3,) ):  
-            if self.Talkative : self.logger.LogTheLog(f"giving unadapted argument to filter '{self.name}' : expected np.array of dim 4 and 3" , style="danger")           
+            if self.talkative : self.logger.LogTheLog(f"giving unadapted argument to filter '{self.name}' : expected np.array of dim 4 and 3" , style="danger")           
         if self.k==0:
             # filter runs for the first time
-            self.Estimate = q
+            self.estimate = q
         # compute quaternion derivative
         wx, wy, wz = w
         qdot = 0.5 * np.array([wx*q[3] + wz*q[1] - wy*q[2],
@@ -78,15 +78,15 @@ class ComplementaryFilter():
                                wz*q[3] + wy*q[0] - wx*q[1],
                               -wx*q[0] - wy*q[1] - wz*q[2]])
         # update estimate
-        self.Estimate = self.b*self.Estimate + self.T*self.b*qdot + (1-self.b)*q
-        self.Estimate = self.Estimate / np.linalg.norm(self.Estimate)
+        self.estimate = self.b*self.estimate + self.T*self.b*qdot + (1-self.b)*q
+        self.estimate = self.estimate / np.linalg.norm(self.estimate)
         self.k += 1
         #if self.k < 5 : self.logger.LogTheLog("Running Filter " + self.name + " (on run " + str(self.k) + " out of 4 prints)")
-        return self.Estimate
+        return self.estimate
 
     
     # standard filter with non-idiotic offset compensation
-    def RunFilterOffset(self, x, xdot, dt=None) -> np.ndarray:
+    def RunFilteroffset(self, x, xdot, dt=None) -> np.ndarray:
         # better averaging technique
         # complementary filter x and its temporal derivative xdot. Updates previous estimates and returns current estimate.
         # check data
@@ -99,19 +99,19 @@ class ComplementaryFilter():
             return None
         if self.k==0:
             # filter runs for the first time
-            self.Estimate = x
-        self.Estimate = self.b*self.Estimate + self.T*self.b*xdot + (1-self.b)*x
+            self.estimate = x
+        self.estimate = self.b*self.estimate + self.T*self.b*xdot + (1-self.b)*x
         # prepare offset correction
-        self.ErrorHistory[self.k%self.MemorySize, :] = x-self.Estimate
-        self.Offset = np.true_divide(self.ErrorHistory.sum(axis=0), np.count_nonzero(self.ErrorHistory, axis=0)) 
+        self.error_history[self.k%self.memory_size, :] = x-self.estimate
+        self.offset = np.true_divide(self.error_history.sum(axis=0), np.count_nonzero(self.error_history, axis=0)) 
         # offset correction
-        self.Estimate += self.Offset * self.OffsetGain
+        self.estimate += self.offset * self.offset_gain
         self.k += 1
         #if self.k < 5 : self.logger.LogTheLog("Running Filter " + self.name + " (on run " + str(self.k) + " out of 4 prints)")
-        return self.Estimate
+        return self.estimate
 
     # standard filter with offset commpensation and adaptative gain for quicker convergence
-    def RunFilterOffsetAdaptive(self, x, xdot, dt=None) -> np.ndarray:
+    def RunFilteroffsetAdaptive(self, x, xdot, dt=None) -> np.ndarray:
         # complementary filter x and its temporal derivative xdot. Updates previous estimates and returns current estimate.
         # check data
         self.Setdt(dt)
@@ -123,20 +123,20 @@ class ComplementaryFilter():
             return None
         if self.k==0:
             # filter runs for the first time
-            self.Estimate = x
-        self.Estimate = self.b*self.Estimate + self.T*self.b*xdot + (1-self.b)*x
+            self.estimate = x
+        self.estimate = self.b*self.estimate + self.T*self.b*xdot + (1-self.b)*x
         # prepare offset correction
-        self.ErrorHistory[self.k%self.MemorySize, :] = x-self.Estimate
+        self.error_history[self.k%self.memory_size, :] = x-self.estimate
         
-        Converger = (self.MemorySize/4 - self.k) * self.OffsetGain * 0.17
-        if Converger < self.OffsetGain:
-            Converger = self.OffsetGain
-        self.Offset = np.true_divide(self.ErrorHistory.sum(axis=0), np.count_nonzero(self.ErrorHistory, axis=0)) * Converger
+        converger = (self.memory_size/4 - self.k) * self.offset_gain * 0.17
+        if converger < self.offset_gain:
+            converger = self.offset_gain
+        self.offset = np.true_divide(self.error_history.sum(axis=0), np.count_nonzero(self.error_history, axis=0)) * converger
         # offset correction
-        self.Estimate += self.Offset
+        self.estimate += self.offset
         self.k += 1
         #if self.k < 5 : self.logger.LogTheLog("Running Filter " + self.name + " (on run " + str(self.k) + " out of 4 prints)")
-        return self.Estimate
+        return self.estimate
 
 
 

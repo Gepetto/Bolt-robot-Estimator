@@ -12,7 +12,7 @@ Uses IMU and kinematics data to estimate the rotation betwwen world frame and fo
 
 
 
-class FootAttitudeEstimator():
+class foot_attitudeEstimator():
     def __init__(self,
                 parameters=[0.001, 2],
                 dt=0.01,
@@ -22,7 +22,7 @@ class FootAttitudeEstimator():
                 ) -> None:
         self.name=name
         self.parameters = parameters
-        self.Talkative = talkative
+        self.talkative = talkative
         # number of filter run
         self.k = 0
         # timestep
@@ -46,8 +46,8 @@ class FootAttitudeEstimator():
         # logs
         if logger is not None : 
             self.logger = logger
-            self.Talkative = False
-        if self.Talkative : self.logger.LogTheLog("Estimator '" + self.name + "' initialized with parameters " + str(self.parameters))
+            self.talkative = False
+        if self.talkative : self.logger.LogTheLog("Estimator '" + self.name + "' initialized with parameters " + str(self.parameters))
 
 
     def Y1(self, yg):
@@ -61,12 +61,12 @@ class FootAttitudeEstimator():
                         [x3, 0, -x1],
                         [-x2, x1, 0]])
     
-    def RefreshKin(self, IMUKinPos, IMUKinRot) :
-        self.cPsdot = (IMUKinPos - self.cPs)/self.dt
-        self.ws = (IMUKinRot - self.cRs)/self.dt
+    def RefreshKin(self, imu_kin_pos, imu_kin_rot) :
+        self.cPsdot = (imu_kin_pos - self.cPs)/self.dt
+        self.ws = (imu_kin_rot - self.cRs)/self.dt
 
-        self.cPs = IMUKinPos
-        self.cRs = IMUKinRot
+        self.cPs = imu_kin_pos
+        self.cRs = imu_kin_rot
         return None
         
 
@@ -75,14 +75,14 @@ class FootAttitudeEstimator():
     # take :
         # Base pose with regard to the foot touching the ground
         # accelerometer and gyrometer acc. and rot.
-    def Estimator(self, IMUKinPos, IMUKinRot, ya, yg) -> np.ndarray:
+    def Estimator(self, imu_kin_pos, imu_kin_rot, ya, yg) -> np.ndarray:
         # run estimator
         if self.k==0:
             # estimator runs for the first time
             pass
         
         # updates kinematics data
-        self.RefreshKin(IMUKinPos, IMUKinRot)
+        self.RefreshKin(imu_kin_pos, imu_kin_rot)
         # updates variables
         self.y1 = self.Y1(yg)
         
@@ -94,9 +94,9 @@ class FootAttitudeEstimator():
         self.x2 = self.x2 + self.dt * self.x2dot
         
         # convert x2 to exepcted data format
-        self.FootAttitude = self.x2
+        self.foot_attitude = self.x2
         self.k += 1
-        return self.FootAttitude
+        return self.foot_attitude
     
 
 

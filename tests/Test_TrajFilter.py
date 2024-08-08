@@ -12,12 +12,12 @@ from bolt_estimator.utils.Graphics import Graphics
 def main(N=1000, noise_level=60):
 
     # generate useful objects
-    test_logger = Log("test", PrintOnFlight=True)
+    test_logger = Log("test", print_on_flight=True)
     grapher = Graphics(logger=test_logger)
 
     # start generator
     generator = TrajectoryGenerator(logger=test_logger)
-    generator.Generate("polynomial5", NoiseLevel=noise_level, N=N)
+    generator.Generate("polynomial5", noise_level=noise_level, N=N)
 
     # start filter
     ComplementaryFilterT = ComplementaryFilter(parameters=(1/N, 2), 
@@ -35,8 +35,8 @@ def main(N=1000, noise_level=60):
                                         talkative=True,
                                         name="offset-compensed complementary",
                                         logger=test_logger,
-                                        MemorySize=100,
-                                        OffsetGain=0.3)
+                                        memory_size=100,
+                                        offset_gain=0.3)
 
     filter_traj_offset = []
     filter_speed_offset = []
@@ -48,16 +48,16 @@ def main(N=1000, noise_level=60):
                                         talkative=True,
                                         name="offset-compensed complementary 1",
                                         logger=test_logger,
-                                        MemorySize=20,
-                                        OffsetGain=0.3)
+                                        memory_size=20,
+                                        offset_gain=0.3)
     filter_traj_offset1 = []
     ComplementaryFilterO_5 = ComplementaryFilter(parameters=(1/N, 2), 
                                         ndim=1, 
                                         talkative=True,
                                         name="offset-compensed complementary 5",
                                         logger=test_logger,
-                                        MemorySize=300,
-                                        OffsetGain=0.3)
+                                        memory_size=300,
+                                        offset_gain=0.3)
     filter_traj_offset5 = []
 
 

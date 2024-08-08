@@ -15,22 +15,22 @@ class MocapIMUFilter():
                  parametersSF = [2],
                  parametersAF = [1.1],
                  parametersPF = [2],
-                 FilterSpeed=True,
-                 FilterAttitude=False,
-                 FilterPosition=False,
+                 filter_speed=True,
+                 filter_attitude=False,
+                 filter_position=False,
                  dt = 0.001,
-                 Logging=0,
-                 Talkative=False
+                 logging=0,
+                 talkative=False
                  ):
         # params
         self.TimeStep = dt
         self.iter = 0
-        self.Logging = Logging
-        self.FS = FilterSpeed
-        self.FA = FilterAttitude
-        self.FP = FilterPosition
+        self.logging = logging
+        self.FS = filter_speed
+        self.FA = filter_attitude
+        self.FP = filter_position
 
-        self.LearningIter = 0
+        self.learning_iter = 0
         self.omega_bias = np.zeros((3,))
         self.a_bias = np.zeros((3,))
 
@@ -42,43 +42,43 @@ class MocapIMUFilter():
 
         self.SpeedFilter = ComplementaryFilter(parameters=parametersSF, 
                                                 name="speed complementary filter", 
-                                                talkative=Talkative, 
+                                                talkative=talkative, 
                                                 logger=None, 
                                                 ndim=3,
                                                 MemorySize=100,
                                                 OffsetGain=0.005)
         self.PositionFilter = ComplementaryFilter(parameters=parametersPF, 
                                                 name="speed complementary filter", 
-                                                talkative=Talkative, 
+                                                talkative=talkative, 
                                                 logger=None, 
                                                 ndim=3)
         self.AttitudeFilter = ComplementaryFilter(parameters=parametersAF, 
                                                 name="attitude complementary filter", 
-                                                talkative=Talkative, 
+                                                talkative=talkative, 
                                                 logger=None, 
                                                 ndim=3)
-        if Talkative: print("Mocap IMU filter initialized")
+        if talkative: print("Mocap IMU filter initialized")
         
-        if self.Logging != 0 :
+        if self.logging != 0 :
             self.InitLogs()
         
         return None
     
     def InitLogs(self):
-        self.p_logs = np.zeros((self.Logging, 3))
-        self.v_logs = np.zeros((self.Logging, 3))
-        self.q_logs = np.zeros((self.Logging, 4))
-        self.w_logs = np.zeros((self.Logging, 3))
+        self.p_logs = np.zeros((self.logging, 3))
+        self.v_logs = np.zeros((self.logging, 3))
+        self.q_logs = np.zeros((self.logging, 4))
+        self.w_logs = np.zeros((self.logging, 3))
 
-        self.p_logs_mocap = np.zeros((self.Logging, 3))
-        self.v_logs_mocap = np.zeros((self.Logging, 3))
-        self.q_logs_mocap = np.zeros((self.Logging, 4))
+        self.p_logs_mocap = np.zeros((self.logging, 3))
+        self.v_logs_mocap = np.zeros((self.logging, 3))
+        self.q_logs_mocap = np.zeros((self.logging, 4))
 
-        self.a_logs_imu = np.zeros((self.Logging, 3))
+        self.a_logs_imu = np.zeros((self.logging, 3))
 
         
     def UpdateLogs(self, p, v, q, w, p_mocap, v_mocap, q_mocap, a_imu):
-        if self.iter>=self.Logging :
+        if self.iter>=self.logging :
             return None
         self.p_logs[self.iter, :] = p[:]
         self.v_logs[self.iter, :] = v[:]
@@ -93,7 +93,7 @@ class MocapIMUFilter():
         return None
     
     def GetLogs(self, data="position"):
-        if self.Logging==0:
+        if self.logging==0:
             print("no logs stored")
             return None
         if data=="position":
@@ -108,12 +108,12 @@ class MocapIMUFilter():
             print("wrong data getter")
 
     def LearnIMUBias(self, a_imu, omega_imu):
-        self.a_bias = (self.LearningIter * self.a_bias + a_imu)/(self.LearningIter + 1)
-        self.omega_bias = (self.LearningIter * self.omega_bias + omega_imu)/(self.LearningIter + 1)
+        self.a_bias = (self.learning_iter * self.a_bias + a_imu)/(self.learning_iter + 1)
+        self.omega_bias = (self.learning_iter * self.omega_bias + omega_imu)/(self.learning_iter + 1)
         print("learning")
     
     def PlotLogs(self):
-        if self.Logging==0:
+        if self.logging==0:
             print("no logs stored")
             return None
         plt.clf()
@@ -172,12 +172,12 @@ class MocapIMUFilter():
         
         plt.show()
 
-    def DeBiasIMU(self, acc, accg, gyro):
+    def de_biasIMU(self, acc, accg, gyro):
         return acc-self.a_bias, accg-self.a_bias, gyro-self.omega_bias
     
     
-    def Run(self, p_mocap, v_mocap, quat_mocap, omega_imu, a_imu, dt=None, deBias=False):
-        if deBias : 
+    def Run(self, p_mocap, v_mocap, quat_mocap, omega_imu, a_imu, dt=None, de_bias=False):
+        if de_bias : 
             # correct learned bias
             a_imu_corr = a_imu - self.a_bias
             omega_imu_corr = omega_imu - self.omega_bias
@@ -209,7 +209,7 @@ class MocapIMUFilter():
         if self.FA :
             quat_out = quat_filter
         
-        if self.Logging != 0 :
+        if self.logging != 0 :
             self.UpdateLogs(p_out, v_out, quat_out, omega_out, p_mocap, v_mocap, quat_mocap, a_imu)
         
         self.iter += 1
