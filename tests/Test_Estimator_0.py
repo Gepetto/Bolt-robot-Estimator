@@ -4,7 +4,7 @@ from scipy.spatial.transform import Rotation as R
 import time as t
 from decimal import Decimal
 
-from bolt_estimator.estimator.Estimator_0 import Estimator
+from bolt_estimator.estimator.Estimator import Estimator
 from bolt_estimator.utils.Graphics import Graphics
 from bolt_estimator.utils.Utils import Log, utils
 
@@ -26,7 +26,7 @@ def main():
     to_plot = "forces contact"
 
     # create objects
-    test_logger = Log("test", PrintOnFlight=True)
+    test_logger = Log("test", print_on_flight=True)
     grapher = Graphics(logger=test_logger)
     generator = TrajectoryGenerator(logger=test_logger)
     device = DeviceEmulator(TrajectoryGenerator=generator, logger=test_logger)
@@ -37,22 +37,22 @@ def main():
     # init estimator
     logging = True
     estimator = Estimator(device=device,
-                    ModelPath="",
-                    UrdfPath="",
-                    Talkative=False,
+                    model_path="",
+                    urdf_path="",
+                    talkative=False,
                     logger=test_logger,
-                    AttitudeFilterType = "complementary",
-                    parametersAF = [2],         # réglé
-                    SpeedFilterType = "complementary",
-                    parametersSF = [1.1],       # réglé
-                    parametersPF = [0.15],      # réglé
-                    parametersTI = [10, 60, 2], # réglé
-                    TimeStep = dt,
-                    IterNumber = N,
-                    T0posDriftComp = 2.0,
-                    EstimatorLogging=logging,
-                    ContactLogging=logging,
-                    TiltLogging=logging)
+                    attitude_filter_type = "complementary",
+                    parameters_af = [2],         # réglé
+                    speed_filter_type = "complementary",
+                    parameters_sf = [1.1],       # réglé
+                    parameters_pf = [0.15],      # réglé
+                    parameters_ti = [10, 60, 2], # réglé
+                    time_step = dt,
+                    iter_number = N,
+                    t0pos_drift_comp = 2.0,
+                    estimator_logging=logging,
+                    contact_logging=logging,
+                    tilt_logging=logging)
     estimator.SetIMUToBaseTransformation(XYZ=[0, 0, 0], EulerXYZ=[np.pi, 0, 0])
     #x = estimator.ExternalDataCaster("acceleration_imu", np.array([1, 2, 3]))
 
@@ -114,11 +114,11 @@ def main():
             udg = (true_g[start, :] -  true_g[start-1, :])/dt / np.linalg.norm(true_g[start, :])
 
 
-            estimator.SetInitValues(BaseSpeed=v,
-                                    BaseAccG=ag, 
-                                    UnitGravity=ug, 
-                                    UnitGravityDerivative=udg, 
-                                    ContactFootID=10,
+            estimator.SetInitValues(baseSpeed=v,
+                                    baseAccG=ag, 
+                                    unit_gravity=ug, 
+                                    unit_gravity_derivative=udg, 
+                                    contact_foot_id=10,
                                     Q = true_Q[start, :],
                                     Qd = true_Qd[start, :])
         estimator.Estimate()
@@ -159,34 +159,34 @@ def main():
 
     # get logs from contact estimator
         # contact forces
-    LCF_1D, RCF_1D = estimator.ContactEstimator.Get("cf_1d")
-    LCF_3D, RCF_3D = estimator.ContactEstimator.Get("cf_3d")
-    LCF_T, RCF_T = estimator.ContactEstimator.Get("cf_torques")
+    LCF_1D, RCF_1D = estimator.contact_estimator.Get("cf_1d")
+    LCF_3D, RCF_3D = estimator.contact_estimator.Get("cf_3d")
+    LCF_T, RCF_T = estimator.contact_estimator.Get("cf_torques")
         # trust etc
-    Trust = estimator.ContactEstimator.Get("trust")
-    Slip = estimator.ContactEstimator.Get("slip_prob")
-    Contact = estimator.ContactEstimator.Get("contact_bool")
-    contact_prob = estimator.ContactEstimator.Get("contact_prob")
-    contact_prob_F = estimator.ContactEstimator.Get("contact_prob_force")
-    contact_prob_T = estimator.ContactEstimator.Get("contact_prob_torque")
+    Trust = estimator.contact_estimator.Get("trust")
+    Slip = estimator.contact_estimator.Get("slip_prob")
+    Contact = estimator.contact_estimator.Get("contact_bool")
+    contact_prob = estimator.contact_estimator.Get("contact_prob")
+    contact_prob_F = estimator.contact_estimator.Get("contact_prob_force")
+    contact_prob_T = estimator.contact_estimator.Get("contact_prob_torque")
 
 
     # logs from tilt estimator
-    omega_tilt = estimator.TiltandSpeedEstimator.x2_hat_dot_logs.copy()
+    omega_tilt = estimator.tilt_and_speed_estimator.x2_hat_dot_logs.copy()
 
     # plot input data
     if "q" in to_plot :
         grapher.SetLegend(["Q in", "Q true "], 2)
-        grapher.CompareNDdatas([input_q[:, 6:8].T, true_Q[:, 6:8].T], "theta", "Inputed and true Q, left leg", StyleAdapter=True)
+        grapher.CompareNDdatas([input_q[:, 6:8].T, true_Q[:, 6:8].T], "theta", "Inputed and true Q, left leg", style_adapter=True)
     if "qdot" in to_plot :
         grapher.SetLegend(["Qd in ", "Qd true"], 2)
-        grapher.CompareNDdatas([input_qd[:, 5:7].T, true_Qd[:, 5:7].T], "omega", "Inputed and true Qd, left leg", StyleAdapter=True)
+        grapher.CompareNDdatas([input_qd[:, 5:7].T, true_Qd[:, 5:7].T], "omega", "Inputed and true Qd, left leg", style_adapter=True)
     if "tau" in to_plot :
         grapher.SetLegend(["Tau in", "Tau true"], 3)
-        grapher.CompareNDdatas([input_tau[:, :3].T, true_Tau[:, :3].T], "Nm", "Inputed and true Tau, left leg", StyleAdapter=True)
+        grapher.CompareNDdatas([input_tau[:, :3].T, true_Tau[:, :3].T], "Nm", "Inputed and true Tau, left leg", style_adapter=True)
     if "input" in to_plot :
         grapher.SetLegend(["a in", "a true"], 3)
-        grapher.CompareNDdatas([input_acc.T, true_a.T], "m/s2", "Inputed acceleration", StyleAdapter=True)
+        grapher.CompareNDdatas([input_acc.T, true_a.T], "m/s2", "Inputed acceleration", style_adapter=True)
 
 
 
@@ -196,13 +196,13 @@ def main():
         InOut_rotations = [theta.T[:2, :], theta_imu[:2, :], theta_estimator[:2, :]]
         
         grapher.SetLegend(["theta in", "theta imu","theta out"], 2)
-        grapher.CompareNDdatas(InOut_rotations, "theta", "Noisy rot and out rot", StyleAdapter=True)
+        grapher.CompareNDdatas(InOut_rotations, "theta", "Noisy rot and out rot", style_adapter=True)
     
         grapher.SetLegend(["theta", "omega"], 3)
-        grapher.CompareNDdatas(Inputs_rotations, "", "rotation and rotation speed as inputed", StyleAdapter=False, mitigate=[1])
+        grapher.CompareNDdatas(Inputs_rotations, "", "rotation and rotation speed as inputed", style_adapter=False, mitigate=[1])
     
         grapher.SetLegend(["g from tilt estimator", "theta"], 3)
-        grapher.CompareNDdatas([-9.81*g_tilt, theta.T], "", "g and theta", StyleAdapter=False, mitigate=[1])
+        grapher.CompareNDdatas([-9.81*g_tilt, theta.T], "", "g and theta", style_adapter=False, mitigate=[1])
 
 
     
@@ -210,7 +210,7 @@ def main():
         ag = device.AccG_true
         a = device.Acc_true
         grapher.SetLegend(["ag", "a"], 3)
-        grapher.CompareNDdatas([ag.T, a.T], "acceleration", "g", StyleAdapter=True, width=1.)
+        grapher.CompareNDdatas([ag.T, a.T], "acceleration", "g", style_adapter=True, width=1.)
         
     
     # plot true base trajectory
@@ -387,10 +387,10 @@ def main_fakedata():
     Inputs_rotations = [theta.T, omega.T]
 
     grapher.SetLegend(["traj", "speed", "acc"], 3)
-    grapher.CompareNDdatas(Inputs_translations, "", "Trajectory, speed and acceleration as inputed", StyleAdapter=False, width=1.)
+    grapher.CompareNDdatas(Inputs_translations, "", "Trajectory, speed and acceleration as inputed", style_adapter=False, width=1.)
 
     grapher.SetLegend(["theta", "omega"], 3)
-    grapher.CompareNDdatas(Inputs_rotations, "", "rotation and rotation speed as inputed", StyleAdapter=False, width=1.)
+    grapher.CompareNDdatas(Inputs_rotations, "", "rotation and rotation speed as inputed", style_adapter=False, width=1.)
 
     
     
@@ -410,12 +410,12 @@ def main_fakedata():
     
     InOut_rotations = [theta.T[:2, :], theta_imu[:2, :], theta_estimator[:2, :]]
     grapher.SetLegend(["theta in", "theta imu","theta out"], 2)
-    grapher.CompareNDdatas(InOut_rotations, "theta", "Noisy rot and out rot", StyleAdapter=True, width=1.)
+    grapher.CompareNDdatas(InOut_rotations, "theta", "Noisy rot and out rot", style_adapter=True, width=1.)
     
     ag = device.AccG
     a = device.Acc
     grapher.SetLegend(["ag", "a"], 3)
-    grapher.CompareNDdatas([ag.T, a.T], "acceleration", "g", StyleAdapter=True, width=1.)
+    grapher.CompareNDdatas([ag.T, a.T], "acceleration", "g", style_adapter=True, width=1.)
 
     '''
 
@@ -428,7 +428,7 @@ def main_fakedata():
     
     InOut_rotations = [theta.T[:2, :], theta_filter[:2, :]]
     grapher.SetLegend(["theta in","theta filter"], 2)
-    grapher.CompareNDdatas(InOut_rotations, "theta", "theta", StyleAdapter=True, AutoLeg=False, width=1.)
+    grapher.CompareNDdatas(InOut_rotations, "theta", "theta", style_adapter=True, AutoLeg=False, width=1.)
     
     '''
 

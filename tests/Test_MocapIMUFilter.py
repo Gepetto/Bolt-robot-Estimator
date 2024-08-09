@@ -9,14 +9,14 @@ Created on Fri Jun 21 13:02:02 2024
 from bolt_estimator.utils.MocapIMUFilter import MocapIMUFilter
 import numpy as np
 
-Filter = MocapIMUFilter(parametersSF = [2],
-                        parametersAF = [1.1],
-                        parametersPF = [2],
+Filter = MocapIMUFilter(parameters_sf = [2],
+                        parameters_af = [1.1],
+                        parameters_pf = [2],
                         filter_speed=True,
                         filter_attitude=True,
                         filter_position=True,
                         dt = 0.001,
-                        logging=0,
+                        logging=5,
                         talkative=False)
 
 N=100

@@ -12,12 +12,12 @@ import numpy as np
 def main(N=500, noise_level=20, drift=40):
 
     # generate useful objects
-    testlogger = Log("test", PrintOnFlight=True)
+    testlogger = Log("test", print_on_flight=True)
     grapher = Graphics(logger=testlogger)
 
     # start generator
     generator = TrajectoryGenerator(logger=testlogger)
-    generator.Generate("polynomial", NoiseLevel=noise_level, Drift=drift, N=N, amplitude=1, avgfreq=1/6, T=1)
+    generator.Generate("polynomial", noise_level=noise_level, drift=drift, N=N, amplitude=1, avgfreq=1/6, T=1)
 
     # start filter
     ComplementaryFilterT = ComplementaryFilter(parameters=(1/N, 2), 
@@ -25,8 +25,8 @@ def main(N=500, noise_level=20, drift=40):
                                         talkative=True, 
                                         name="Standard complementary",
                                         logger=testlogger,
-                                        MemorySize=150,
-                                        OffsetGain=0.02)
+                                        memory_size=150,
+                                        offset_gain=0.02)
     filter_traj = []
     filter_speed = []
     filter_acc = []

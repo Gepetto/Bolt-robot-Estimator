@@ -34,7 +34,7 @@ class DeviceEmulator():
 
         return None
     
-    def GenerateTrajectory(self,N, NoiseLevelXY, NoiseLevelZ, Drift, NoiseLevelAttitude, T) -> None:
+    def GenerateTrajectory(self,N, noise_levelXY, noise_levelZ, Drift, noise_levelAttitude, T) -> None:
         # generate trajectories and attitudes that are supposed to look like real ones
         
         self.Traj = np.zeros((N, 3))
@@ -48,15 +48,15 @@ class DeviceEmulator():
         
         # TRAJ IN M, M/S, M/S²
         # generate X trajectory
-        self.generator.Generate("sinus", NoiseLevel=NoiseLevelXY, N=N, amplitude=0.5, T=T, avgfreq=0.05)
+        self.generator.Generate("sinus", noise_level=noise_levelXY, N=N, amplitude=0.5, T=T, avgfreq=0.05)
         self.X, self.Xd, self.Xdd = self.generator.GetTrueTraj()
         self.XN, self.XNd, self.XNdd = self.generator.GetNoisyTraj()
         # generate Y trajectory
-        self.generator.Generate("sinus", NoiseLevel=NoiseLevelXY, N=N, amplitude=0.1, T=T, avgfreq=0.05)
+        self.generator.Generate("sinus", noise_level=noise_levelXY, N=N, amplitude=0.1, T=T, avgfreq=0.05)
         self.Y, self.Yd, self.Ydd = self.generator.GetTrueTraj()
         self.YN, self.YNd, self.YNdd = self.generator.GetNoisyTraj()
         # generate Z trajectory
-        self.generator.Generate("sinus", NoiseLevel=NoiseLevelZ, N=N, amplitude=0.01, T=T, avgfreq=0.5)
+        self.generator.Generate("sinus", noise_level=noise_levelZ, N=N, amplitude=0.01, T=T, avgfreq=0.5)
         self.Z, self.Zd, self.Zdd = self.generator.GetTrueTraj()
         self.ZN, self.ZNd, self.ZNdd = self.generator.GetNoisyTraj()
 
@@ -64,18 +64,18 @@ class DeviceEmulator():
         # ATTITUDE IN RADIANS
         # data from generator are [[x0, x1, x2...]], removing 1D
         # generate X, Y attitude with noise and drift
-        self.generator.Generate("sinus", NoiseLevel=NoiseLevelAttitude, N=N, amplitude=0.08, Drift=Drift, T=T, avgfreq=1.5)
+        self.generator.Generate("sinus", noise_level=noise_levelAttitude, N=N, amplitude=0.08, Drift=Drift, T=T, avgfreq=1.5)
         self.RX, self.RXd, self.RXdd = self.generator.GetTrueTraj()
         self.RXN, self.RXNd, self.RXNdd = self.generator.GetGyroTraj()
         # same traj without drift
         self.RXNnondrift,*o = self.generator.GetNoisyTraj()
 
-        self.generator.Generate("sinus", NoiseLevel=NoiseLevelAttitude, N=N, amplitude=0.05, Drift=Drift, T=T, avgfreq=1.5)
+        self.generator.Generate("sinus", noise_level=noise_levelAttitude, N=N, amplitude=0.05, Drift=Drift, T=T, avgfreq=1.5)
         self.RY, self.RYd, self.RYdd = self.generator.GetTrueTraj()
         self.RYN, self.RYNd, self.RYNdd = self.generator.GetGyroTraj()
         self.RYNnondrift,*o = self.generator.GetNoisyTraj()
         # generate Z attitude
-        self.generator.Generate("polynomial1", NoiseLevel=NoiseLevelAttitude/2, N=N, amplitude=0.3, Drift=Drift, T=T)
+        self.generator.Generate("polynomial1", noise_level=noise_levelAttitude/2, N=N, amplitude=0.3, Drift=Drift, T=T)
         self.RZ, self.RZd, self.RZdd = self.generator.GetTrueTraj()
         self.RZN, self.RZNd, self.RZNdd = self.generator.GetGyroTraj()
 
@@ -140,27 +140,27 @@ class DeviceEmulator():
 
 
         # start noise generator
-        noise = Metal(traj=self.Acc_true, NoiseLevel=0.5, DriftingCoeff=0.)
+        noise = Metal(traj=self.Acc_true, noise_level=0.5, drifting_coeff=0.)
         
         # DATA THAT ESTIMATOR WILL ACCESS
         # base acceleration
-        noise.SetNoise(NoiseLevel=0, DriftingCoeff=0.)
-        self.Acc = noise.makeNoiseAdaptativeAmplitude(self.Acc_true)
-        self.AccG = noise.makeNoiseAdaptativeAmplitude(self.AccG_true)
+        noise.SetNoise(noise_level=0, drifting_coeff=0.)
+        self.Acc = noise.MakeNoiseAdaptativeAmplitude(self.Acc_true)
+        self.AccG = noise.MakeNoiseAdaptativeAmplitude(self.AccG_true)
         # base rotation speed
-        #noise.SetNoise(NoiseLevel=5, DriftingCoeff=0.)
-        self.Omega = noise.makeNoise(self.Omega_true)
+        #noise.SetNoise(noise_level=5, drifting_coeff=0.)
+        self.Omega = noise.MakeNoise(self.Omega_true)
         # base speed and attitude (IMU has an integrator)
-        #noise.SetNoise(NoiseLevel=5, DriftingCoeff=0.)
-        self.Speed = noise.makeNoiseAdaptativeAmplitude(self.Speed_true)
-        self.Theta = noise.makeNoiseAdaptativeAmplitude(self.Theta_true)
+        #noise.SetNoise(noise_level=5, drifting_coeff=0.)
+        self.Speed = noise.MakeNoiseAdaptativeAmplitude(self.Speed_true)
+        self.Theta = noise.MakeNoiseAdaptativeAmplitude(self.Theta_true)
         # encoders
-        #noise.SetNoise(NoiseLevel=5, DriftingCoeff=0.)
-        self.Q = noise.makeNoiseAdaptativeAmplitude(self.Q_true)
-        self.Qd = noise.makeNoiseAdaptativeAmplitude(self.Qd_true)
+        #noise.SetNoise(noise_level=5, drifting_coeff=0.)
+        self.Q = noise.MakeNoiseAdaptativeAmplitude(self.Q_true)
+        self.Qd = noise.MakeNoiseAdaptativeAmplitude(self.Qd_true)
         # torques
-        #noise.SetNoise(NoiseLevel=5, DriftingCoeff=0.)
-        self.Tau = noise.makeNoiseAdaptativeAmplitude(self.Tau_true)
+        #noise.SetNoise(noise_level=5, drifting_coeff=0.)
+        self.Tau = noise.MakeNoiseAdaptativeAmplitude(self.Tau_true)
 
         return None
     
@@ -189,27 +189,27 @@ class DeviceEmulator():
         self.OmegaDot_true = np.zeros(self.Omega_true.shape)
 
         # start noise generator
-        noise = Metal(traj=self.Acc_true, NoiseLevel=0.5, DriftingCoeff=0.)
+        noise = Metal(traj=self.Acc_true, noise_level=0.5, drifting_coeff=0.)
         
         # DATA THAT ESTIMATOR WILL ACCESS
         # base acceleration
-        noise.SetNoise(NoiseLevel=0, DriftingCoeff=0.)
-        self.Acc = noise.makeNoiseAdaptativeAmplitude(self.Acc_true)
-        self.AccG = noise.makeNoiseAdaptativeAmplitude(self.AccG_true)
+        noise.SetNoise(noise_level=0, drifting_coeff=0.)
+        self.Acc = noise.MakeNoiseAdaptativeAmplitude(self.Acc_true)
+        self.AccG = noise.MakeNoiseAdaptativeAmplitude(self.AccG_true)
         # base rotation speed
-        #noise.SetNoise(NoiseLevel=5, DriftingCoeff=0.)
-        self.Omega = noise.makeNoise(self.Omega_true)
+        #noise.SetNoise(noise_level=5, drifting_coeff=0.)
+        self.Omega = noise.MakeNoise(self.Omega_true)
         # base speed and attitude (IMU has an integrator)
-        #noise.SetNoise(NoiseLevel=5, DriftingCoeff=0.)
-        self.Speed = noise.makeNoiseAdaptativeAmplitude(self.Speed_true)
-        self.Theta = noise.makeNoiseAdaptativeAmplitude(self.Theta_true)
+        #noise.SetNoise(noise_level=5, drifting_coeff=0.)
+        self.Speed = noise.MakeNoiseAdaptativeAmplitude(self.Speed_true)
+        self.Theta = noise.MakeNoiseAdaptativeAmplitude(self.Theta_true)
         # encoders
-        #noise.SetNoise(NoiseLevel=5, DriftingCoeff=0.)
-        self.Q = noise.makeNoiseAdaptativeAmplitude(self.Q_true)
-        self.Qd = noise.makeNoiseAdaptativeAmplitude(self.Qd_true)
+        #noise.SetNoise(noise_level=5, drifting_coeff=0.)
+        self.Q = noise.MakeNoiseAdaptativeAmplitude(self.Q_true)
+        self.Qd = noise.MakeNoiseAdaptativeAmplitude(self.Qd_true)
         # torques
-        #noise.SetNoise(NoiseLevel=5, DriftingCoeff=0.)
-        self.Tau = noise.makeNoiseAdaptativeAmplitude(self.Tau_true)
+        #noise.SetNoise(noise_level=5, drifting_coeff=0.)
+        self.Tau = noise.MakeNoiseAdaptativeAmplitude(self.Tau_true)
 
         return None
     

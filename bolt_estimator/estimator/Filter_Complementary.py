@@ -86,7 +86,7 @@ class ComplementaryFilter():
 
     
     # standard filter with non-idiotic offset compensation
-    def RunFilteroffset(self, x, xdot, dt=None) -> np.ndarray:
+    def RunFilterOffset(self, x, xdot, dt=None) -> np.ndarray:
         # better averaging technique
         # complementary filter x and its temporal derivative xdot. Updates previous estimates and returns current estimate.
         # check data
@@ -111,7 +111,7 @@ class ComplementaryFilter():
         return self.estimate
 
     # standard filter with offset commpensation and adaptative gain for quicker convergence
-    def RunFilteroffsetAdaptive(self, x, xdot, dt=None) -> np.ndarray:
+    def RunFilterOffsetAdaptive(self, x, xdot, dt=None) -> np.ndarray:
         # complementary filter x and its temporal derivative xdot. Updates previous estimates and returns current estimate.
         # check data
         self.Setdt(dt)

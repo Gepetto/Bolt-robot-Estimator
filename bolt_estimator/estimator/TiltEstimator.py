@@ -20,13 +20,13 @@ class TiltEstimator():
                  robot,
                  Q0,
                  Qd0,
-                 Niter,
-                 Logging,
+                 n_iter,
+                 logging,
                  params)-> None:
         """ initialize variables """
         # iter 
         self.iter = 0
-        self.Niter = Niter
+        self.n_iter = n_iter
         # pinocchio
         self.Q = Q0
         self.Qd = Qd0
@@ -57,8 +57,8 @@ class TiltEstimator():
         self.g0 = -9.81
         
         # logs
-        self.Logging = Logging
-        if self.Logging : self.InitLogs()
+        self.logging = logging
+        if self.logging : self.InitLogs()
 
         # parameters
         self.alpha1, self.alpha2, self.gamma = params
@@ -82,17 +82,17 @@ class TiltEstimator():
     def InitLogs(self)-> None :
         """ create log matrixes"""
         # state variables
-        self.x1_hat_logs = np.zeros((self.Niter,3))
-        self.x2_hat_logs = np.zeros((self.Niter, 3))
-        self.x2_prime_logs = np.zeros((self.Niter, 3))
+        self.x1_hat_logs = np.zeros((self.n_iter,3))
+        self.x2_hat_logs = np.zeros((self.n_iter, 3))
+        self.x2_prime_logs = np.zeros((self.n_iter, 3))
         
         # errors
-        self.x1_tilde_logs = np.zeros((self.Niter,3))
-        self.x2_tilde_logs = np.zeros((self.Niter, 3))
-        self.x2_tildeprime_logs = np.zeros((self.Niter, 3))
+        self.x1_tilde_logs = np.zeros((self.n_iter,3))
+        self.x2_tilde_logs = np.zeros((self.n_iter, 3))
+        self.x2_tildeprime_logs = np.zeros((self.n_iter, 3))
 
         # derivatives
-        self.x2_hat_dot_logs = np.zeros((self.Niter,3))
+        self.x2_hat_dot_logs = np.zeros((self.n_iter,3))
         
         return None
     
@@ -100,9 +100,9 @@ class TiltEstimator():
     def UpdateLogs(self) -> None:
         """ update log matrixes"""
         LogIter = self.iter
-        if self.iter >= self.Niter:
+        if self.iter >= self.n_iter:
             # Logs matrices' size will not be sufficient
-            LogIter = self.Niter-1
+            LogIter = self.n_iter-1
             
         # state variables
         self.x1_hat_logs[LogIter, :] = self.x1_hat[:]
@@ -236,7 +236,7 @@ class TiltEstimator():
         self.ErrorUpdate(dt)
         
         # logging
-        if self.Logging : self.UpdateLogs()
+        if self.logging : self.UpdateLogs()
         self.iter += 1
         
         # norm x2

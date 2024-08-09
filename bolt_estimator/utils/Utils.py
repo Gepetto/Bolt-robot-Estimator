@@ -94,7 +94,7 @@ class Quat_Utils():
     
     def RotateQuat(self, quat_to_rotate, quat):
         # rotate a quaternion by a quaternion
-        quat_inv = self.InvQuat(Quat)
+        quat_inv = self.InvQuat(quat)
         return self.QuatProduct(quat_inv, self.QuatProduct(quat_to_rotate, quat))
 
 

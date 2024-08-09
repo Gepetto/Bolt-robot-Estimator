@@ -30,10 +30,10 @@ class Test_Filter():
             self.name = name
 
     def TestDim(self, desired_dim, inputed_dim):
-        testlogger = Log("testing dimension input ", PrintOnFlight=True)
+        testlogger = Log("testing dimension input ", print_on_flight=True)
         print("# ", self.optparameters)
         memsize, integratorgain = self.optparameters
-        filter = ComplementaryFilter(self.parameters, ndim=desired_dim, talkative=True, name=self.name, logger=testlogger, MemorySize=memsize, OffsetGain=integratorgain)
+        filter = ComplementaryFilter(self.parameters, ndim=desired_dim, talkative=True, name=self.name, logger=testlogger, memory_size=memsize, offset_gain=integratorgain)
         x = np.ones(inputed_dim)
         xdot = np.ones(inputed_dim)
         filter.RunFilter(x, xdot)
@@ -42,7 +42,7 @@ class Test_Filter():
 
     def RunTest(self, N, noise_level, datatype):
         # generate useful objects
-        testlogger = Log("test " + datatype + " with noise level " + str(noise_level), PrintOnFlight=True)
+        testlogger = Log("test " + datatype + " with noise level " + str(noise_level), print_on_flight=True)
         grapher = Graphics(logger=testlogger)
 
         # load custom data
@@ -118,7 +118,7 @@ class Test_Filter():
             print(" # optparams ", self.optparameters)
             print(" # ndim ", ndim)
             memsize, integratorgain = self.optparameters
-            self.filter = ComplementaryFilter(self.parameters, ndim=ndim, talkative=True, name=self.name, logger=testlogger, MemorySize=memsize, OffsetGain=integratorgain)
+            self.filter = ComplementaryFilter(self.parameters, ndim=ndim, talkative=True, name=self.name, logger=testlogger, memory_size=memsize, offset_gain=integratorgain)
             
         # empty filter data filter
         filter_traj = np.zeros((ndim, N))
@@ -134,7 +134,7 @@ class Test_Filter():
         # plotting
         dataset = [noisy_traj, true_traj, filter_traj]
         grapher.SetLegend(["Noisy position (" + str(noise_level) + "%)", "True pos", "Filter out pos"], ndim)
-        grapher.CompareNDdatas(dataset, "position", "Output on " + datatype + " traj. with noise level " + str(noise_level) + "\n to filter " + self.filter.name, StyleAdapter=False)
+        grapher.CompareNDdatas(dataset, "position", "Output on " + datatype + " traj. with noise level " + str(noise_level) + "\n to filter " + self.filter.name, style_adapter=False)
 
         # plotting error
         scaler = abs(np.max(true_traj) / np.min(true_traj))
@@ -142,7 +142,7 @@ class Test_Filter():
         dataset = [scaled_error]
         print(" error coeff : ", np.sum(scaled_error))
         grapher.SetLegend(["error of the filter " + self.filter.name], ndim)
-        grapher.CompareNDdatas(dataset, "position", "Error on " + datatype + " traj. with noise level " + str(noise_level) + "\n to filter " + self.filter.name, StyleAdapter=False, width=0.5)
+        grapher.CompareNDdatas(dataset, "position", "Error on " + datatype + " traj. with noise level " + str(noise_level) + "\n to filter " + self.filter.name, style_adapter=False, width=0.5)
         grapher.end()
 
 

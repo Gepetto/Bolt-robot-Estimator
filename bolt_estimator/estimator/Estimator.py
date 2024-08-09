@@ -8,12 +8,12 @@ import example_robot_data
 from bolt_estimator.utils.Utils import utils
 from bolt_estimator.utils.Utils import Log
 
-from bolt_estimator.estimator.contact_estimator import contact_estimator
+from bolt_estimator.estimator.ContactEstimator import ContactEstimator
 from bolt_estimator.estimator.TiltEstimator import TiltEstimator
 
 from bolt_estimator.estimator.Filter import Filter
 from bolt_estimator.estimator.Filter_Complementary import ComplementaryFilter
-from bolt_estimator.estimator.foot_attitude_estimator import foot_attitude_estimator
+from bolt_estimator.estimator.FootAttitudeEstimator import FootAttitudeEstimator
 
 
 """
@@ -191,8 +191,8 @@ class Estimator():
                                                     talkative=talkative, 
                                                     logger=self.logger, 
                                                     ndim=3,
-                                                    MemorySize=80,
-                                                    OffsetGain=0.02)
+                                                    memory_size=80,
+                                                    offset_gain=0.02)
         self.logger.LogTheLog("Speed Filter of type '" + speed_filter_type + "' added.", to_print=talkative)
         
         self.height_filter = ComplementaryFilter(parameters=parameters_pf, 
@@ -204,26 +204,26 @@ class Estimator():
 
         # returns info on Slips, Contact Forces, Contact with the ground
         self.contact_estimator = ContactEstimator(robot=self.robot, 
-                                                 LeftFootFrameID=self.feet_indexes[0], 
-                                                 RightFootFrameID=self.feet_indexes[1], 
-                                                 LeftKneeFrameID=7, # self.robot.model.getFrameId("FL_KNEE"),
-                                                 RightKneeFrameID=15, # self.robot.model.getFrameId("FR_KNEE"),
-                                                 LeftKneeTorqueID=2,
-                                                 RightKneeTorqueID=5,
+                                                 left_foot_frame_id=self.feet_indexes[0], 
+                                                 right_foot_frame_id=self.feet_indexes[1], 
+                                                 left_knee_frame_id=7, # self.robot.model.getFrameId("FL_KNEE"),
+                                                 right_knee_frame_id=15, # self.robot.model.getFrameId("FR_KNEE"),
+                                                 left_knee_torque_id=2,
+                                                 right_knee_torque_id=5,
                                                  iter_number=self.iter_number,
                                                  dt=self.time_step,
-                                                 MemorySize=5,
-                                                 Logging=self.contact_logging,
+                                                 memory_size=5,
+                                                 logging=self.contact_logging,
                                                  talkative=self.talkative,
                                                  logger=self.logger)
         self.logger.LogTheLog("Contact Estimator added.", to_print=talkative)
         
         # returns info on Slips, Contact Forces, Contact with the ground
-        self.tiltand_speed_estimator = TiltEstimator(robot=self.robot,
+        self.tilt_and_speed_estimator = TiltEstimator(robot=self.robot,
                                                    Q0=self.q,
                                                    Qd0=self.qdot,
-                                                   Niter=self.iter_number,
-                                                   Logging=self.tilt_logging,
+                                                   n_iter=self.iter_number,
+                                                   logging=self.tilt_logging,
                                                    params=parameters_ti)
         
         self.logger.LogTheLog("Tilt Estimator added with parameters " + str(parameters_ti), to_print=talkative)
@@ -243,7 +243,7 @@ class Estimator():
     
 
     
-    def SetInitValues(self, base_speed, base_acc_g, unit_gravity, unit_gravity_derivative, contact_foot_id, Q, Qd):
+    def SetInitValues(self, baseSpeed, baseAccG, unit_gravity, unit_gravity_derivative, contact_foot_id, Q, Qd):
         """ modify init values """
         self.q[:] = Q
         self.qdot[:]  = Qd
@@ -251,7 +251,7 @@ class Estimator():
         base_wrt_foot_orientation_as_matrix = rot.T
         unit_gravity[2] *=-1
         unit_gravity_derivative[2] *=-1
-        self.tiltand_speed_estimator.SetInitValues(base_speed, base_acc_g, unit_gravity, unit_gravity_derivative, base_wrt_foot_orientation_as_matrix)
+        self.tilt_and_speed_estimator.SetInitValues(baseSpeed, baseAccG, unit_gravity, unit_gravity_derivative, base_wrt_foot_orientation_as_matrix)
 
 
     def ExternalDataCaster(self, data_type:str, received_data) -> np.ndarray:
@@ -627,7 +627,7 @@ class Estimator():
         self.w_imu[:] = self.device.baseAngularVelocity[:]
         # integrated data from IMU
         self.theta_imu[:] = self.device.baseAttitude[:]
-        self.v_imu[:] = self.device.base_speed[:]
+        self.v_imu[:] = self.device.baseSpeed[:]
         # Kinematic data from encoders
         self.q[:] = self.device.q_mes[:]
         self.qdot[:] = self.device.v_mes[:]
@@ -676,9 +676,9 @@ class Estimator():
                                                                                  self.a_imu, 
                                                                                  self.tau,
                                                                                  self.g_tilt,
-                                                                                 TorqueForceMingler=1.0, 
-                                                                                 ProbThresold=0.45, 
-                                                                                 TrustThresold=0.5
+                                                                                 torque_force_mingler=1.0, 
+                                                                                 prob_thresold=0.45, 
+                                                                                 trust_thresold=0.5
                                                                                  )
         # contact forces
         self.fl_contact, self.RLContact = self.contact_estimator.Get("current_cf_averaged")
@@ -926,7 +926,7 @@ class Estimator():
         else :
             contact_foot_id = self.feet_indexes[1]
         # run tilt estimator
-        self.v_tilt, self.g_tilt = self.tiltand_speed_estimator.Estimate(Q=self.q.copy(),
+        self.v_tilt, self.g_tilt = self.tilt_and_speed_estimator.Estimate(Q=self.q.copy(),
                                             Qd=self.qdot.copy(),
                                             base_id=1,
                                             contact_foot_id=contact_foot_id,

@@ -85,8 +85,8 @@ def main(N=1000, noise_level=60):
     #FilterAcc_offset = np.array(FilterAcc_offset).reshape(1, N)
 
     dataset = [noisy_traj, true_traj, filter_traj, filter_traj_offset1, filter_traj_offset, filter_traj_offset5]
-    grapher.SetLegend(["Noisy position (" + str(noise_level) + "%)", "True pos", "Filter out pos", "Filter w/OC out pos (memory=20)", "Filter w/OC out pos (memory=100)", "Filter w/OC out pos (memory=300)"])
-    grapher.CompareNDdatas(dataset, "position", "Test CF, position, polynomial (OCgain=0.3)", StyleAdapter=False, AutoLeg=False, width=1.3)
+    grapher.SetLegend(["Noisy position (" + str(noise_level) + "%)", "True pos", "Filter out pos", "Filter w/OC out pos (memory=20)", "Filter w/OC out pos (memory=100)", "Filter w/OC out pos (memory=300)"], 1)
+    grapher.CompareNDdatas(dataset, "position", "Test CF, position, polynomial (OCgain=0.3)", style_adapter=False, width=1.3)
     return dataset
 
 

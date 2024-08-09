@@ -12,7 +12,7 @@ Uses IMU and kinematics data to estimate the rotation betwwen world frame and fo
 
 
 
-class foot_attitudeEstimator():
+class FootAttitudeEstimator():
     def __init__(self,
                 parameters=[0.001, 2],
                 dt=0.01,

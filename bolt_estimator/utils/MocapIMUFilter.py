@@ -12,9 +12,9 @@ import matplotlib.pyplot as plt
 
 class MocapIMUFilter():
     def __init__(self,
-                 parametersSF = [2],
-                 parametersAF = [1.1],
-                 parametersPF = [2],
+                 parameters_sf = [2],
+                 parameters_af = [1.1],
+                 parameters_pf = [2],
                  filter_speed=True,
                  filter_attitude=False,
                  filter_position=False,
@@ -23,7 +23,7 @@ class MocapIMUFilter():
                  talkative=False
                  ):
         # params
-        self.TimeStep = dt
+        self.time_step = dt
         self.iter = 0
         self.logging = logging
         self.FS = filter_speed
@@ -36,23 +36,23 @@ class MocapIMUFilter():
 
         
         # filters params
-        parametersSF = [self.TimeStep] + parametersSF
-        parametersAF = [self.TimeStep] + parametersAF
-        parametersPF = [self.TimeStep] + parametersPF
+        parameters_sf = [self.time_step] + parameters_sf
+        parameters_af = [self.time_step] + parameters_af
+        parameters_pf = [self.time_step] + parameters_pf
 
-        self.SpeedFilter = ComplementaryFilter(parameters=parametersSF, 
+        self.SpeedFilter = ComplementaryFilter(parameters=parameters_sf, 
                                                 name="speed complementary filter", 
                                                 talkative=talkative, 
                                                 logger=None, 
                                                 ndim=3,
-                                                MemorySize=100,
-                                                OffsetGain=0.005)
-        self.PositionFilter = ComplementaryFilter(parameters=parametersPF, 
+                                                memory_size=100,
+                                                offset_gain=0.005)
+        self.PositionFilter = ComplementaryFilter(parameters=parameters_pf, 
                                                 name="speed complementary filter", 
                                                 talkative=talkative, 
                                                 logger=None, 
                                                 ndim=3)
-        self.AttitudeFilter = ComplementaryFilter(parameters=parametersAF, 
+        self.AttitudeFilter = ComplementaryFilter(parameters=parameters_af, 
                                                 name="attitude complementary filter", 
                                                 talkative=talkative, 
                                                 logger=None, 

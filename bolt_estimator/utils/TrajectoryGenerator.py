@@ -56,11 +56,11 @@ class TrajectoryGenerator:
         self.type_of_traj = type_of_traj
         self.TrajType(type_of_traj, traj=traj, speed=speed)
         # create fake noise
-        self.noise_maker = Metal(self.trajectory, self.speed, self.acceleration, noise_level, driftingCoeff=drift, logger=self.logger)
+        self.noise_maker = Metal(self.trajectory, self.speed, self.acceleration, noise_level, drifting_coeff=drift, logger=self.logger)
         self.noisy_trajectory, self.noisy_speed, self.noisy_acceleration = self.noise_maker.NoisyFullTrajectory()
         # create drift in data
-        self.drifting_trajectory, self.drifting_speed, self.drifting_acceleration = self.noise_maker.driftingFullTrajectory()
-        self.noisy_drifting_trajectory, self.noisy_drifting_speed, self.noisy_drifting_acceleration = self.noise_maker.driftingNoisyFullTrajectory()
+        self.drifting_trajectory, self.drifting_speed, self.drifting_acceleration = self.noise_maker.DriftingFullTrajectory()
+        self.noisy_drifting_trajectory, self.noisy_drifting_speed, self.noisy_drifting_acceleration = self.noise_maker.DriftingNoisyFullTrajectory()
 
         
 
@@ -70,9 +70,9 @@ class TrajectoryGenerator:
         return self.trajectory, self.speed, self.acceleration
     def GetNoisyTraj(self):
         return self.noisy_trajectory, self.noisy_speed, self.noisy_acceleration
-    def GetdriftingTraj(self):
+    def GetDriftingTraj(self):
         return self.drifting_trajectory, self.drifting_speed, self.drifting_acceleration
-    def GetdriftingNoisyTraj(self):
+    def GetDriftingNoisyTraj(self):
         return self.noisy_drifting_trajectory, self.noisy_drifting_speed, self.noisy_drifting_acceleration
     def GetGyroTraj(self):
         return self.noisy_drifting_trajectory, self.noisy_speed, self.noisy_acceleration
@@ -170,13 +170,13 @@ class TrajectoryGenerator:
         return self.trajectory, self.speed, self.acceleration
     
 
-    def TrajectoryExponential(self, ImposedInit=0):
+    def TrajectoryExponential(self, imposed_init=0):
         T_array = np.linspace(0, self.T, self.N)
         # randomly generates coeff that matches approx. speed and frequency
-        if ImposedInit == 0:
+        if imposed_init == 0:
             C = np.random.random(1)*self.amplitude*self.T
         else :
-            C = ImposedInit
+            C = imposed_init
         w = (np.random.random(1)+0.5)*w
         # trajectory to be followed
         T = Exp(C, w)
@@ -199,7 +199,7 @@ class TrajectoryGenerator:
          
         self.trajectory[0,:], self.speed[0,:], self.acceleration[0,:] = self.TrajectoryExponential(n, T_array[n], w)
         for j in range(1, k):
-            self.trajectory[j,:], self.speed[j,:], self.acceleration[j,:] = self.TrajectoryExponential(n, T_array[j*n], w, ImposedInit=self.trajectory[j-1, 0])
+            self.trajectory[j,:], self.speed[j,:], self.acceleration[j,:] = self.TrajectoryExponential(n, T_array[j*n], w, imposed_init=self.trajectory[j-1, 0])
         # flatten and truncate
         return self.trajectory.reshape((1, -1))[:, :self.N], self.speed.reshape((1, -1))[:, :self.N], self.acceleration.reshape((1, -1))[:, :self.N]
        
@@ -235,7 +235,7 @@ class TrajectoryGenerator:
     
     def SimpleSmoother(self, data, smoothing=70):
         # data must be a 2D array [[x], [y], [z]]
-        Smoothdata = np.zeros((data.shape))
+        smoothdata = np.zeros((data.shape))
         # max differences on x, y, z (useless for now)
         scale = abs(np.max(data, axis=0) - np.min(data, axis=0))
         trigger = (100-smoothing)/100 * scale
@@ -245,8 +245,8 @@ class TrajectoryGenerator:
         MovedRight = data.copy()
         MovedRight[:, 1:-1] = data[:, 2:]
         # average data
-        Smoothdata = (MovedLeft + MovedRight + data)/3
-        return Smoothdata
+        smoothdata = (MovedLeft + MovedRight + data)/3
+        return smoothdata
 
     
     def AdaptTrajectory(self):
@@ -262,10 +262,10 @@ class TrajectoryGenerator:
 
 # a class to add noise 
 class Metal:
-    def __init__(self, traj, speed=None, acc=None, noise_level=0.1, driftingCoeff=0.05, logger=None):
+    def __init__(self, traj, speed=None, acc=None, noise_level=0.1, drifting_coeff=0.05, logger=None):
         # the absolute or relative noise to add to the data
         self.noise_level = noise_level
-        self.driftingCoeff = driftingCoeff
+        self.drifting_coeff = drifting_coeff
         # dimensions and length of traj
         self.D, self.N = np.shape(traj)
 
@@ -286,22 +286,22 @@ class Metal:
         else:
             self.talkative = False
     
-    def SetNoise(self, noise_level=0.1, driftingCoeff=0.05):
+    def SetNoise(self, noise_level=0.1, drifting_coeff=0.05):
         # the absolute or relative noise to add to the data
         self.noise_level = noise_level
-        self.driftingCoeff = driftingCoeff
+        self.drifting_coeff = drifting_coeff
 
         
-    def makeNoise(self, data, AutoAdjustAmplitude=True):
+    def MakeNoise(self, data, auto_adjust_amplitude=True):
         self.D, self.N = np.shape(data)
         # tune the noise level (absolute or proportionnal to signal)
         amplitude = self.noise_level/100
-        if AutoAdjustAmplitude : 
+        if auto_adjust_amplitude : 
             amplitude = np.max(abs(data)) * self.noise_level / 100
             #self.logger.LogTheLog(str(np.max(data)), style="warn")
         return data + np.random.normal(loc=0.0, scale=amplitude, size=(self.D,self.N))
     
-    def makeNoiseAdaptativeAmplitude(self, data, division=10):
+    def MakeNoiseAdaptativeAmplitude(self, data, division=10):
         data = data.copy()
         self.D, self.N = np.shape(data)
         # tune the noise level on every division
@@ -314,35 +314,35 @@ class Metal:
             data[j*increment:(j+1)*increment, :] = minidata + noise
         return data
     
-    def makedrift(self, data, AutoAdjustAmplitude=True):
+    def MakeDrift(self, data, auto_adjust_amplitude=True):
         self.D, self.N = np.shape(data)
-        drift = self.driftingCoeff/100
-        if AutoAdjustAmplitude : 
-            drift = (np.max(abs(data)) - np.min(data)) * self.driftingCoeff / 100
+        drift = self.drifting_coeff/100
+        if auto_adjust_amplitude : 
+            drift = (np.max(abs(data)) - np.min(data)) * self.drifting_coeff / 100
         return data + np.linspace(np.zeros(self.D), drift*np.ones(self.D), self.N).T
     
     def NoisyFullTrajectory(self):
         self.logger.LogTheLog("Adding noise on x, y, z provided data")
-        return self.makeNoise(self.RealTraj), self.makeNoise(self.RealSpeed), self.makeNoise(self.RealAcc)
+        return self.MakeNoise(self.RealTraj), self.MakeNoise(self.RealSpeed), self.MakeNoise(self.RealAcc)
     
-    def driftingFullTrajectory(self):
+    def DriftingFullTrajectory(self):
         self.logger.LogTheLog("Adding drift on x, y, z provided data")
-        return self.makedrift(self.RealTraj), self.makedrift(self.RealSpeed), self.makedrift(self.RealAcc)
+        return self.MakeDrift(self.RealTraj), self.MakeDrift(self.RealSpeed), self.MakeDrift(self.RealAcc)
     
-    def driftingNoisyFullTrajectory(self):
+    def DriftingNoisyFullTrajectory(self):
         self.logger.LogTheLog("Adding drift and noise on x, y, z provided data")
-        return self.makedrift(self.makeNoise(self.RealTraj)), self.makedrift(self.makeNoise(self.RealSpeed)), self.makedrift(self.makeNoise(self.RealAcc))
+        return self.MakeDrift(self.MakeNoise(self.RealTraj)), self.MakeDrift(self.MakeNoise(self.RealSpeed)), self.MakeDrift(self.MakeNoise(self.RealAcc))
     
-    def measurePos(self):
-        self.NoisyTraj = self.makeNoise(self.RealTraj)
+    def MeasurePos(self):
+        self.NoisyTraj = self.MakeNoise(self.RealTraj)
         return self.NoisyTraj
     
-    def measureSpeed(self):
-        self.NoisySpeed = self.makeNoise(self.RealSpeed)
+    def MeasureSpeed(self):
+        self.NoisySpeed = self.MakeNoise(self.RealSpeed)
         return self.NoisySpeed
     
-    def measureAcc(self):
-        self.NoisyAcc = self.makeNoise(self.RealAcc)
+    def MeasureAcc(self):
+        self.NoisyAcc = self.MakeNoise(self.RealAcc)
         return self.NoisyAcc
     
 
