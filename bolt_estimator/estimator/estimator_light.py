@@ -5,15 +5,15 @@ from scipy.spatial.transform import Rotation as R
 import example_robot_data
 
 
-from bolt_estimator.utils.Utils import utils
-from bolt_estimator.utils.Utils import Log
+from bolt_estimator.utils.utils import utils
+from bolt_estimator.utils.utils import Log
 
-from bolt_estimator.estimator.ContactEstimator import ContactEstimator
-from bolt_estimator.estimator.TiltEstimator import TiltEstimator
+from bolt_estimator.estimator.contact_estimator import ContactEstimator
+from bolt_estimator.estimator.tilt_estimator import TiltEstimator
 
-from bolt_estimator.estimator.Filter import Filter
-from bolt_estimator.estimator.Filter_Complementary import ComplementaryFilter
-from bolt_estimator.estimator.FootAttitudeEstimator import FootAttitudeEstimator
+from bolt_estimator.estimator.filter import Filter
+from bolt_estimator.estimator.filter_complementary import ComplementaryFilter
+from bolt_estimator.estimator.foot_attitude_estimator import FootAttitudeEstimator
 
 
 """

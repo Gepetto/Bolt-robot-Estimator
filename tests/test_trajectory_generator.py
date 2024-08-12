@@ -1,12 +1,12 @@
 
 
-from bolt_estimator.utils.Utils import utils, Log
+from bolt_estimator.utils.utils import utils, Log
 
-from bolt_estimator.data.DataReader import DataReader
+from bolt_estimator.data.data_reader import DataReader
 
-from bolt_estimator.utils.TrajectoryGenerator import TrajectoryGenerator, Metal
-from bolt_estimator.utils.Graphics import Graphics
-from bolt_estimator.estimator.Filter_Complementary import ComplementaryFilter
+from bolt_estimator.utils.trajectory_generator import TrajectoryGenerator, Metal
+from bolt_estimator.utils.graphics import Graphics
+from bolt_estimator.estimator.filter_complementary import ComplementaryFilter
 import numpy as np
 
 

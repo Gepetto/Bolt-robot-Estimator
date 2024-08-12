@@ -1,6 +1,6 @@
 import numpy as np
 import pinocchio as pin
-from bolt_estimator.utils.Utils import utils
+from bolt_estimator.utils.utils import utils
 
 
 class ContactEstimator():
