@@ -1,6 +1,6 @@
 import numpy as np
 from numpy.polynomial import Polynomial
-from bolt_estimator.utils.Utils import Sinus, Cosinus, Exp
+from bolt_estimator.utils.utils import Sinus, Cosinus, Exp
 
 
 
