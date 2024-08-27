@@ -5,13 +5,17 @@
 
 
 
-### What is this Git ?
+### About is this Git
 
 
 This Git contains the code of a speed, position, attitude and contact estimator, to be implemented on bipedal robot Bolt.
 
+### Install
 
-### What is Bolt ?
+This code can be install as an editable pip package. In the cloned directory _Bolt-robot-Estimator_, run the command
+> $ pip install -e .
+
+### Bolt
 
 
 Bolt is a 6-DOF robot developed by the Open Dynamic Robot Initiative (ODRI)[https://github.com/open-dynamic-robot-initiative/open_robot_actuator_hardware/blob/master/mechanics/biped_6dof_v1/README.md].
@@ -20,14 +24,29 @@ It is a bipedal variant of Solo-12 quadruped robot.
 Its main function is to serve as a developpment platform for reasearch purposes. 
 
 
-### Where to find additionnal ressources linked to this ?
+### Dependencies
+
+This code requires the following python libraries :
+
+1. numpy
+2. matplotlib
+3. pinocchio
+
+It was initially tested with : 
+
+- python 3.12
+- numpy 1.26
+- matplotlib 3.8
+- pinocchio 2.7
+
+### Additionnal ressources linked to this
 
 Here : [LAAS Github](https://github.com/Gepetto/Bolt-Robot-TechnicalDoc)
 
 Or there : [personnal Github](https://github.com/nnniels/Bolt-Robot-TechnicalDoc)
 
 
-### Was this code implemented ?
+### Implementation and tests
 
 
 This code was tested in simulation and briefly in real-life.
